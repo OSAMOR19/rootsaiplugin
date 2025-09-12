@@ -9,6 +9,7 @@ import SessionKeyModal from "@/components/SessionKeyModal"
 import SearchInput from "@/components/SearchInput"
 import GradientButton from "@/components/GradientButton"
 import ThemeToggle from "@/components/ThemeToggle"
+import AudioListener from "@/components/AudioListener"
 import { useRouter } from "next/navigation"
 
 export default function CapturePage() {
@@ -152,7 +153,7 @@ export default function CapturePage() {
       </motion.header>
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center min-h-[calc(100vh-120px)] px-6">
+      <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center min-h-[calc(100vh-200px)] px-6 pb-16">
         {/* Left Side - Search Input */}
         <motion.div
           className="w-full lg:w-1/3 lg:pr-12 mb-8 lg:mb-0"
@@ -211,6 +212,25 @@ export default function CapturePage() {
           </div>
         </motion.div>
       </div>
+
+      {/* RootAI Audio Listener Section */}
+      <motion.div
+        className="relative z-10 py-16 px-6 bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.8 }}
+      >
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent mb-4">
+            RootAI Audio Analysis
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+            Let RootAI listen to your environment and recommend perfect Afrobeat drum loops
+          </p>
+          
+          <AudioListener />
+        </div>
+      </motion.div>
 
       {/* Session Key Modal */}
       <SessionKeyModal

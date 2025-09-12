@@ -94,7 +94,7 @@ function ResultsContent() {
               <h1 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
                 {query || "Audio Analysis"}
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 {filteredSamples.length} Afrobeat drum loops found • Drag to your DAW
                 {currentlyPlaying && (
                   <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
@@ -106,7 +106,7 @@ function ResultsContent() {
                     Playing
                   </span>
                 )}
-              </p>
+              </div>
             </div>
           </div>
 
@@ -193,6 +193,7 @@ function ResultsContent() {
               isPlaying={currentlyPlaying === sample.id}
               onPlayPause={() => handlePlayPause(sample.id)}
               index={index}
+              audioUrl={sample.audioUrl}
             />
           ))}
         </div>

@@ -88,10 +88,13 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     if (!audioRef.current) return
 
     try {
+      console.log('Setting audio source:', audioUrl)
       audioRef.current.src = audioUrl
       await audioRef.current.load()
+      console.log('Audio loaded successfully')
     } catch (error) {
       console.error('Error loading audio:', error)
+      throw error
     }
   }, [])
 
@@ -100,12 +103,25 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
     try {
       if (audioUrl && audioRef.current.src !== audioUrl) {
+        console.log('Loading audio:', audioUrl)
         await loadAudio(audioUrl)
       }
       
+      console.log('Playing audio...')
       await audioRef.current.play()
+      console.log('Audio started playing')
     } catch (error) {
       console.error('Error playing audio:', error)
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          alert('Audio autoplay is blocked. Please click the play button again.')
+        } else if (error.name === 'NotSupportedError') {
+          alert('Audio format not supported or file not found.')
+        } else {
+          alert(`Audio error: ${error.message}`)
+        }
+      }
+      throw error
     }
   }, [loadAudio])
 

@@ -26,6 +26,7 @@ interface DraggableSampleProps {
 export default function DraggableSample({ sample, isPlaying, onPlayPause, index, audioUrl }: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
   
   // Use the audio player hook for real audio playback
   const { audioState, play, pause, stop } = useAudioPlayer()
@@ -33,11 +34,23 @@ export default function DraggableSample({ sample, isPlaying, onPlayPause, index,
   // Sync the audio player state with the component state
   useEffect(() => {
     if (audioUrl && isPlaying && !audioState.isPlaying) {
-      play(audioUrl)
+      console.log('Attempting to play audio:', audioUrl)
+      setHasStarted(true)
+      play(audioUrl).catch(error => {
+        console.error('Error playing audio:', error)
+        alert('Error playing audio. Please check if the file exists and try again.')
+      })
     } else if (!isPlaying && audioState.isPlaying) {
       pause()
     }
   }, [isPlaying, audioUrl, audioState.isPlaying, play, pause])
+
+  // Reset hasStarted when audio ends
+  useEffect(() => {
+    if (audioState.duration > 0 && audioState.currentTime >= audioState.duration) {
+      setHasStarted(false)
+    }
+  }, [audioState.duration, audioState.currentTime])
   
   // Use real audio progress if available, otherwise use mock progress
   const currentProgress = audioUrl ? audioState.progress : (isPlaying ? 50 : 0)
@@ -143,99 +156,85 @@ export default function DraggableSample({ sample, isPlaying, onPlayPause, index,
       onDragStart={(e) => handleDragStart(e as any)}
       onDragEnd={handleDragEnd}
     >
-      {/* Progress bar in center of card */}
-      {isPlaying && (
+      {/* Waveform progress bar in center of card */}
+      {hasStarted && (
         <motion.div
-          className="absolute w-64 h-4 bg-gray-800/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg overflow-hidden z-20 border border-gray-600/50 shadow-lg"
+          className="absolute w-64 h-8 bg-gray-300/20 dark:bg-gray-600/20 rounded-lg overflow-hidden"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
           style={{
-            left: '50%',
+            left: '30%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
-            zIndex: 20
+            zIndex: 10
           }}
         >
-            {/* Background track with subtle grid */}
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-700/50 to-gray-600/50">
-              <div className="absolute inset-0 opacity-20">
-                <svg className="w-full h-full" viewBox="0 0 100 16" preserveAspectRatio="none">
-                  <defs>
-                    <pattern id="grid" x="0" y="0" width="10" height="16" patternUnits="userSpaceOnUse">
-                      <line x1="0" y1="0" x2="0" y2="16" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5"/>
-                      <line x1="0" y1="8" x2="10" y2="8" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5"/>
-                    </pattern>
-                  </defs>
-                  <rect width="100" height="16" fill="url(#grid)" />
-                </svg>
-              </div>
+          {/* Background waveform */}
+          <div className="absolute inset-0 flex items-center justify-center px-2">
+            <div className="flex items-end space-x-1 h-6 w-full">
+              {sample.waveform.slice(0, 40).map((height: number, i: number) => (
+                <motion.div
+                  key={i}
+                  className="w-0.5 bg-gray-400 dark:bg-gray-500 rounded-full"
+                  style={{ height: `${Math.max(2, height * 0.3)}px` }}
+                  animate={
+                    isPlaying
+                      ? {
+                          scaleY: [1, 1.2, 1],
+                          opacity: [0.6, 1, 0.6],
+                        }
+                      : {}
+                  }
+                  transition={{
+                    duration: 0.8,
+                    repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
+                    delay: i * 0.02,
+                  }}
+                />
+              ))}
             </div>
+          </div>
 
-            {/* Progress fill with audio waveform style */}
-            <motion.div
-              className="h-full bg-gradient-to-r from-green-500 via-green-400 to-green-500 rounded-lg relative overflow-hidden"
-              initial={{ width: "0%" }}
-              animate={{ width: `${currentProgress}%` }}
-              transition={{
-                duration: audioUrl ? 0.1 : 8,
-                ease: "linear",
-                repeat: audioUrl ? 0 : Number.POSITIVE_INFINITY,
-              }}
-            >
-              {/* Audio waveform visualization */}
-              <div className="absolute inset-0 flex items-center justify-center px-1">
-                <div className="flex items-end space-x-0.5 h-2 w-full">
-                  {sample.waveform.slice(0, 20).map((height: number, i: number) => (
-                    <motion.div
-                      key={i}
-                      className="w-0.5 bg-white/80 rounded-full"
-                      style={{ height: `${Math.max(2, height * 0.4)}px` }}
-                      animate={
-                        isPlaying
-                          ? {
-                              scaleY: [1, 1.3, 1],
-                              opacity: [0.7, 1, 0.7],
-                            }
-                          : {}
-                      }
-                      transition={{
-                        duration: 0.8,
-                        repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
-                        delay: i * 0.04,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Glowing edge effect */}
-              <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-r from-transparent to-white/60 rounded-r-lg" />
-              
-              {/* Time indicator dots */}
-              <div className="absolute inset-0 flex items-center justify-between px-2">
-                {[...Array(5)].map((_, i) => (
-                  <div
+          {/* Progress fill with waveform */}
+          <motion.div
+            className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-lg relative overflow-hidden"
+            initial={{ width: "0%" }}
+            animate={{ width: `${currentProgress}%` }}
+            transition={{
+              duration: audioUrl ? 0.1 : 8,
+              ease: "linear",
+              repeat: audioUrl ? 0 : Number.POSITIVE_INFINITY,
+            }}
+          >
+            {/* Active waveform */}
+            <div className="absolute inset-0 flex items-center justify-center px-2">
+              <div className="flex items-end space-x-1 h-6 w-full">
+                {sample.waveform.slice(0, 40).map((height: number, i: number) => (
+                  <motion.div
                     key={i}
-                    className="w-0.5 h-2 bg-white/40 rounded-full"
+                    className="w-0.5 bg-white rounded-full"
+                    style={{ height: `${Math.max(2, height * 0.3)}px` }}
+                    animate={
+                      isPlaying
+                        ? {
+                            scaleY: [1, 1.3, 1],
+                            opacity: [0.8, 1, 0.8],
+                          }
+                        : {}
+                    }
+                    transition={{
+                      duration: 0.6,
+                      repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
+                      delay: i * 0.02,
+                    }}
                   />
                 ))}
               </div>
-            </motion.div>
-
-            {/* Playhead indicator */}
-            <motion.div
-              className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
-              initial={{ left: "0%" }}
-              animate={{ left: `${currentProgress}%` }}
-              transition={{
-                duration: audioUrl ? 0.1 : 8,
-                ease: "linear",
-                repeat: audioUrl ? 0 : Number.POSITIVE_INFINITY,
-              }}
-            />
+            </div>
           </motion.div>
-        )}
+        </motion.div>
+      )}
 
       <div className="flex items-center p-4 space-x-4">
         {/* Drag Handle */}
@@ -300,7 +299,7 @@ export default function DraggableSample({ sample, isPlaying, onPlayPause, index,
         </div>
 
         {/* Parameters */}
-        <div className="flex-shrink-0 grid grid-cols-3 gap-3 text-xs">
+        <div className="flex-shrink-0 grid grid-cols-3 gap-3 text-xs relative z-20">
           <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px]">
             <div className="text-gray-600 dark:text-gray-400 text-xs">TYPE</div>
             <div className="text-green-600 dark:text-green-400 font-mono font-semibold text-[10px] capitalize">{sample.category?.replace(' & ', '&') || 'Drums'}</div>
@@ -316,7 +315,7 @@ export default function DraggableSample({ sample, isPlaying, onPlayPause, index,
         </div>
 
         {/* Controls */}
-        <div className="flex-shrink-0 flex items-center space-x-2">
+        <div className="flex-shrink-0 flex items-center space-x-2 relative z-20">
           <motion.button
             onClick={onPlayPause}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
