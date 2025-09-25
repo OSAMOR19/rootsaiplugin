@@ -204,23 +204,23 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)
           `,
           boxShadow: `
-            inset 0 0 0 1px rgba(255, 255, 255, 0.3),
-            inset 0 0 60px rgba(255, 255, 255, 0.1),
-            inset 0 0 0 8px rgba(0, 0, 0, 0.02),
-            0 20px 60px rgba(0, 0, 0, 0.15),
-            0 8px 25px rgba(0, 0, 0, 0.1),
-            0 0 0 1px rgba(0, 0, 0, 0.05)
-          `,
+              inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+              inset 0 0 60px rgba(255, 255, 255, 0.1),
+              inset 0 0 0 8px rgba(0, 0, 0, 0.02),
+              0 20px 60px rgba(0, 0, 0, 0.15),
+              0 8px 25px rgba(0, 0, 0, 0.1),
+              0 0 0 1px rgba(0, 0, 0, 0.05)
+            `,
         }}
       >
         {/* Rotating disc pattern when recording */}
         {(isRecording || isProcessing) && (
-          <motion.div
+                <motion.div
             className="absolute inset-4 rounded-full"
             animate={{ rotate: 360 }}
-            transition={{
+                  transition={{
               duration: 4,
-              repeat: Number.POSITIVE_INFINITY,
+                    repeat: Number.POSITIVE_INFINITY,
               ease: "linear",
             }}
             style={{
@@ -262,7 +262,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                   ? "bg-gradient-to-br from-red-500 to-red-700"
                   : isProcessing
                     ? "bg-gradient-to-br from-yellow-500 to-yellow-700"
-                    : "bg-gradient-to-br from-green-500 to-green-700"
+                  : "bg-gradient-to-br from-green-500 to-green-700"
             } shadow-2xl`}
             whileHover={{ scale: 1.1 }}
             animate={isRecording ? { scale: [1, 1.1, 1] } : {}}
@@ -272,7 +272,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
               isPlayingRecording ? (
                 <Square className="w-8 h-8 text-white" />
               ) : (
-                <Play className="w-10 h-10 text-white ml-1" />
+              <Play className="w-10 h-10 text-white ml-1" />
               )
             ) : isRecording ? (
               <MicOff className="w-8 h-8 text-white" />
@@ -299,7 +299,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                     ? "PLAYING RECORDING • LISTEN TO WHAT WAS CAPTURED • "
                     : "CLICK TO PLAY • LISTEN TO YOUR RECORDING • CLICK TO PLAY • "
                   : hasListened
-                    ? "AUDIO ANALYZED • SAMPLES READY • AUDIO ANALYZED • SAMPLES READY • "
+                  ? "AUDIO ANALYZED • SAMPLES READY • AUDIO ANALYZED • SAMPLES READY • "
                     : isRecording
                       ? "RECORDING • LISTENING TO ENVIRONMENT • RECORDING • "
                       : isProcessing
@@ -319,7 +319,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 shadow-inner">
-            <motion.div
+          <motion.div
               className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full shadow-sm"
               initial={{ width: 0 }}
               animate={{ width: `${recordingProgress}%` }}
