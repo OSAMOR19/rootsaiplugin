@@ -3,10 +3,10 @@
 import type React from "react"
 
 import { motion } from "framer-motion"
-import { Play, Pause, Heart, MoreHorizontal, GripVertical } from "lucide-react"
+import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { useAudioPlayer } from "../hooks/useAudioPlayer"
+import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
 
 // Import drum images
 import kickDrumImage from "./images/kickdrum.jpg"
@@ -21,39 +21,101 @@ interface DraggableSampleProps {
   onPlayPause: () => void
   index: number
   audioUrl?: string // Add audio URL prop for real audio files
+  recordedAudioBuffer?: AudioBuffer | null // Add recorded audio buffer for sync playback
+  recordedBPM?: number | null // Add recorded BPM for sync playback
+  syncMode?: boolean // Whether to play in sync mode
 }
 
-export default function DraggableSample({ sample, isPlaying, onPlayPause, index, audioUrl }: DraggableSampleProps) {
+export default function DraggableSample({ 
+  sample, 
+  isPlaying, 
+  onPlayPause, 
+  index, 
+  audioUrl, 
+  recordedAudioBuffer, 
+  recordedBPM, 
+  syncMode = false 
+}: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
   
-  // Use the audio player hook for real audio playback
-  const { audioState, play, pause, stop } = useAudioPlayer()
-  
-  // Sync the audio player state with the component state
+  // Load audio buffer when component mounts
   useEffect(() => {
-    if (audioUrl && isPlaying && !audioState.isPlaying) {
-      console.log('Attempting to play audio:', audioUrl)
-      setHasStarted(true)
-      play(audioUrl).catch(error => {
-        console.error('Error playing audio:', error)
-        alert('Error playing audio. Please check if the file exists and try again.')
-      })
-    } else if (!isPlaying && audioState.isPlaying) {
-      pause()
+    if (audioUrl) {
+      console.log('Loading audio buffer for:', audioUrl)
+      loadAudioBuffer(audioUrl)
+        .then(buffer => {
+          console.log('Successfully loaded audio buffer:', buffer)
+          setAudioBuffer(buffer)
+        })
+        .catch(error => {
+          console.error('Error loading audio buffer for', audioUrl, ':', error)
+          // Try alternative path
+          const altUrl = audioUrl.replace('/audio/', '/public/audio/')
+          console.log('Trying alternative path:', altUrl)
+          loadAudioBuffer(altUrl)
+            .then(buffer => {
+              console.log('Successfully loaded audio buffer with alt path:', buffer)
+              setAudioBuffer(buffer)
+            })
+            .catch(altError => {
+              console.error('Error loading audio buffer with alt path:', altError)
+            })
+        })
     }
-  }, [isPlaying, audioUrl, audioState.isPlaying, play, pause])
+  }, [audioUrl])
+  
+  // Handle play/pause with sync engine
+  useEffect(() => {
+    if (audioBuffer && isPlaying && !hasStarted) {
+      console.log('Playing audio with sync engine:', audioUrl)
+      setHasStarted(true)
+      
+      // Check if we should play in sync mode
+      if (syncMode && recordedAudioBuffer && recordedBPM && sample.bpm) {
+        console.log('Playing in sync mode:', { 
+          recordedBPM, 
+          sampleBPM: sample.bpm, 
+          recordedAudioBufferLength: recordedAudioBuffer.length,
+          audioBufferLength: audioBuffer.length,
+          syncMode: syncMode
+        })
+        syncEngine.syncPlay(recordedAudioBuffer, audioBuffer, sample.bpm, { volume: 0.8 })
+          .catch(error => {
+            console.error('Error in sync playback:', error)
+            // Fallback to regular playback
+            syncEngine.playAudioBuffer(audioBuffer, { volume: 0.8 })
+          })
+      } else {
+        console.log('Playing in regular mode:', { 
+          syncMode, 
+          hasRecordedAudioBuffer: !!recordedAudioBuffer, 
+          recordedBPM, 
+          sampleBPM: sample.bpm 
+        })
+        // Regular playback
+        syncEngine.playAudioBuffer(audioBuffer, { volume: 0.8 })
+      }
+    } else if (!isPlaying && hasStarted) {
+      syncEngine.stopAll()
+      setHasStarted(false)
+    }
+  }, [isPlaying, audioBuffer, hasStarted, audioUrl, syncMode, recordedAudioBuffer, recordedBPM, sample.bpm])
 
   // Reset hasStarted when audio ends
   useEffect(() => {
-    if (audioState.duration > 0 && audioState.currentTime >= audioState.duration) {
-      setHasStarted(false)
+    // Cleanup effect for sync engine
+    return () => {
+      if (hasStarted) {
+        syncEngine.stopAll()
+      }
     }
-  }, [audioState.duration, audioState.currentTime])
+  }, [hasStarted])
   
   // Use real audio progress if available, otherwise use mock progress
-  const currentProgress = audioUrl ? audioState.progress : (isPlaying ? 50 : 0)
+  const currentProgress = audioUrl ? (hasStarted ? 50 : 0) : (isPlaying ? 50 : 0)
 
   // Function to get the appropriate image for each drum type
   const getDrumImage = (category: string) => {
@@ -284,7 +346,15 @@ export default function DraggableSample({ sample, isPlaying, onPlayPause, index,
 
         {/* Sample Info */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-1">{sample.name}</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-1 flex items-center space-x-2">
+            <span>{sample.name}</span>
+            {syncMode && recordedAudioBuffer && (
+              <div className="flex items-center space-x-1">
+                <Volume2 className="w-3 h-3 text-green-500" />
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium">SYNC</span>
+              </div>
+            )}
+          </h3>
           <p className="text-xs text-gray-600 dark:text-gray-400 truncate mb-2">{sample.artist}</p>
 
           {/* Tags */}

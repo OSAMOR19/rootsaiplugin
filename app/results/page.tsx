@@ -6,13 +6,18 @@ import { ArrowLeft, Volume2, Search } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import DraggableSample from "@/components/DraggableSample"
 import DragDropZone from "@/components/DragDropZone"
+import SyncPlayback from "@/components/SyncPlayback"
 import { mockSamples } from "@/lib/mockData"
+import { blobToAudioBuffer, detectBPM, syncEngine } from "@/lib/syncEngine"
 
 function ResultsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const query = searchParams.get("query") || ""
   const sessionKey = searchParams.get("key") || "F MAJOR"
+  const detectedBPM = searchParams.get("bpm")
+  const detectedKey = searchParams.get("detectedKey")
+  const recommendationsParam = searchParams.get("recommendations")
 
   const [samples, setSamples] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,16 +25,78 @@ function ResultsContent() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [volume, setVolume] = useState(75)
   const [searchFilter, setSearchFilter] = useState("")
+  const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
+  const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
+  const [syncMode, setSyncMode] = useState(true) // Default to sync mode for audio analysis results
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSamples(mockSamples)
+      // If we have recommendations from audio analysis, use those
+      if (recommendationsParam) {
+        try {
+          const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
+          // Convert recommendations to sample format
+          const audioAnalysisSamples = recommendations.map((rec: any, index: number) => ({
+            id: `audio-analysis-${index}`,
+            name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+            artist: 'Audio Analysis Match',
+            category: 'audio-analysis',
+            bpm: rec.bpm,
+            key: rec.key,
+            audioUrl: rec.url,
+            imageUrl: '/placeholder.jpg',
+            duration: '4 bars',
+            tags: ['audio-analysis', 'matching-bpm', 'matching-key'],
+            waveform: Array.from({ length: 50 }, () => Math.random() * 100) // Generate random waveform data
+          }))
+          setSamples(audioAnalysisSamples)
+          
+          // Set recorded BPM from URL params
+          if (detectedBPM) {
+            setRecordedBPM(parseInt(detectedBPM))
+          }
+          
+          // Load recorded audio buffer from localStorage
+          try {
+            const audioDataStr = localStorage.getItem('recordedAudioData')
+            
+            if (audioDataStr) {
+              const compressedData = JSON.parse(audioDataStr)
+              
+              if (compressedData.data && compressedData.data.length > 0) {
+                // Upsample back to original rate
+                const upsampledData = new Float32Array(compressedData.originalLength)
+                for (let i = 0; i < compressedData.data.length; i++) {
+                  for (let j = 0; j < compressedData.downsampleFactor; j++) {
+                    upsampledData[i * compressedData.downsampleFactor + j] = compressedData.data[i]
+                  }
+                }
+                
+                // Recreate AudioBuffer
+                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+                const audioBuffer = audioContext.createBuffer(1, upsampledData.length, compressedData.sampleRate)
+                audioBuffer.copyToChannel(upsampledData, 0)
+                
+                setRecordedAudioBuffer(audioBuffer)
+              }
+            }
+          } catch (error) {
+            console.error('Error loading recorded audio buffer:', error)
+          }
+        } catch (error) {
+          console.error('Error parsing recommendations:', error)
+          setSamples(mockSamples)
+        }
+      } else {
+        // Fallback to mock samples for search-based results
+        setSamples(mockSamples)
+      }
       setLoading(false)
     }, 1500)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, recommendationsParam, detectedBPM])
 
   const handlePlayPause = (sampleId: string) => {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
@@ -92,19 +159,37 @@ function ResultsContent() {
             </motion.button>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
-                {query || "Audio Analysis"}
+                {recommendationsParam ? "Audio Analysis Results" : (query || "Search Results")}
               </h1>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {filteredSamples.length} Afrobeat drum loops found • Drag to your DAW
-                {currentlyPlaying && (
-                  <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
-                    <motion.div
-                      className="w-2 h-2 bg-green-500 rounded-full mr-2"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                    />
-                    Playing
-                  </span>
+                {recommendationsParam ? (
+                  <>
+                    {filteredSamples.length} matching Afrobeat drum loops • Detected: {detectedBPM} BPM, {detectedKey} key
+                    {currentlyPlaying && (
+                      <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
+                        <motion.div
+                          className="w-2 h-2 bg-green-500 rounded-full mr-2"
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+                        />
+                        Playing
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {filteredSamples.length} Afrobeat drum loops found • Drag to your DAW
+                    {currentlyPlaying && (
+                      <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
+                        <motion.div
+                          className="w-2 h-2 bg-green-500 rounded-full mr-2"
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+                        />
+                        Playing
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -142,49 +227,57 @@ function ResultsContent() {
               <div className="text-xs text-gray-600 dark:text-gray-400">SESSION KEY</div>
               <div className="font-semibold text-green-600 dark:text-green-400">{sessionKey}</div>
             </div>
+
+            {/* Sync Mode Toggle - Only show for audio analysis results */}
+            {recommendationsParam && recordedAudioBuffer && (
+              <motion.button
+                onClick={() => setSyncMode(!syncMode)}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all ${
+                  syncMode
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600'
+                }`}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Volume2 className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {syncMode ? 'Sync ON' : 'Sync OFF'}
+                </span>
+              </motion.button>
+            )}
           </div>
         </div>
 
-        {/* Category Tabs */}
-        <div className="px-4 pb-4">
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-x-auto">
-            {categories.map((category) => {
-              const categoryKey = category.toLowerCase()
-              const sampleCount = samples.filter(sample => 
-                categoryKey === "all" ? true : sample.category === categoryKey
-              ).length
-              
-              return (
-                <motion.button
-                  key={category}
-                  onClick={() => setSelectedCategory(categoryKey)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                    selectedCategory === categoryKey
-                      ? "bg-green-500 text-white shadow-lg"
-                      : "text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>{category}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                      selectedCategory === categoryKey
-                        ? "bg-white/20 text-white"
-                        : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400"
-                    }`}>
-                      {sampleCount}
-                    </span>
-                  </div>
-                </motion.button>
-              )
-            })}
-          </div>
-        </div>
       </motion.header>
 
       {/* Sample List - Row Layout */}
       <div className="p-6">
+        {/* Sync Playback Section for Audio Analysis Results */}
+        {recommendationsParam && recordedBPM && samples.length > 0 && (
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
+              Sync Playback - Perfect Tempo Match
+            </h3>
+            <div className="space-y-4">
+              {samples.slice(0, 3).map((sample, index) => (
+                <SyncPlayback
+                  key={sample.id}
+                  recordedAudioBuffer={recordedAudioBuffer}
+                  recordedBPM={recordedBPM}
+                  sampleUrl={sample.audioUrl}
+                  sampleBPM={sample.bpm}
+                  sampleName={sample.name}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         <div className="space-y-3">
           {filteredSamples.map((sample, index) => (
             <DraggableSample
@@ -194,6 +287,9 @@ function ResultsContent() {
               onPlayPause={() => handlePlayPause(sample.id)}
               index={index}
               audioUrl={sample.audioUrl}
+              recordedAudioBuffer={recordedAudioBuffer}
+              recordedBPM={recordedBPM}
+              syncMode={recommendationsParam ? syncMode : false}
             />
           ))}
         </div>

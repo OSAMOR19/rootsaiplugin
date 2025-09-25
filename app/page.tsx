@@ -9,7 +9,6 @@ import SessionKeyModal from "@/components/SessionKeyModal"
 import SearchInput from "@/components/SearchInput"
 import GradientButton from "@/components/GradientButton"
 import ThemeToggle from "@/components/ThemeToggle"
-import AudioListener from "@/components/AudioListener"
 import { useRouter } from "next/navigation"
 
 export default function CapturePage() {
@@ -18,30 +17,59 @@ export default function CapturePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sessionKey, setSessionKey] = useState("F MAJOR")
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
+  const [analysisData, setAnalysisData] = useState<{ detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer } | null>(null)
   const router = useRouter()
 
   const handleListen = () => {
-    if (isListening) {
-      // Stop listening
-      setIsListening(false)
-      // Reset to initial state - don't set hasListened
-    } else {
-      // Start listening
-      setIsListening(true)
+    setIsListening(true)
+  }
 
-      // Set a timeout that can be cleared
-      const timeoutId = setTimeout(() => {
-        setIsListening(false)
-        setHasListened(true)
-        setTimeout(() => {
-          router.push(
-            `/results?query=${encodeURIComponent(searchQuery || "afrobeat")}&key=${encodeURIComponent(sessionKey)}`,
-          )
-        }, 1000)
-      }, 8000)
+  const handleAnalysisComplete = (data: { detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer }) => {
+    setAnalysisData(data)
+    setHasListened(true)
+    setIsListening(false)
+    // Don't auto-navigate - let user decide when to go to results
+  }
 
-      // Store timeout ID so we can clear it if user stops manually
-      // You might want to use useRef for this in a real implementation
+  const handleGoToResults = () => {
+    if (analysisData) {
+      // Store recorded audio buffer in localStorage for results page
+      if (analysisData.recordedAudioBuffer) {
+        try {
+          // Convert audio buffer to a more compact format
+          const audioData = analysisData.recordedAudioBuffer.getChannelData(0)
+          const sampleRate = analysisData.recordedAudioBuffer.sampleRate
+          
+          // Downsample to reduce size (take every 2nd sample for better quality)
+          const downsampledData = []
+          for (let i = 0; i < audioData.length; i += 2) {
+            downsampledData.push(audioData[i])
+          }
+          
+          // Convert to a more efficient format with better compression
+          const compressedData = {
+            data: Array.from(downsampledData),
+            sampleRate: sampleRate,
+            downsampleFactor: 2, // Reduced from 8 to 2 for better quality
+            originalLength: audioData.length
+          }
+          
+          localStorage.setItem('recordedAudioData', JSON.stringify(compressedData))
+        } catch (error) {
+          console.error('Error storing audio data:', error)
+          // Fallback: store minimal data
+          localStorage.setItem('recordedAudioData', JSON.stringify({
+            data: [],
+            sampleRate: analysisData.recordedAudioBuffer.sampleRate,
+            downsampleFactor: 1,
+            originalLength: 0
+          }))
+        }
+      }
+      
+      router.push(
+        `/results?query=${encodeURIComponent(searchQuery || "audio analysis")}&key=${encodeURIComponent(sessionKey)}&bpm=${analysisData.detectedBPM}&detectedKey=${analysisData.detectedKey}&recommendations=${encodeURIComponent(JSON.stringify(analysisData.recommendations))}`
+      )
     }
   }
 
@@ -185,7 +213,8 @@ export default function CapturePage() {
             isListening={isListening}
             hasListened={hasListened}
             onListen={handleListen}
-            disabled={false} // Remove the hasListened disable condition
+            disabled={false}
+            onAnalysisComplete={handleAnalysisComplete}
           />
         </motion.div>
 
@@ -196,8 +225,8 @@ export default function CapturePage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          <GradientButton onClick={handleSearch} disabled={isListening} className="w-full lg:w-auto">
-            {isListening ? "LISTENING..." : "FIND SAMPLES"}
+          <GradientButton onClick={hasListened ? handleGoToResults : handleSearch} disabled={isListening} className="w-full lg:w-auto">
+            {isListening ? "LISTENING..." : hasListened ? "VIEW RESULTS" : "FIND SAMPLES"}
           </GradientButton>
           <div className="mt-4">
             <motion.button
@@ -213,24 +242,6 @@ export default function CapturePage() {
         </motion.div>
       </div>
 
-      {/* RootAI Audio Listener Section */}
-      <motion.div
-        className="relative z-10 py-16 px-6 bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm"
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.8 }}
-      >
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent mb-4">
-            RootAI Audio Analysis
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-            Let RootAI listen to your environment and recommend perfect Afrobeat drum loops
-          </p>
-          
-          <AudioListener />
-        </div>
-      </motion.div>
 
       {/* Session Key Modal */}
       <SessionKeyModal
