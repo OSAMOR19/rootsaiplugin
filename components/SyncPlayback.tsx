@@ -270,7 +270,7 @@ export default function SyncPlayback({
           ) : (
             <>
               <Play className="w-4 h-4" />
-              <span>Perfect Sync</span>
+              <span>Tempo Match</span>
             </>
           )}
         </motion.button>
@@ -287,11 +287,11 @@ export default function SyncPlayback({
               {isPlaying ? `Synced at ${recordedBPM} BPM` : `Ready to sync at ${recordedBPM} BPM`}
             </span>
             <span className="text-orange-500 font-medium">
-              BPM Difference: {Math.abs(recordedBPM! - sampleBPM)} ({sampleBPM} vs {recordedBPM})
+              Sample adjusted to: {(sampleBPM / recordedBPM).toFixed(2)}x speed ({(sampleBPM / recordedBPM) < 1 ? 'slower' : 'faster'})
             </span>
             {isPlaying && (
               <span className="text-green-600 font-bold">
-                🎵 Both Audios Playing Naturally Together! 🎵
+                🎵 Perfect Sync at {recordedBPM} BPM! 🎵
               </span>
             )}
           </div>

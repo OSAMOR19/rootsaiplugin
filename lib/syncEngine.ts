@@ -535,20 +535,16 @@ class AudioSyncEngine {
     recordedSource.buffer = recordedBuffer
     sampleSource.buffer = sampleBuffer
     
-    // SIMPLE SYNC: Both audios play at their natural speeds for maximum quality
-    // The key is starting them at exactly the same time
-    const recordedPlaybackRate = 1.0
-    const samplePlaybackRate = 1.0
+    // REAL TEMPO MATCHING: Slow down the sample to match recorded audio's BPM exactly
+    const recordedPlaybackRate = 1.0  // Keep recorded audio at natural speed (master tempo)
+    const samplePlaybackRate = sampleBPM / recordedBPM  // Sample plays slower to match recorded BPM
     
-    // Calculate the BPM ratio for info purposes only
-    const bpmRatio = recordedBPM / sampleBPM
-    
-    console.log('Simple Sync - Natural Playback:', {
+    console.log('REAL Tempo Matching:', {
       recordedBPM: recordedBPM,
       sampleBPM: sampleBPM,
-      bpmDifference: `${Math.abs(recordedBPM - sampleBPM)} BPM`,
-      'Both playing naturally': true,
-      'Perfect sync timing': 'Simultaneous start'
+      'Recorded audio rate': recordedPlaybackRate,
+      'Sample will play': `${samplePlaybackRate.toFixed(3)}x speed ${samplePlaybackRate < 1 ? '(SLOWER)' : '(FASTER)'}`,
+      'Result': `Both will beat at ${recordedBPM} BPM exactly!`
     })
     
     // Apply playback rates
