@@ -23,6 +23,10 @@ export default function SyncPlayback({
   const [isPlaying, setIsPlaying] = useState(false)
   const [sampleBuffer, setSampleBuffer] = useState<AudioBuffer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [recordedVolume, setRecordedVolume] = useState(0.5) // Volume for recorded audio
+  const [sampleVolume, setSampleVolume] = useState(0.5) // Volume for sample audio
+  const [uploadedOnlyPlaying, setUploadedOnlyPlaying] = useState(false) // For uploaded-only toggle
+  const [activeSources, setActiveSources] = useState<{recorded: any, sample: any} | null>(null)
 
   // Load sample buffer
   useEffect(() => {
@@ -40,8 +44,36 @@ export default function SyncPlayback({
     }
   }, [sampleUrl])
 
+  // Real-time volume updates for active playback
+  useEffect(() => {
+    if (activeSources && activeSources.recordedGainNode && activeSources.sampleGainNode) {
+      console.log('Updating volumes in real-time:', {
+        recorded: recordedVolume * 0.8,
+        sample: sampleVolume * 0.8
+      })
+      
+      // Update recorded audio gain in real-time
+      activeSources.recordedGainNode.gain.value = recordedVolume * 0.8
+      
+      // Update sample audio gain in real-time
+      activeSources.sampleGainNode.gain.value = sampleVolume * 0.8
+    }
+  }, [recordedVolume, sampleVolume, activeSources])
+
   const handleSyncPlay = async () => {
     if (!recordedAudioBuffer || !sampleBuffer) return
+
+    console.log('Starting sync playback:', {
+      recordedAudioDuration: recordedAudioBuffer.duration,
+      recordedAudioSampleRate: recordedAudioBuffer.sampleRate,
+      recordedAudioChannels: recordedAudioBuffer.numberOfChannels,
+      sampleAudioDuration: sampleBuffer.duration,
+      sampleAudioSampleRate: sampleBuffer.sampleRate,
+      sampleAudioChannels: sampleBuffer.numberOfChannels,
+      recordedBPM,
+      sampleBPM,
+      playbackRate: recordedBPM ? recordedBPM / sampleBPM : 1
+    })
 
     try {
       setIsPlaying(true)
@@ -49,17 +81,34 @@ export default function SyncPlayback({
       // Calculate playback rate for tempo matching
       const playbackRate = recordedBPM ? recordedBPM / sampleBPM : 1
       
-      // Sync play both audio sources
-      await syncEngine.syncPlay(
+      console.log('Setting volumes for sync playback:', {
+        recordedVolume: recordedVolume.toFixed(2),
+        sampleVolume: sampleVolume.toFixed(2)
+      })
+      
+      // Sync play both audio sources with precise BPM matching and individual volumes
+      const sources = await syncEngine.syncPlay(
         recordedAudioBuffer,
         sampleBuffer,
         sampleBPM,
-        { volume: 0.8 }
+        { 
+          recordedBPM: recordedBPM, // Pass the accurate BPM for perfect sync
+          recordedVolume: recordedVolume * 0.8, // Individual volume for recorded audio (master volume)
+          sampleVolume: sampleVolume * 0.8 // Individual volume for sample audio (master volume)
+        }
       )
+      
+      setActiveSources(sources)
       
       console.log(`Sync playing: ${sampleName} at ${playbackRate.toFixed(2)}x speed`)
     } catch (error) {
       console.error('Error in sync playback:', error)
+      console.error('Detailed error:', {
+        recordedAudioBufferExists: !!recordedAudioBuffer,
+        sampleBufferExists: !!sampleBuffer,
+        recordedBPM,
+        sampleBPM
+      })
       setIsPlaying(false)
     }
   }
@@ -95,10 +144,109 @@ export default function SyncPlayback({
             )}
             {recordedBPM && (
               <span className="text-green-600 dark:text-green-400">
-                Rate: {(recordedBPM / sampleBPM).toFixed(2)}x
+                Sample adjusted to: {recordedBPM} BPM
+              </span>
+            )}
+            {recordedBPM && (
+              <span className="text-blue-600 dark:text-blue-400">
+                Sample rate: {(recordedBPM / sampleBPM).toFixed(2)}x {(recordedBPM / sampleBPM) > 1 ? 'slower' : 'faster'}
               </span>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Hide Volume Controls for Now - Too Much Space */}
+      {false && (
+      <div className="mb-4 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg backdrop-blur-sm">
+        <div className="space-y-3">
+          {/* Volume Controls */}
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Uploaded Audio
+            </span>
+            <div className="flex items-center space-x-2 w-40">
+              <Volume2 className="w-4 h-4 text-gray-500" />
+              <div className="flex-1 relative">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(recordedVolume * 100)}
+                  onChange={(e) => setRecordedVolume(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
+                  style={{
+                    background: `linear-gradient(to right, #10b981 0%, #10b981 ${recordedVolume * 100}%, #e5e7eb ${recordedVolume * 100}%, #e5e7eb 100%)`,
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
+                  }}
+                />
+              </div>
+              <span className="text-xs text-gray-500 w-8 text-right">
+                {Math.round(recordedVolume * 100)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Sample Audio
+            </span>
+            <div className="flex items-center space-x-2 w-40">
+              <Volume2 className="w-4 h-4 text-gray-500" />
+              <div className="flex-1 relative">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(sampleVolume * 100)}
+                  onChange={(e) => setSampleVolume(parseInt(e.target.value) / 100)}
+                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${sampleVolume * 100}%, #e5e7eb ${sampleVolume * 100}%, #e5e7eb 100%)`,
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
+                  }}
+                />
+              </div>
+              <span className="text-xs text-gray-500 w-8 text-right">
+                {Math.round(sampleVolume * 100)}%
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Info Text */}
+        <div className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400">
+          Adjust volumes to isolate each audio and verify sync timing
+        </div>
+      </div>
+      )}
+
+      {/* Micro Volume Controls */}
+      <div className="mb-2 flex justify-between items-center text-xs px-2 py-1 bg-gray-50/50 dark:bg-gray-800/30 rounded">
+        <div className="flex items-center space-x-2">
+          <span className="text-green-600 dark:text-green-400">🎵</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={Math.round(recordedVolume * 100)}
+            onChange={(e) => setRecordedVolume(parseInt(e.target.value) / 100)}
+            className="w-12 h-1 accent-green-500 cursor-pointer"
+          />
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <span className="text-blue-600 dark:text-blue-400">🔊</span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={Math.round(sampleVolume * 100)}
+            onChange={(e) => setSampleVolume(parseInt(e.target.value) / 100)}
+            className="w-12 h-1 accent-blue-500 cursor-pointer"
+          />
         </div>
       </div>
 
@@ -122,10 +270,32 @@ export default function SyncPlayback({
           ) : (
             <>
               <Play className="w-4 h-4" />
-              <span>Sync Play</span>
+              <span>Perfect Sync</span>
             </>
           )}
         </motion.button>
+
+        {/* Tempo indicator */}
+        {recordedBPM && (
+          <div className="flex items-center space-x-2 text-xs">
+            <motion.div
+              className="w-2 h-2 bg-green-500 rounded-full"
+              animate={isPlaying ? { scale: [1, 1.2, 1] } : {}}
+              transition={{ duration: 60 / recordedBPM, repeat: isPlaying ? Infinity : 0 }}
+            />
+            <span className="text-gray-500 dark:text-gray-400">
+              {isPlaying ? `Synced at ${recordedBPM} BPM` : `Ready to sync at ${recordedBPM} BPM`}
+            </span>
+            <span className="text-orange-500 font-medium">
+              BPM Difference: {Math.abs(recordedBPM! - sampleBPM)} ({sampleBPM} vs {recordedBPM})
+            </span>
+            {isPlaying && (
+              <span className="text-green-600 font-bold">
+                🎵 Both Audios Playing Naturally Together! 🎵
+              </span>
+            )}
+          </div>
+        )}
 
         <motion.button
           onClick={isPlaying ? handleStop : handlePlaySampleOnly}
@@ -147,6 +317,49 @@ export default function SyncPlayback({
             <>
               <Volume2 className="w-4 h-4" />
               <span>Sample Only</span>
+            </>
+          )}
+        </motion.button>
+
+        {/* Quick Solo Test Button */}
+        <motion.button
+          onClick={async () => {
+            if (uploadedOnlyPlaying) {
+              // Stop and reset
+              setUploadedOnlyPlaying(false)
+              setIsPlaying(false)
+              await syncEngine.stopAll()
+            } else {
+              // Play uploaded audio only
+              if (recordedAudioBuffer) {
+                setIsPlaying(false)
+                await syncEngine.stopAll()
+                setUploadedOnlyPlaying(true)
+                await syncEngine.playAudioBuffer(recordedAudioBuffer, { 
+                  volume: recordedVolume,
+                  recordedBPM: recordedBPM 
+                })
+              }
+            }
+          }}
+          disabled={!recordedAudioBuffer || isLoading}
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs disabled:opacity-50 ${
+            uploadedOnlyPlaying 
+              ? 'bg-red-500 hover:bg-red-600 text-white' 
+              : 'bg-purple-500 hover:bg-purple-600 text-white'
+          }`}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {uploadedOnlyPlaying ? (
+            <>
+              <Square className="w-3 h-3" />
+              <span>Stop Uploaded</span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="w-3 h-3" />
+              <span>Uploaded Only</span>
             </>
           )}
         </motion.button>

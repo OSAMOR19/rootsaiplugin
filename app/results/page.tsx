@@ -32,7 +32,7 @@ function ResultsContent() {
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const loadData = async () => {
       // If we have recommendations from audio analysis, use those
       if (recommendationsParam) {
         try {
@@ -63,21 +63,36 @@ function ResultsContent() {
             const audioDataStr = localStorage.getItem('recordedAudioData')
             
             if (audioDataStr) {
-              const compressedData = JSON.parse(audioDataStr)
+              const storedData = JSON.parse(audioDataStr)
               
-              if (compressedData.data && compressedData.data.length > 0) {
-                // Upsample back to original rate
-                const upsampledData = new Float32Array(compressedData.originalLength)
-                for (let i = 0; i < compressedData.data.length; i++) {
-                  for (let j = 0; j < compressedData.downsampleFactor; j++) {
-                    upsampledData[i * compressedData.downsampleFactor + j] = compressedData.data[i]
-                  }
-                }
+              if (storedData.wavData) {
+                console.log('Loading stored audio data:', {
+                  sampleRate: storedData.sampleRate,
+                  duration: storedData.duration,
+                  numberOfChannels: storedData.numberOfChannels,
+                  length: storedData.length
+                })
                 
-                // Recreate AudioBuffer
+                // Convert base64 back to blob
+                const base64Data = storedData.wavData.split(',')[1]
+                const binaryString = atob(base64Data)
+                const bytes = new Uint8Array(binaryString.length)
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i)
+                }
+                const blob = new Blob([bytes], { type: 'audio/wav' })
+                
+                // Convert blob back to AudioBuffer
                 const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-                const audioBuffer = audioContext.createBuffer(1, upsampledData.length, compressedData.sampleRate)
-                audioBuffer.copyToChannel(upsampledData, 0)
+                const arrayBuffer = await blob.arrayBuffer()
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+                
+                console.log('Reconstructed audio buffer:', {
+                  duration: audioBuffer.duration,
+                  sampleRate: audioBuffer.sampleRate,
+                  numberOfChannels: audioBuffer.numberOfChannels,
+                  length: audioBuffer.length
+                })
                 
                 setRecordedAudioBuffer(audioBuffer)
               }
@@ -94,7 +109,9 @@ function ResultsContent() {
         setSamples(mockSamples)
       }
       setLoading(false)
-    }, 1500)
+    }
+
+    const timer = setTimeout(loadData, 1500)
     return () => clearTimeout(timer)
   }, [query, recommendationsParam, detectedBPM])
 

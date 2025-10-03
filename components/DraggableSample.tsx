@@ -82,7 +82,12 @@ export default function DraggableSample({
           audioBufferLength: audioBuffer.length,
           syncMode: syncMode
         })
-        syncEngine.syncPlay(recordedAudioBuffer, audioBuffer, sample.bpm, { volume: 0.8 })
+        syncEngine.syncPlay(recordedAudioBuffer, audioBuffer, sample.bpm, { 
+          volume: 0.8,
+          recordedBPM: recordedBPM, // Pass accurate BPM for perfect sync
+          recordedVolume: 0.5, // Default recorded audio volume
+          sampleVolume: 0.5 // Default sample volume
+        })
           .catch(error => {
             console.error('Error in sync playback:', error)
             // Fallback to regular playback

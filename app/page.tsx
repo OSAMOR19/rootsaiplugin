@@ -20,6 +20,52 @@ export default function CapturePage() {
   const [analysisData, setAnalysisData] = useState<{ detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer } | null>(null)
   const router = useRouter()
 
+  // Convert AudioBuffer to WAV blob
+  const audioBufferToWavBlob = (audioBuffer: AudioBuffer): Blob => {
+    const length = audioBuffer.length
+    const sampleRate = audioBuffer.sampleRate
+    const numberOfChannels = audioBuffer.numberOfChannels
+    
+    // Create a WAV file header
+    const header = new ArrayBuffer(44)
+    const view = new DataView(header)
+    
+    // WAV file header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i))
+      }
+    }
+    
+    writeString(0, 'RIFF')
+    view.setUint32(4, 36 + length * numberOfChannels * 2, true)
+    writeString(8, 'WAVE')
+    writeString(12, 'fmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, numberOfChannels, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * numberOfChannels * 2, true)
+    view.setUint16(32, numberOfChannels * 2, true)
+    view.setUint16(34, 16, true)
+    writeString(36, 'data')
+    view.setUint32(40, length * numberOfChannels * 2, true)
+    
+    // Convert channels to interleaved audio
+    const audioData = new ArrayBuffer(length * numberOfChannels * 2)
+    const audioView = new Int16Array(audioData)
+    
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel)
+      for (let i = 0; i < length; i++) {
+        const sample = Math.max(-1, Math.min(1, channelData[i]))
+        audioView[i * numberOfChannels + channel] = sample * 32767
+      }
+    }
+    
+    return new Blob([header, audioData], { type: 'audio/wav' })
+  }
+
   const handleListen = () => {
     setIsListening(true)
   }
@@ -37,33 +83,37 @@ export default function CapturePage() {
       // Store recorded audio buffer in localStorage for results page
       if (analysisData.recordedAudioBuffer) {
         try {
-          // Convert audio buffer to a more compact format
-          const audioData = analysisData.recordedAudioBuffer.getChannelData(0)
-          const sampleRate = analysisData.recordedAudioBuffer.sampleRate
+          console.log('Storing audio buffer:', {
+            duration: analysisData.recordedAudioBuffer.duration,
+            sampleRate: analysisData.recordedAudioBuffer.sampleRate,
+            numberOfChannels: analysisData.recordedAudioBuffer.numberOfChannels,
+            length: analysisData.recordedAudioBuffer.length
+          })
           
-          // Downsample to reduce size (take every 2nd sample for better quality)
-          const downsampledData = []
-          for (let i = 0; i < audioData.length; i += 2) {
-            downsampledData.push(audioData[i])
+          // Create WAV file blob for more reliable storage
+          const wavBlob = audioBufferToWavBlob(analysisData.recordedAudioBuffer)
+          
+          // Convert to base64 for localStorage
+          const reader = new FileReader()
+          reader.onload = () => {
+            const storedAudioData = {
+              wavData: reader.result as string,
+              sampleRate: analysisData.recordedAudioBuffer.sampleRate,
+              duration: analysisData.recordedAudioBuffer.duration,
+              numberOfChannels: analysisData.recordedAudioBuffer.numberOfChannels,
+              length: analysisData.recordedAudioBuffer.length
+            }
+            localStorage.setItem('recordedAudioData', JSON.stringify(storedAudioData))
           }
+          reader.readAsDataURL(wavBlob)
           
-          // Convert to a more efficient format with better compression
-          const compressedData = {
-            data: Array.from(downsampledData),
-            sampleRate: sampleRate,
-            downsampleFactor: 2, // Reduced from 8 to 2 for better quality
-            originalLength: audioData.length
-          }
-          
-          localStorage.setItem('recordedAudioData', JSON.stringify(compressedData))
         } catch (error) {
           console.error('Error storing audio data:', error)
-          // Fallback: store minimal data
+          // Store basic info as fallback
           localStorage.setItem('recordedAudioData', JSON.stringify({
-            data: [],
             sampleRate: analysisData.recordedAudioBuffer.sampleRate,
-            downsampleFactor: 1,
-            originalLength: 0
+            duration: analysisData.recordedAudioBuffer.duration,
+            error: true
           }))
         }
       }

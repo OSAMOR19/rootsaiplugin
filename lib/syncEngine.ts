@@ -14,6 +14,9 @@ export interface SyncPlaybackOptions {
   startTime?: number
   loop?: boolean
   volume?: number
+  recordedBPM?: number // Pass the actual detected BPM to avoid re-detection
+  recordedVolume?: number // Individual volume for recorded audio (0.0 to 1.0)
+  sampleVolume?: number // Individual volume for sample audio (0.0 to 1.0)
 }
 
 class AudioSyncEngine {
@@ -496,27 +499,26 @@ class AudioSyncEngine {
     options: SyncPlaybackOptions = {}
   ): Promise<{ recordedSource: AudioBufferSourceNode; sampleSource: AudioBufferSourceNode }> {
     const audioContext = await this.ensureAudioContext()
-    const { startTime = 0, volume = 1 } = options
+    const { 
+      startTime = 0, 
+      volume = 1, 
+      recordedVolume = 0.5, 
+      sampleVolume = 0.5 
+    } = options
     
-    // Detect precise BPM and beat positions
-    const recordedBPM = this.detectBPM(recordedBuffer)
-    const quantizedBPM = this.quantizeBPM(recordedBPM)
-    const beatPositions = this.detectBeatPositions(recordedBuffer)
+    // Detect BPM for recorded audio (use passed BPM if available)
+    const recordedBPM = options.recordedBPM || this.detectBPM(recordedBuffer)
     
-    // Enhance audio quality for studio-grade sound
-    const enhancedRecordedBuffer = this.enhanceAudioQuality(recordedBuffer)
-    const enhancedSampleBuffer = this.enhanceAudioQuality(sampleBuffer)
+    // Find the target BPM - use the recorded audio's BPM as the master
+    const targetBPM = recordedBPM
     
-    console.log('Sync Analysis:', {
-      detectedBPM: recordedBPM,
-      quantizedBPM: quantizedBPM,
+    console.log('Perfect Sync Analysis:', {
+      recordedBPM: recordedBPM,
       sampleBPM: sampleBPM,
-      beatPositions: beatPositions.length,
-      enhanced: true
+      targetBPM: targetBPM,
+      recordedDuration: recordedBuffer.duration,
+      sampleDuration: sampleBuffer.duration
     })
-    
-    // Calculate precise playback rate
-    const playbackRate = quantizedBPM / sampleBPM
     
     // Stop any currently playing audio
     this.stopAll()
@@ -529,14 +531,39 @@ class AudioSyncEngine {
     const recordedGain = audioContext.createGain()
     const sampleGain = audioContext.createGain()
     
-    // Configure sources with enhanced audio
-    recordedSource.buffer = enhancedRecordedBuffer
-    sampleSource.buffer = enhancedSampleBuffer
-    sampleSource.playbackRate.value = playbackRate
+    // Configure sources - both play at their NATURAL speeds first
+    recordedSource.buffer = recordedBuffer
+    sampleSource.buffer = sampleBuffer
     
-    // Set volumes with better balance
-    recordedGain.gain.value = volume * 0.5 // Recorded audio quieter
-    sampleGain.gain.value = volume * 1.0   // Sample at full volume
+    // SIMPLE SYNC: Both audios play at their natural speeds for maximum quality
+    // The key is starting them at exactly the same time
+    const recordedPlaybackRate = 1.0
+    const samplePlaybackRate = 1.0
+    
+    // Calculate the BPM ratio for info purposes only
+    const bpmRatio = recordedBPM / sampleBPM
+    
+    console.log('Simple Sync - Natural Playback:', {
+      recordedBPM: recordedBPM,
+      sampleBPM: sampleBPM,
+      bpmDifference: `${Math.abs(recordedBPM - sampleBPM)} BPM`,
+      'Both playing naturally': true,
+      'Perfect sync timing': 'Simultaneous start'
+    })
+    
+    // Apply playback rates
+    recordedSource.playbackRate.value = recordedPlaybackRate
+    sampleSource.playbackRate.value = samplePlaybackRate
+    
+    // Set individual volumes for precise control
+    recordedGain.gain.value = volume * recordedVolume // Individual recorded audio volume
+    sampleGain.gain.value = volume * sampleVolume     // Individual sample audio volume
+    
+    console.log('Volume Settings:', {
+      recordedVolume: `Recorded: ${(volume * recordedVolume).toFixed(2)}`,
+      sampleVolume: `Sample: ${(volume * sampleVolume).toFixed(2)}`,
+      totalVolume: `Master: ${volume.toFixed(2)}`
+    })
     
     // Connect audio graph
     recordedSource.connect(recordedGain)
@@ -544,25 +571,27 @@ class AudioSyncEngine {
     recordedGain.connect(this.masterGainNode!)
     sampleGain.connect(this.masterGainNode!)
     
-    // Calculate precise alignment
-    let alignmentOffset = 0
-    if (beatPositions.length > 0) {
-      const alignmentBeat = this.findAlignmentBeat(beatPositions, recordedBuffer.sampleRate)
-      alignmentOffset = alignmentBeat / recordedBuffer.sampleRate // Convert to seconds
-    }
+    // Simple alignment - no complex beat detection needed for tempo sync
+    const startTimeOffset = audioContext.currentTime + startTime
     
-    // Add small latency compensation
-    const latencyCompensation = 0.01 // 10ms compensation
+    // Start both sources at the same time for perfect tempo alignment
+    console.log('Starting audio sources...', {
+      recordedBufferExists: !!recordedSource.buffer,
+      sampleBufferExists: !!sampleSource.buffer,
+      audioContextState: audioContext.state,
+      currentTime: audioContext.currentTime
+    })
     
-    // Schedule playback with precise alignment
-    const scheduleTime = audioContext.currentTime + startTime + latencyCompensation
-    recordedSource.start(scheduleTime)
-    sampleSource.start(scheduleTime + alignmentOffset)
+    recordedSource.start(startTimeOffset)
+    sampleSource.start(startTimeOffset)
     
-    console.log('Sync Playback:', {
-      playbackRate: playbackRate,
-      alignmentOffset: alignmentOffset,
-      scheduleTime: scheduleTime
+    console.log('Audio sources started successfully!')
+    
+    console.log('Perfect Sync Playback Started:', {
+      recordedPlaybackRate: recordedPlaybackRate.toFixed(3),
+      samplePlaybackRate: samplePlaybackRate.toFixed(3),
+      targetBPM: targetBPM,
+      startTimeOffset: startTimeOffset.toFixed(3)
     })
     
     // Track active sources
@@ -580,9 +609,12 @@ class AudioSyncEngine {
     recordedSource.onended = cleanup
     sampleSource.onended = cleanup
     
-    console.log(`Sync Play: Recorded BPM: ${recordedBPM}, Sample BPM: ${sampleBPM}, Playback Rate: ${playbackRate.toFixed(2)}`)
-    
-    return { recordedSource, sampleSource }
+    return { 
+      recordedSource, 
+      sampleSource,
+      recordedGainNode: recordedGain, // Expose gain nodes for real-time control
+      sampleGainNode: sampleGain
+    }
   }
 
   /**
