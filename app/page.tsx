@@ -25,6 +25,7 @@ export default function CapturePage() {
   }
 
   const handleAnalysisComplete = (data: { detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer }) => {
+    console.log('Analysis completed on main page:', data)
     setAnalysisData(data)
     setHasListened(true)
     setIsListening(false)

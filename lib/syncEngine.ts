@@ -253,6 +253,171 @@ class AudioSyncEngine {
   }
 
   /**
+   * Enhance audio quality with professional processing
+   */
+  private enhanceAudioQuality(audioBuffer: AudioBuffer): AudioBuffer {
+    const sampleRate = audioBuffer.sampleRate
+    const length = audioBuffer.length
+    const channels = audioBuffer.numberOfChannels
+    
+    // Create enhanced buffer
+    const enhancedBuffer = this.audioContext!.createBuffer(channels, length, sampleRate)
+    
+    for (let channel = 0; channel < channels; channel++) {
+      const inputData = audioBuffer.getChannelData(channel)
+      const outputData = enhancedBuffer.getChannelData(channel)
+      
+      // Apply professional audio enhancement
+      for (let i = 0; i < length; i++) {
+        let sample = inputData[i]
+        
+        // 1. Normalize audio levels
+        sample = Math.max(-1, Math.min(1, sample))
+        
+        // 2. Apply gentle compression (soft limiting)
+        if (Math.abs(sample) > 0.8) {
+          sample = sample > 0 ? 0.8 + (sample - 0.8) * 0.2 : -0.8 + (sample + 0.8) * 0.2
+        }
+        
+        // 3. Apply subtle high-frequency enhancement
+        if (i > 0) {
+          const prevSample = inputData[i - 1]
+          const diff = sample - prevSample
+          sample = sample + diff * 0.1 // Subtle enhancement
+        }
+        
+        // 4. Apply gentle noise gate
+        if (Math.abs(sample) < 0.001) {
+          sample = 0
+        }
+        
+        outputData[i] = sample
+      }
+    }
+    
+    return enhancedBuffer
+  }
+
+  /**
+   * Extract the best 4 bars from uploaded audio
+   * Automatically finds the most interesting/musical section
+   */
+  async extractBest4Bars(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
+    const sampleRate = audioBuffer.sampleRate
+    const channels = audioBuffer.numberOfChannels
+    const fullLength = audioBuffer.length
+    
+    // Detect BPM and calculate duration of 4 bars
+    const detectedBPM = this.detectBPM(audioBuffer)
+    const beatsPerBar = 4
+    const totalBeats = beatsPerBar * 4 // 4 bars
+    const beatsPerSecond = detectedBPM / 60
+    const fourBarsDurationSeconds = totalBeats / beatsPerSecond
+    const fourBarsSampleLength = Math.floor(fourBarsDurationSeconds * sampleRate)
+    
+    console.log('Extracting audio:', {
+      detectedBPM,
+      fourBarsDurationSeconds: fourBarsDurationSeconds.toFixed(2),
+      fourBarsSampleLength,
+      originalLength: fullLength,
+      originalDurationSeconds: (fullLength / sampleRate).toFixed(2)
+    })
+    
+    // If audio is shorter than 4 bars, return the entire audio
+    if (fourBarsSampleLength >= fullLength) {
+      console.log('Audio shorter than 4 bars, returning full audio')
+      return audioBuffer
+    }
+    
+    // Analyze energy/power throughout the audio to find the most interesting section
+    const energyWindowLength = Math.floor(sampleRate * 0.5) // 0.5 second windows
+    const numWindows = Math.floor(fullLength / energyWindowLength)
+    const energyValues = new Float32Array(numWindows)
+    
+    // Calculate energy for each window
+    for (let i = 0; i < numWindows; i++) {
+      const startSample = i * energyWindowLength
+      const endSample = Math.min(startSample + energyWindowLength, fullLength)
+      let totalEnergy = 0
+      
+      for (let channel = 0; channel < channels; channel++) {
+        const channelData = audioBuffer.getChannelData(channel)
+        for (let j = startSample; j < endSample; j++) {
+          const sample = channelData[j]
+          totalEnergy += sample * sample
+        }
+      }
+      
+      energyValues[i] = totalEnergy / ((endSample - startSample) * channels)
+    }
+    
+    // Find the window with highest energy (most interesting part)
+    let bestWindowStartSample = 0
+    let bestEnergy = 0
+    
+    // Only consider windows that can fit 4 bars
+    const maxStartWindow = Math.max(0, numWindows - Math.ceil(fourBarsSampleLength / energyWindowLength))
+    
+    for (let i = 0; i < maxStartWindow; i++) {
+      if (energyValues[i] > bestEnergy) {
+        bestEnergy = energyValues[i]
+        bestWindowStartSample = i * energyWindowLength
+      }
+    }
+    
+    // Ensure we don't exceed audio bounds
+    const startSample = Math.max(0, Math.min(bestWindowStartSample, fullLength - fourBarsSampleLength))
+    
+    console.log('Best section found:', {
+      startSample,
+      energy: bestEnergy.toFixed(6),
+      startTimeSeconds: (startSample / sampleRate).toFixed(2),
+      endTimeSeconds: ((startSample + fourBarsSampleLength) / sampleRate).toFixed(2)
+    })
+    
+    // Extract the 4 bars
+    return this.extractAudioSlice(audioBuffer, startSample, fourBarsSampleLength)
+  }
+
+  /**
+   * Extract a specific slice from an AudioBuffer
+   */
+  private extractAudioSlice(audioBuffer: AudioBuffer, startSample: number, length: number): AudioBuffer {
+    const sampleRate = audioBuffer.sampleRate
+    const channels = audioBuffer.numberOfChannels
+    
+    const newBuffer = this.audioContext!.createBuffer(channels, length, sampleRate)
+    
+    for (let channel = 0; channel < channels; channel++) {
+      const originalData = audioBuffer.getChannelData(channel)
+      const newData = newBuffer.getChannelData(channel)
+      
+      for (let i = 0; i < length; i++) {
+        newData[i] = originalData[startSample + i] || 0
+      }
+    }
+    
+    return newBuffer
+  }
+
+  /**
+   * Convert File to AudioBuffer (for file uploads)
+   */
+  async fileToAudioBuffer(file: File): Promise<AudioBuffer> {
+    const audioContext = await this.ensureAudioContext()
+    
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      
+      return audioBuffer
+    } catch (error) {
+      console.error('Error converting file to audio buffer:', error)
+      throw new Error(`Failed to process audio file: ${file.name}`)
+    }
+  }
+
+  /**
    * Simple high-pass filter
    */
   private highPassFilter(data: Float32Array, cutoff: number): Float32Array {
@@ -338,11 +503,16 @@ class AudioSyncEngine {
     const quantizedBPM = this.quantizeBPM(recordedBPM)
     const beatPositions = this.detectBeatPositions(recordedBuffer)
     
+    // Enhance audio quality for studio-grade sound
+    const enhancedRecordedBuffer = this.enhanceAudioQuality(recordedBuffer)
+    const enhancedSampleBuffer = this.enhanceAudioQuality(sampleBuffer)
+    
     console.log('Sync Analysis:', {
       detectedBPM: recordedBPM,
       quantizedBPM: quantizedBPM,
       sampleBPM: sampleBPM,
-      beatPositions: beatPositions.length
+      beatPositions: beatPositions.length,
+      enhanced: true
     })
     
     // Calculate precise playback rate
@@ -359,9 +529,9 @@ class AudioSyncEngine {
     const recordedGain = audioContext.createGain()
     const sampleGain = audioContext.createGain()
     
-    // Configure sources
-    recordedSource.buffer = recordedBuffer
-    sampleSource.buffer = sampleBuffer
+    // Configure sources with enhanced audio
+    recordedSource.buffer = enhancedRecordedBuffer
+    sampleSource.buffer = enhancedSampleBuffer
     sampleSource.playbackRate.value = playbackRate
     
     // Set volumes with better balance
@@ -450,6 +620,8 @@ export const syncEngine = new AudioSyncEngine()
 export const loadAudioBuffer = (filePath: string) => syncEngine.loadAudioBuffer(filePath)
 export const blobToAudioBuffer = (blob: Blob) => syncEngine.blobToAudioBuffer(blob)
 export const detectBPM = (audioBuffer: AudioBuffer) => syncEngine.detectBPM(audioBuffer)
+export const extractBest4Bars = (audioBuffer: AudioBuffer) => syncEngine.extractBest4Bars(audioBuffer)
+export const fileToAudioBuffer = (file: File) => syncEngine.fileToAudioBuffer(file)
 export const syncPlay = (recordedBuffer: AudioBuffer, sampleBuffer: AudioBuffer, sampleBPM: number, options?: SyncPlaybackOptions) => 
   syncEngine.syncPlay(recordedBuffer, sampleBuffer, sampleBPM, options)
 export const playAudioBuffer = (audioBuffer: AudioBuffer, options?: SyncPlaybackOptions) => 

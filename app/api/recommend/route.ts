@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
-import { detectBPM } from '@/lib/syncEngine'
 
 // Types for our metadata
 interface LoopMetadata {
@@ -21,7 +20,7 @@ interface Recommendation {
 }
 
 // Simple BPM detection using autocorrelation
-function detectBPM(audioData: Float32Array, sampleRate: number): number {
+function detectBPMClientSide(audioData: Float32Array, sampleRate: number): number {
   const minBPM = 60
   const maxBPM = 200
   const minPeriod = Math.floor(sampleRate * 60 / maxBPM)
@@ -120,6 +119,15 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
+    const clientBPM = formData.get('bpm') as string // Get BPM from client
+    const clientKey = formData.get('key') as string // Get key from client
+    
+    console.log('API Request received:', {
+      hasAudio: !!audioFile,
+      fileSize: audioFile?.size,
+      clientBPM,
+      clientKey
+    })
     
     if (!audioFile) {
       return NextResponse.json(
@@ -145,20 +153,21 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // For now, we'll simulate audio analysis since proper audio decoding requires additional libraries
-    // In a real implementation, you'd use libraries like 'web-audio-api' or 'node-wav' to decode the audio
+    // Use BPM and key from client-side analysis (which already works)
+    let detectedBPM: number
+    let detectedKey: string
     
-    // Simulate BPM detection (in real implementation, analyze the actual audio)
-    const simulatedBPM = Math.floor(Math.random() * 40) + 80 // Random BPM between 80-120
-    const simulatedKey = ['C', 'Am', 'F', 'G', 'Dm', 'F#m'][Math.floor(Math.random() * 6)]
-    
-    // For demo purposes, we'll use sample rate 44100
-    const sampleRate = 44100
-    
-    // For now, use simulated BPM detection since we need AudioContext on server side
-    // In a real implementation, you'd need to set up Web Audio API on the server
-    const detectedBPM = simulatedBPM
-    const detectedKey = simulatedKey
+    if (clientBPM && clientKey) {
+      // Use client-provided values
+      detectedBPM = parseInt(clientBPM)
+      detectedKey = clientKey
+      console.log('Using client-provided analysis:', { detectedBPM, detectedKey })
+    } else {
+      // Fallback to simulated values
+      detectedBPM = Math.floor(Math.random() * 40) + 80
+      detectedKey = ['C', 'Am', 'F', 'G', 'Dm', 'F#m'][Math.floor(Math.random() * 6)]
+      console.log('Using simulated analysis:', { detectedBPM, detectedKey })
+    }
     
     // Load loop metadata
     const metadataPath = path.join(process.cwd(), 'public', 'audio', 'metadata.json')
