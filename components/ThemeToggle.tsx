@@ -1,41 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Sun, Moon, Monitor } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system")
+  const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | "system" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-    }
   }, [])
-
-  useEffect(() => {
-    if (!mounted) return
-
-    const root = document.documentElement
-    localStorage.setItem("theme", theme)
-
-    if (theme === "dark") {
-      root.classList.add("dark")
-    } else if (theme === "light") {
-      root.classList.remove("dark")
-    } else {
-      // System preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-      if (prefersDark) {
-        root.classList.add("dark")
-      } else {
-        root.classList.remove("dark")
-      }
-    }
-  }, [theme, mounted])
 
   if (!mounted) return null
 
@@ -50,7 +26,7 @@ export default function ThemeToggle() {
       {themes.map(({ value, icon: Icon, label }) => (
         <motion.button
           key={value}
-          onClick={() => setTheme(value as any)}
+          onClick={() => setTheme(value)}
           className={`p-2 rounded-md transition-all ${
             theme === value
               ? "bg-white dark:bg-gray-700 shadow-sm text-green-600 dark:text-green-400"

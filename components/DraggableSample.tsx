@@ -383,9 +383,9 @@ export default function DraggableSample({
           <div className="w-full mb-1">
             <div 
               ref={waveformRef}
-              className="w-full h-6 bg-gradient-to-r from-gray-50/50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg shadow-sm border border-gray-200/60 dark:border-gray-600/60 overflow-hidden cursor-pointer hover:shadow-md transition-all duration-300 backdrop-blur-sm"
+              className="w-full h-6 rounded-lg overflow-hidden cursor-pointer transition-all duration-300"
               style={{
-                background: 'linear-gradient(135deg, rgba(249, 250, 251, 0.8) 0%, rgba(243, 244, 246, 0.9) 100%)',
+                background: 'transparent',
               }}
             >
               {/* WaveSurfer will render here */}
