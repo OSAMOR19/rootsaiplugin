@@ -43,6 +43,8 @@ export default function DraggableSample({
   const [audioDuration, setAudioDuration] = useState(0) // Audio duration in seconds
   const [waveSurfer, setWaveSurfer] = useState<WaveSurfer | null>(null)
   const waveformRef = useRef<HTMLDivElement>(null)
+  const isInitializingRef = useRef(false)
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Load audio buffer when component mounts
   useEffect(() => {
@@ -74,94 +76,158 @@ export default function DraggableSample({
   
   // Initialize WaveSurfer
   useEffect(() => {
-    if (waveformRef.current && !waveSurfer) {
-      const ws = WaveSurfer.create({
-        container: waveformRef.current,
-        waveColor: 'rgb(156, 163, 175)', // gray-400
-        progressColor: 'rgb(34, 197, 94)', // green-500
-        cursorColor: 'transparent',
-        barWidth: 2,
-        barGap: 1,
-        barRadius: 2,
-        height: 24,
-        normalize: true,
-        backend: 'WebAudio',
-        mediaControls: false,
-        interact: true,
-        hideScrollbar: true,
-        fillParent: true,
-        minPxPerSec: 1,
-      })
+    // Clear any existing timeout
+    if (initTimeoutRef.current) {
+      clearTimeout(initTimeoutRef.current)
+    }
 
-      // Set dark mode colors if needed
-      if (document.documentElement.classList.contains('dark')) {
-        ws.setOptions({
-          waveColor: 'rgb(75, 85, 99)', // gray-600 for dark mode
-          progressColor: 'rgb(34, 197, 94)', // green-500 stays same
+    if (waveformRef.current && !waveSurfer && !isInitializingRef.current) {
+      // Small debounce to prevent rapid re-initialization
+      initTimeoutRef.current = setTimeout(() => {
+        isInitializingRef.current = true
+      
+      try {
+        if (!waveformRef.current) return
+        
+        const ws = WaveSurfer.create({
+          container: waveformRef.current,
+          waveColor: 'rgb(156, 163, 175)', // gray-400
+          progressColor: 'rgb(34, 197, 94)', // green-500
+          cursorColor: 'transparent',
+          barWidth: 2,
+          barGap: 1,
+          barRadius: 2,
+          height: 24,
+          normalize: true,
+          backend: 'WebAudio',
+          mediaControls: false,
+          interact: true,
+          hideScrollbar: true,
+          fillParent: true,
+          minPxPerSec: 1,
         })
-      }
 
-      // Load audio if URL is available
-      if (audioUrl) {
-        ws.load(audioUrl)
-      } else {
-        // Generate mock waveform for samples without real audio
-        const mockAudioData = new Float32Array(sample.waveform.length)
-        sample.waveform.forEach((val: number, i: number) => {
-          mockAudioData[i] = (val / 100 - 0.5) * 2 // Convert to -1 to 1 range
-        })
-        ws.loadBlob(new Blob([mockAudioData.buffer], { type: 'audio/wav' }))
-      }
-
-      ws.on('ready', () => {
-        setAudioDuration(ws.getDuration())
-      })
-
-      ws.on('audioprocess', () => {
-        const progress = (ws.getCurrentTime() / ws.getDuration()) * 100
-        setAudioProgress(progress)
-      })
-
-      ws.on('finish', () => {
-        setAudioProgress(0)
-        setHasStarted(false)
-      })
-
-      setWaveSurfer(ws)
-
-      // Cleanup
-      return () => {
-        if (ws) {
-          ws.destroy()
+        // Set dark mode colors if needed
+        if (document.documentElement.classList.contains('dark')) {
+          ws.setOptions({
+            waveColor: 'rgb(75, 85, 99)', // gray-600 for dark mode
+            progressColor: 'rgb(34, 197, 94)', // green-500 stays same
+          })
         }
+
+        // Load audio if URL is available
+        if (audioUrl) {
+          ws.load(audioUrl).catch((error) => {
+            console.error('Error loading audio:', error)
+          })
+        } else {
+          // Generate mock waveform for samples without real audio
+          const mockAudioData = new Float32Array(sample.waveform.length)
+          sample.waveform.forEach((val: number, i: number) => {
+            mockAudioData[i] = (val / 100 - 0.5) * 2 // Convert to -1 to 1 range
+          })
+          
+          try {
+            const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
+            ws.loadBlob(blob).catch((error) => {
+              console.error('Error loading mock audio:', error)
+            })
+          } catch (error) {
+            console.error('Error creating mock audio blob:', error)
+          }
+        }
+
+        ws.on('ready', () => {
+          setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
+        })
+
+        ws.on('audioprocess', () => {
+          if (ws.getDuration() > 0) {
+            const progress = (ws.getCurrentTime() / ws.getDuration()) * 100
+            setAudioProgress(progress)
+          }
+        })
+
+        ws.on('finish', () => {
+          setAudioProgress(0)
+          setHasStarted(false)
+        })
+
+        ws.on('error', (error) => {
+          console.error('WaveSurfer error:', error)
+        })
+
+        setWaveSurfer(ws)
+        isInitializingRef.current = false
+        
+      } catch (error) {
+        console.error('Error initializing WaveSurfer:', error)
+        isInitializingRef.current = false
+      }
+      }, 50) // 50ms debounce
+    }
+
+    // Cleanup function for this effect
+    return () => {
+      // Clear timeout on cleanup
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current)
       }
     }
   }, [waveformRef.current, sample.waveform, audioUrl])
 
   // Handle WaveSurfer play/pause 
   useEffect(() => {
-    if (waveSurfer) {
-      if (isPlaying && !hasStarted) {
-        console.log('Playing audio with WaveSurfer:', audioUrl)
-        setHasStarted(true)
-        waveSurfer.play()
-      } else if (!isPlaying && hasStarted) {
-        console.log('Pausing audio with WaveSurfer:', audioUrl)
-        waveSurfer.pause()
+    if (waveSurfer && !isInitializingRef.current) {
+      try {
+        if (isPlaying && !hasStarted) {
+          console.log('Playing audio with WaveSurfer:', audioUrl)
+          setHasStarted(true)
+          waveSurfer.play().catch((error) => {
+            console.error('Error playing WaveSurfer:', error)
+            setHasStarted(false)
+          })
+        } else if (!isPlaying && hasStarted) {
+          console.log('Pausing audio with WaveSurfer:', audioUrl)
+          waveSurfer.pause()
+          setHasStarted(false)
+        }
+      } catch (error) {
+        console.error('Error controlling WaveSurfer playback:', error)
         setHasStarted(false)
       }
     }
   }, [isPlaying, waveSurfer, hasStarted, audioUrl])
 
-  // Cleanup effect for WaveSurfer
+  // Component unmount cleanup
   useEffect(() => {
+    const currentWaveSurfer = waveSurfer
+    
     return () => {
-      if (waveSurfer) {
-        waveSurfer.destroy()
+      // Clear any pending initialization
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current)
       }
+      
+      if (currentWaveSurfer) {
+        try {
+          // Try to pause first if possible
+          try {
+            currentWaveSurfer.pause()
+          } catch (pauseError) {
+            // Ignore pause errors
+          }
+          
+          // Then destroy
+          currentWaveSurfer.destroy()
+        } catch (error) {
+          // Ignore cleanup errors on unmount
+          console.warn('WaveSurfer cleanup warning:', error)
+        }
+      }
+      isInitializingRef.current = false
     }
   }, [waveSurfer])
-
   
   // Use real audio progress
   const currentProgress = audioProgress
@@ -313,16 +379,16 @@ export default function DraggableSample({
             </div>
           </div>
 
-          {/* WaveSurfer.js Waveform - Clean Transparent Design */}
+          {/* WaveSurfer.js Waveform - Professional Audio Visualization */}
           <div className="w-full mb-1">
             <div 
               ref={waveformRef}
-              className="w-full h-6 cursor-pointer transition-all duration-300 wavesurfer-transparent"
+              className="w-full h-6 bg-gradient-to-r from-gray-50/50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg shadow-sm border border-gray-200/60 dark:border-gray-600/60 overflow-hidden cursor-pointer hover:shadow-md transition-all duration-300 backdrop-blur-sm"
               style={{
-                background: 'transparent',
+                background: 'linear-gradient(135deg, rgba(249, 250, 251, 0.8) 0%, rgba(243, 244, 246, 0.9) 100%)',
               }}
             >
-              {/* WaveSurfer will render here with transparent background */}
+              {/* WaveSurfer will render here */}
             </div>
           </div>
 
