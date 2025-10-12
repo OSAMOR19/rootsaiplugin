@@ -465,18 +465,10 @@ export default function DraggableSample({
         </div>
 
         {/* Parameters */}
-        <div className="flex-shrink-0 grid grid-cols-3 gap-2 text-xs relative z-20">
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
-            <div className="text-gray-600 dark:text-gray-400 text-xs">TYPE</div>
-            <div className="text-green-600 dark:text-green-400 font-mono font-semibold text-[10px] capitalize">{sample.category?.replace(' & ', '&') || 'Drums'}</div>
-          </div>
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
+        <div className="flex-shrink-0 flex justify-center text-xs relative z-20">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[70px]">
             <div className="text-gray-600 dark:text-gray-400 text-xs">BPM</div>
             <div className="text-green-600 dark:text-green-400 font-mono font-semibold">{sample.bpm}</div>
-          </div>
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
-            <div className="text-gray-600 dark:text-gray-400 text-xs">TIME</div>
-            <div className="text-green-600 dark:text-green-400 font-mono font-semibold">{sample.duration}</div>
           </div>
         </div>
 

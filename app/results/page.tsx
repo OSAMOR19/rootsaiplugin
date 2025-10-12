@@ -309,7 +309,7 @@ function ResultsContent() {
             </motion.button>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
-                {recommendationsParam ? "AI-Matched Compatible Sounds" : (query || "Search Results")}
+                {recommendationsParam ? "Compatible Sounds" : (query || "Search Results")}
               </h1>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 {recommendationsParam ? (
