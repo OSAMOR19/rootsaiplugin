@@ -4,9 +4,10 @@ import type React from "react"
 
 import { motion } from "framer-motion"
 import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
+import WaveSurfer from "wavesurfer.js"
 
 // Import drum images
 import kickDrumImage from "./images/kickdrum.jpg"
@@ -21,9 +22,8 @@ interface DraggableSampleProps {
   onPlayPause: () => void
   index: number
   audioUrl?: string // Add audio URL prop for real audio files
-  recordedAudioBuffer?: AudioBuffer | null // Add recorded audio buffer for sync playback
-  recordedBPM?: number | null // Add recorded BPM for sync playback
-  syncMode?: boolean // Whether to play in sync mode
+  recordedAudioBuffer?: AudioBuffer | null // Add recorded audio buffer for compatibility
+  recordedBPM?: number | null // Add recorded BPM for compatibility
 }
 
 export default function DraggableSample({ 
@@ -33,13 +33,16 @@ export default function DraggableSample({
   index, 
   audioUrl, 
   recordedAudioBuffer, 
-  recordedBPM, 
-  syncMode = false 
+  recordedBPM 
 }: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
+  const [audioProgress, setAudioProgress] = useState(0) // Real audio progress from 0-100
+  const [audioDuration, setAudioDuration] = useState(0) // Audio duration in seconds
+  const [waveSurfer, setWaveSurfer] = useState<WaveSurfer | null>(null)
+  const waveformRef = useRef<HTMLDivElement>(null)
   
   // Load audio buffer when component mounts
   useEffect(() => {
@@ -49,6 +52,7 @@ export default function DraggableSample({
         .then(buffer => {
           console.log('Successfully loaded audio buffer:', buffer)
           setAudioBuffer(buffer)
+          setAudioDuration(buffer.duration) // Set the actual audio duration
         })
         .catch(error => {
           console.error('Error loading audio buffer for', audioUrl, ':', error)
@@ -59,6 +63,7 @@ export default function DraggableSample({
             .then(buffer => {
               console.log('Successfully loaded audio buffer with alt path:', buffer)
               setAudioBuffer(buffer)
+              setAudioDuration(buffer.duration) // Set the actual audio duration
             })
             .catch(altError => {
               console.error('Error loading audio buffer with alt path:', altError)
@@ -67,60 +72,99 @@ export default function DraggableSample({
     }
   }, [audioUrl])
   
-  // Handle play/pause with sync engine
+  // Initialize WaveSurfer
   useEffect(() => {
-    if (audioBuffer && isPlaying && !hasStarted) {
-      console.log('Playing audio with sync engine:', audioUrl)
-      setHasStarted(true)
-      
-      // Check if we should play in sync mode
-      if (syncMode && recordedAudioBuffer && recordedBPM && sample.bpm) {
-        console.log('Playing in sync mode:', { 
-          recordedBPM, 
-          sampleBPM: sample.bpm, 
-          recordedAudioBufferLength: recordedAudioBuffer.length,
-          audioBufferLength: audioBuffer.length,
-          syncMode: syncMode
-        })
-        syncEngine.syncPlay(recordedAudioBuffer, audioBuffer, sample.bpm, { 
-          volume: 0.8,
-          recordedBPM: recordedBPM, // Pass accurate BPM for perfect sync
-          recordedVolume: 0.5, // Default recorded audio volume
-          sampleVolume: 0.5 // Default sample volume
-        })
-          .catch(error => {
-            console.error('Error in sync playback:', error)
-            // Fallback to regular playback
-            syncEngine.playAudioBuffer(audioBuffer, { volume: 0.8 })
-          })
-      } else {
-        console.log('Playing in regular mode:', { 
-          syncMode, 
-          hasRecordedAudioBuffer: !!recordedAudioBuffer, 
-          recordedBPM, 
-          sampleBPM: sample.bpm 
-        })
-        // Regular playback
-        syncEngine.playAudioBuffer(audioBuffer, { volume: 0.8 })
-      }
-    } else if (!isPlaying && hasStarted) {
-      syncEngine.stopAll()
-      setHasStarted(false)
-    }
-  }, [isPlaying, audioBuffer, hasStarted, audioUrl, syncMode, recordedAudioBuffer, recordedBPM, sample.bpm])
+    if (waveformRef.current && !waveSurfer) {
+      const ws = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: 'rgb(156, 163, 175)', // gray-400
+        progressColor: 'rgb(34, 197, 94)', // green-500
+        cursorColor: 'transparent',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 24,
+        normalize: true,
+        backend: 'WebAudio',
+        mediaControls: false,
+        interact: true,
+        hideScrollbar: true,
+        fillParent: true,
+        minPxPerSec: 1,
+      })
 
-  // Reset hasStarted when audio ends
-  useEffect(() => {
-    // Cleanup effect for sync engine
-    return () => {
-      if (hasStarted) {
-        syncEngine.stopAll()
+      // Set dark mode colors if needed
+      if (document.documentElement.classList.contains('dark')) {
+        ws.setOptions({
+          waveColor: 'rgb(75, 85, 99)', // gray-600 for dark mode
+          progressColor: 'rgb(34, 197, 94)', // green-500 stays same
+        })
+      }
+
+      // Load audio if URL is available
+      if (audioUrl) {
+        ws.load(audioUrl)
+      } else {
+        // Generate mock waveform for samples without real audio
+        const mockAudioData = new Float32Array(sample.waveform.length)
+        sample.waveform.forEach((val: number, i: number) => {
+          mockAudioData[i] = (val / 100 - 0.5) * 2 // Convert to -1 to 1 range
+        })
+        ws.loadBlob(new Blob([mockAudioData.buffer], { type: 'audio/wav' }))
+      }
+
+      ws.on('ready', () => {
+        setAudioDuration(ws.getDuration())
+      })
+
+      ws.on('audioprocess', () => {
+        const progress = (ws.getCurrentTime() / ws.getDuration()) * 100
+        setAudioProgress(progress)
+      })
+
+      ws.on('finish', () => {
+        setAudioProgress(0)
+        setHasStarted(false)
+      })
+
+      setWaveSurfer(ws)
+
+      // Cleanup
+      return () => {
+        if (ws) {
+          ws.destroy()
+        }
       }
     }
-  }, [hasStarted])
+  }, [waveformRef.current, sample.waveform, audioUrl])
+
+  // Handle WaveSurfer play/pause 
+  useEffect(() => {
+    if (waveSurfer) {
+      if (isPlaying && !hasStarted) {
+        console.log('Playing audio with WaveSurfer:', audioUrl)
+        setHasStarted(true)
+        waveSurfer.play()
+      } else if (!isPlaying && hasStarted) {
+        console.log('Pausing audio with WaveSurfer:', audioUrl)
+        waveSurfer.pause()
+        setHasStarted(false)
+      }
+    }
+  }, [isPlaying, waveSurfer, hasStarted, audioUrl])
+
+  // Cleanup effect for WaveSurfer
+  useEffect(() => {
+    return () => {
+      if (waveSurfer) {
+        waveSurfer.destroy()
+      }
+    }
+  }, [waveSurfer])
+
   
-  // Use real audio progress if available, otherwise use mock progress
-  const currentProgress = audioUrl ? (hasStarted ? 50 : 0) : (isPlaying ? 50 : 0)
+  // Use real audio progress
+  const currentProgress = audioProgress
 
   // Function to get the appropriate image for each drum type
   const getDrumImage = (category: string) => {
@@ -223,94 +267,15 @@ export default function DraggableSample({
       onDragStart={(e) => handleDragStart(e as any)}
       onDragEnd={handleDragEnd}
     >
-      {/* Waveform progress bar in center of card */}
-      {hasStarted && (
-        <motion.div
-          className="absolute w-64 h-8 bg-gray-300/20 dark:bg-gray-600/20 rounded-lg overflow-hidden"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          style={{
-            left: '30%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10
-          }}
-        >
-          {/* Background waveform */}
-          <div className="absolute inset-0 flex items-center justify-center px-2">
-            <div className="flex items-end space-x-1 h-6 w-full">
-              {sample.waveform.slice(0, 40).map((height: number, i: number) => (
-                <motion.div
-                  key={i}
-                  className="w-0.5 bg-gray-400 dark:bg-gray-500 rounded-full"
-                  style={{ height: `${Math.max(2, height * 0.3)}px` }}
-                  animate={
-                    isPlaying
-                      ? {
-                          scaleY: [1, 1.2, 1],
-                          opacity: [0.6, 1, 0.6],
-                        }
-                      : {}
-                  }
-                  transition={{
-                    duration: 0.8,
-                    repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
-                    delay: i * 0.02,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* Progress fill with waveform */}
-          <motion.div
-            className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-lg relative overflow-hidden"
-            initial={{ width: "0%" }}
-            animate={{ width: `${currentProgress}%` }}
-            transition={{
-              duration: audioUrl ? 0.1 : 8,
-              ease: "linear",
-              repeat: audioUrl ? 0 : Number.POSITIVE_INFINITY,
-            }}
-          >
-            {/* Active waveform */}
-            <div className="absolute inset-0 flex items-center justify-center px-2">
-              <div className="flex items-end space-x-1 h-6 w-full">
-                {sample.waveform.slice(0, 40).map((height: number, i: number) => (
-                  <motion.div
-                    key={i}
-                    className="w-0.5 bg-white rounded-full"
-                    style={{ height: `${Math.max(2, height * 0.3)}px` }}
-                    animate={
-                      isPlaying
-                        ? {
-                            scaleY: [1, 1.3, 1],
-                            opacity: [0.8, 1, 0.8],
-                          }
-                        : {}
-                    }
-                    transition={{
-                      duration: 0.6,
-                      repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
-                      delay: i * 0.02,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-
-      <div className="flex items-center p-4 space-x-4">
+      <div className="flex items-center p-3 space-x-3">
         {/* Drag Handle */}
         <div className="flex-shrink-0 text-gray-400 dark:text-gray-500 group-hover:text-green-500 transition-colors">
           <GripVertical className="w-5 h-5" />
         </div>
 
         {/* Drum Image with Waveform */}
-        <div className="flex-shrink-0 w-20 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg relative overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="flex-shrink-0 w-16 h-10 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg relative overflow-hidden border border-gray-200 dark:border-gray-700">
           <Image
             src={getDrumImage(sample.category)}
             alt={sample.category || "Drum"}
@@ -320,28 +285,16 @@ export default function DraggableSample({
           <div className="absolute inset-0 bg-black/10" />
           
           {/* Compact Waveform Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 h-3 bg-black/40 backdrop-blur-sm">
+          <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/30 backdrop-blur-sm">
             <div className="flex items-end justify-center px-1 h-full">
-              <div className="flex items-end space-x-0.5 h-2 w-full">
+              <div className="flex items-end space-x-0.5 h-full w-full">
                 {sample.waveform.slice(0, 12).map((height: number, i: number) => (
-                  <motion.div
+                  <div
                     key={i}
-                    className="w-0.5 bg-white/70 rounded-full"
-                    style={{ height: `${height * 0.3}%` }}
-                    animate={
-                      isPlaying
-                        ? {
-                            scaleY: [1, 1.4, 1],
-                            opacity: [0.7, 1, 0.7],
-                            backgroundColor: ["#10b981", "#ffffff", "#10b981"],
-                          }
-                        : {}
-                    }
-                    transition={{
-                      duration: 0.6,
-                      repeat: isPlaying ? Number.POSITIVE_INFINITY : 0,
-                      delay: i * 0.05,
-                    }}
+                    className={`w-0.5 rounded-full ${
+                      isPlaying ? 'bg-green-400' : 'bg-white/60'
+                    }`}
+                    style={{ height: `${Math.max(30, height * 0.6)}%` }}
                   />
                 ))}
               </div>
@@ -349,18 +302,29 @@ export default function DraggableSample({
           </div>
         </div>
 
-        {/* Sample Info */}
+        {/* Sample Info with Always-Visible Waveform */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-1 flex items-center space-x-2">
-            <span>{sample.name}</span>
-            {syncMode && recordedAudioBuffer && (
-              <div className="flex items-center space-x-1">
-                <Volume2 className="w-3 h-3 text-green-500" />
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium">SYNC</span>
-              </div>
-            )}
-          </h3>
-          <p className="text-xs text-gray-600 dark:text-gray-400 truncate mb-2">{sample.artist}</p>
+          <div className="flex items-center space-x-2 mb-1">
+            <div className="flex-1">
+              <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-0.5">
+                {sample.name}
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{sample.artist}</p>
+            </div>
+          </div>
+
+          {/* WaveSurfer.js Waveform - Clean Transparent Design */}
+          <div className="w-full mb-1">
+            <div 
+              ref={waveformRef}
+              className="w-full h-6 cursor-pointer transition-all duration-300 wavesurfer-transparent"
+              style={{
+                background: 'transparent',
+              }}
+            >
+              {/* WaveSurfer will render here with transparent background */}
+            </div>
+          </div>
 
           {/* Tags */}
           <div className="flex items-center space-x-2">
@@ -374,26 +338,26 @@ export default function DraggableSample({
         </div>
 
         {/* Parameters */}
-        <div className="flex-shrink-0 grid grid-cols-3 gap-3 text-xs relative z-20">
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px]">
+        <div className="flex-shrink-0 grid grid-cols-3 gap-2 text-xs relative z-20">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
             <div className="text-gray-600 dark:text-gray-400 text-xs">TYPE</div>
             <div className="text-green-600 dark:text-green-400 font-mono font-semibold text-[10px] capitalize">{sample.category?.replace(' & ', '&') || 'Drums'}</div>
           </div>
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px]">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
             <div className="text-gray-600 dark:text-gray-400 text-xs">BPM</div>
             <div className="text-green-600 dark:text-green-400 font-mono font-semibold">{sample.bpm}</div>
           </div>
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px]">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded px-2 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[45px]">
             <div className="text-gray-600 dark:text-gray-400 text-xs">TIME</div>
             <div className="text-green-600 dark:text-green-400 font-mono font-semibold">{sample.duration}</div>
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex-shrink-0 flex items-center space-x-2 relative z-20">
+        <div className="flex-shrink-0 flex items-center space-x-1.5 relative z-20">
           <motion.button
             onClick={onPlayPause}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
               isPlaying
                 ? "bg-green-500 text-white shadow-lg"
                 : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400"
@@ -401,12 +365,12 @@ export default function DraggableSample({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
           </motion.button>
 
           <motion.button
             onClick={() => setIsLiked(!isLiked)}
-            className={`p-2 rounded-full transition-colors ${
+            className={`p-1.5 rounded-full transition-colors ${
               isLiked
                 ? "text-red-500 bg-red-50 dark:bg-red-900/20"
                 : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -414,15 +378,15 @@ export default function DraggableSample({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+            <Heart className={`w-3.5 h-3.5 ${isLiked ? "fill-current" : ""}`} />
           </motion.button>
 
           <motion.button
-            className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-1.5 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <MoreHorizontal className="w-4 h-4" />
+            <MoreHorizontal className="w-3.5 h-3.5" />
           </motion.button>
         </div>
 

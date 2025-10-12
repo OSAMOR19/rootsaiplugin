@@ -6,7 +6,7 @@ import { ArrowLeft, Volume2, Search } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import DraggableSample from "@/components/DraggableSample"
 import DragDropZone from "@/components/DragDropZone"
-import SyncPlayback from "@/components/SyncPlayback"
+import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
 import { blobToAudioBuffer, detectBPM, syncEngine } from "@/lib/syncEngine"
 
@@ -27,7 +27,6 @@ function ResultsContent() {
   const [searchFilter, setSearchFilter] = useState("")
   const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
   const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
-  const [syncMode, setSyncMode] = useState(true) // Default to sync mode for audio analysis results
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
@@ -142,16 +141,84 @@ function ResultsContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 flex items-center justify-center">
-        <motion.div className="text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <motion.div
-            className="w-16 h-16 border-4 border-green-400/30 border-t-green-400 rounded-full mx-auto mb-4"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-          />
-          <p className="text-lg text-green-600 dark:text-green-400 font-medium">Analyzing your track...</p>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">Finding perfect Afrobeat drum loops</p>
-        </motion.div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
+        {/* VST-Style Header Skeleton */}
+        <motion.header
+          className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center space-x-4">
+              <Skeleton className="w-9 h-9 rounded-lg" />
+              <div>
+                <Skeleton className="h-6 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-9 w-48 rounded-lg" />
+              <Skeleton className="h-9 w-32 rounded-lg" />
+              <Skeleton className="h-9 w-24 rounded-lg" />
+            </div>
+          </div>
+        </motion.header>
+
+        {/* Content Skeleton */}
+        <div className="p-6">
+          {/* Sync Playback Section Skeleton */}
+          <div className="mb-8">
+            <Skeleton className="h-6 w-64 mb-4" />
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <Skeleton className="w-12 h-12 rounded-lg" />
+                      <div>
+                        <Skeleton className="h-5 w-32 mb-2" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-9 w-24 rounded-lg" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-40" />
+                    <div className="flex items-center space-x-4">
+                      <Skeleton className="h-6 w-16" />
+                      <Skeleton className="h-6 w-16" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sample Cards Skeleton */}
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-4">
+                  <Skeleton className="w-16 h-16 rounded-lg flex-shrink-0" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <div className="flex items-center space-x-4">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-3 w-12" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -176,12 +243,12 @@ function ResultsContent() {
             </motion.button>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
-                {recommendationsParam ? "Audio Analysis Results" : (query || "Search Results")}
+                {recommendationsParam ? "AI-Matched Compatible Sounds" : (query || "Search Results")}
               </h1>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 {recommendationsParam ? (
                   <>
-                    {filteredSamples.length} matching Afrobeat drum loops • Detected: {detectedBPM} BPM, {detectedKey} key
+                    {filteredSamples.length} naturally compatible Afrobeat loops • Source: {detectedBPM} BPM, {detectedKey} key
                     {currentlyPlaying && (
                       <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
                         <motion.div
@@ -245,24 +312,6 @@ function ResultsContent() {
               <div className="font-semibold text-green-600 dark:text-green-400">{sessionKey}</div>
             </div>
 
-            {/* Sync Mode Toggle - Only show for audio analysis results */}
-            {recommendationsParam && recordedAudioBuffer && (
-              <motion.button
-                onClick={() => setSyncMode(!syncMode)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all ${
-                  syncMode
-                    ? 'bg-green-500 text-white border-green-500'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600'
-                }`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Volume2 className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {syncMode ? 'Sync ON' : 'Sync OFF'}
-                </span>
-              </motion.button>
-            )}
           </div>
         </div>
 
@@ -270,30 +319,6 @@ function ResultsContent() {
 
       {/* Sample List - Row Layout */}
       <div className="p-6">
-        {/* Sync Playback Section for Audio Analysis Results */}
-        {recommendationsParam && recordedBPM && samples.length > 0 && (
-          <motion.div
-            className="mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
-              Sync Playback - Perfect Tempo Match
-            </h3>
-            <div className="space-y-4">
-              {samples.slice(0, 3).map((sample, index) => (
-                <SyncPlayback
-                  key={sample.id}
-                  recordedAudioBuffer={recordedAudioBuffer}
-                  recordedBPM={recordedBPM}
-                  sampleUrl={sample.audioUrl}
-                  sampleBPM={sample.bpm}
-                  sampleName={sample.name}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
 
         <div className="space-y-3">
           {filteredSamples.map((sample, index) => (
@@ -306,7 +331,6 @@ function ResultsContent() {
               audioUrl={sample.audioUrl}
               recordedAudioBuffer={recordedAudioBuffer}
               recordedBPM={recordedBPM}
-              syncMode={recommendationsParam ? syncMode : false}
             />
           ))}
         </div>
@@ -332,10 +356,32 @@ export default function ResultsPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-green-400/30 border-t-green-400 rounded-full mx-auto mb-4 animate-spin" />
-            <p className="text-lg text-green-600 dark:text-green-400">Loading...</p>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
+          {/* Quick Loading Skeleton */}
+          <div className="p-6">
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-4">
+                    <Skeleton className="w-16 h-16 rounded-lg flex-shrink-0" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-48 mb-2" />
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       }
