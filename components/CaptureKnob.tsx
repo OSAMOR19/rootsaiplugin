@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { syncEngine, blobToAudioBuffer, fileToAudioBuffer, extractBest4Bars } from "@/lib/syncEngine"
 import { toast } from "sonner"
 import { useBPMDetection } from "@/hooks/useBPMDetection"
+import BreathingOrb from "./BreathingOrb"
 
 interface CaptureKnobProps {
   isListening: boolean
@@ -607,84 +608,49 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             `,
         }}
       >
-        {/* Rotating disc pattern when recording/processing/extracting */}
+        {/* Breathing Orb when recording/processing/extracting */}
         {(isRecording || isProcessing || isExtracting || isBPMAnalyzing) && (
-                <motion.div
-            className="absolute inset-4 rounded-full"
-            animate={{ rotate: 360 }}
-                  transition={{
-              duration: 4,
-                    repeat: Number.POSITIVE_INFINITY,
-              ease: "linear",
-            }}
-            style={{
-              background: `
-                radial-gradient(circle at center, transparent 0%, rgba(57, 160, 19, 0.1) 20%, transparent 25%, rgba(34, 197, 94, 0.1) 30%, transparent 35%, rgba(57, 160, 19, 0.1) 40%, transparent 45%, rgba(34, 197, 94, 0.1) 50%, transparent 55%, rgba(57, 160, 19, 0.1) 60%, transparent 65%, rgba(34, 197, 94, 0.1) 70%, transparent 75%, rgba(57, 160, 19, 0.1) 80%, transparent 85%, rgba(34, 197, 94, 0.1) 90%, transparent 95%, rgba(57, 160, 19, 0.1) 100%)
-              `,
-            }}
-          >
-            {/* Subtle rotating grooves */}
-            <div className="absolute inset-0 rounded-full">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute rounded-full border border-green-300 opacity-20"
-                  style={{
-                    width: `${65 + i * 6}%`,
-                    height: `${65 + i * 6}%`,
-                    top: `${17.5 - i * 2.5}%`,
-                    left: `${17.5 - i * 2.5}%`,
-                  }}
-                />
-              ))}
-            </div>
-          </motion.div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <BreathingOrb 
+              active={true} 
+              size="lg" 
+              className="pointer-events-none"
+            />
+          </div>
         )}
 
-        {/* Center icon */}
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center z-10"
-          transition={{ duration: 0.3 }}
-        >
+        {/* Center icon - Only show when not processing */}
+        {!(isRecording || isProcessing || isExtracting || isBPMAnalyzing) && (
           <motion.div
-            className={`w-20 h-20 rounded-full flex items-center justify-center ${
-              hasListened && recordedAudioBuffer
-                ? isPlayingRecording
-                  ? "bg-gradient-to-br from-blue-500 to-blue-700"
-                  : "bg-gradient-to-br from-green-400 to-green-600"
-                : isRecording
-                  ? "bg-gradient-to-br from-green-500 to-green-700"
-                  : isProcessing
-                    ? "bg-gradient-to-br from-yellow-500 to-yellow-700"
-                  : isExtracting
-                    ? "bg-gradient-to-br from-purple-500 to-purple-700"
-                  : isBPMAnalyzing
-                    ? "bg-gradient-to-br from-orange-500 to-orange-700"
+            className="absolute inset-0 flex items-center justify-center z-10"
+            transition={{ duration: 0.3 }}
+          >
+            <motion.div
+              className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                hasListened && recordedAudioBuffer
+                  ? isPlayingRecording
+                    ? "bg-gradient-to-br from-blue-500 to-blue-700"
+                    : "bg-gradient-to-br from-green-400 to-green-600"
                   : mode === 'upload'
                     ? "bg-gradient-to-br from-blue-500 to-blue-700"
                     : "bg-gradient-to-br from-green-500 to-green-700"
-            } shadow-2xl`}
-            whileHover={{ scale: 1.1 }}
-            animate={(isRecording || isExtracting || isBPMAnalyzing) ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 1, repeat: (isRecording || isExtracting || isBPMAnalyzing) ? Infinity : 0 }}
-          >
-            {hasListened && recordedAudioBuffer ? (
-              isPlayingRecording ? (
-                <Square className="w-8 h-8 text-white" />
+              } shadow-2xl`}
+              whileHover={{ scale: 1.1 }}
+            >
+              {hasListened && recordedAudioBuffer ? (
+                isPlayingRecording ? (
+                  <Square className="w-8 h-8 text-white" />
+                ) : (
+                <Play className="w-10 h-10 text-white ml-1" />
+                )
+              ) : mode === 'upload' ? (
+                <Upload className="w-10 h-10 text-white" />
               ) : (
-              <Play className="w-10 h-10 text-white ml-1" />
-              )
-            ) : isRecording ? (
-              <MicOff className="w-8 h-8 text-white" />
-            ) : isProcessing || isExtracting || isBPMAnalyzing ? (
-              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : mode === 'upload' ? (
-              <Upload className="w-10 h-10 text-white" />
-            ) : (
-              <Mic className="w-10 h-10 text-white" />
-            )}
+                <Mic className="w-10 h-10 text-white" />
+              )}
+            </motion.div>
           </motion.div>
-        </motion.div>
+        )}
 
         {/* Subtle circular text */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
