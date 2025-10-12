@@ -285,7 +285,7 @@ export default function DraggableSample({
     e.dataTransfer.setData("application/json", JSON.stringify(dragData))
     e.dataTransfer.setData("audio/wav", realAudioUrl)
     
-    // Add file data for better DAW compatibility
+    // Add file data for both DAW and desktop/folder dropping
     try {
       // Fetch the actual audio file
       const response = await fetch(realAudioUrl)
@@ -299,6 +299,9 @@ export default function DraggableSample({
       // Use DataTransferItemList for file dragging
       const dataTransferItemList = e.dataTransfer.items
       dataTransferItemList.add(audioFile)
+      
+      // Also set as download URL for desktop dropping
+      e.dataTransfer.setData("DownloadURL", `audio/wav:${sample.name || sample.filename}:${realAudioUrl}`)
       
     } catch (error) {
       console.warn('Could not fetch audio file for drag:', error)
@@ -412,7 +415,7 @@ export default function DraggableSample({
           <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/30 backdrop-blur-sm">
             <div className="flex items-end justify-center px-1 h-full">
               <div className="flex items-end space-x-0.5 h-full w-full">
-                {sample.waveform.slice(0, 12).map((height: number, i: number) => (
+                {(sample.waveform || []).slice(0, 12).map((height: number, i: number) => (
                   <div
                     key={i}
                     className={`w-0.5 rounded-full ${
@@ -527,7 +530,7 @@ export default function DraggableSample({
         {/* Drag Instruction */}
         <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
-            Drag to DAW
+            Drag to DAW or Desktop
           </div>
         </div>
       </div>

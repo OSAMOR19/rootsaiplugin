@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import DraggableSample from "@/components/DraggableSample"
 import DragDropZone from "@/components/DragDropZone"
@@ -27,6 +27,7 @@ function ResultsContent() {
   const [searchFilter, setSearchFilter] = useState("")
   const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
   const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
@@ -116,6 +117,71 @@ function ResultsContent() {
 
   const handlePlayPause = (sampleId: string) => {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
+  }
+
+  const handleViewMore = async () => {
+    if (!recordedAudioBuffer || isLoadingMore) return
+    
+    setIsLoadingMore(true)
+    
+    try {
+      // Simulate API call to get more recommendations
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Generate additional mock recommendations
+      const additionalSamples = [
+        {
+          id: `additional-${Date.now()}-1`,
+          name: "Extended Afrobeat Loop",
+          artist: 'AI Generated Match',
+          category: 'extended',
+          bpm: recordedBPM || 120,
+          key: detectedKey || 'C',
+          audioUrl: '/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav',
+          imageUrl: '/placeholder.jpg',
+          duration: '8 bars',
+          tags: ['extended', 'afrobeat', 'ai-generated'],
+          audioBuffer: null,
+          waveform: [0.2, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.8, 0.2, 0.6, 0.4, 0.7, 0.3, 0.9, 0.5, 0.8]
+        },
+        {
+          id: `additional-${Date.now()}-2`,
+          name: "Variation Pattern",
+          artist: 'AI Generated Match',
+          category: 'variation',
+          bpm: (recordedBPM || 120) + 5,
+          key: detectedKey || 'C',
+          audioUrl: '/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav',
+          imageUrl: '/placeholder.jpg',
+          duration: '4 bars',
+          tags: ['variation', 'afrobeat', 'ai-generated'],
+          audioBuffer: null,
+          waveform: [0.3, 0.7, 0.5, 0.8, 0.4, 0.9, 0.2, 0.6, 0.5, 0.8, 0.3, 0.7, 0.4, 0.9, 0.2, 0.6]
+        },
+        {
+          id: `additional-${Date.now()}-3`,
+          name: "Complementary Rhythm",
+          artist: 'AI Generated Match',
+          category: 'complementary',
+          bpm: (recordedBPM || 120) - 3,
+          key: detectedKey || 'C',
+          audioUrl: '/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav',
+          imageUrl: '/placeholder.jpg',
+          duration: '4 bars',
+          tags: ['complementary', 'afrobeat', 'ai-generated'],
+          audioBuffer: null,
+          waveform: [0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9, 0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9]
+        }
+      ]
+      
+      // Add new samples to existing ones
+      setSamples(prevSamples => [...prevSamples, ...additionalSamples])
+      
+    } catch (error) {
+      console.error('Error loading more samples:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
   }
 
   const handleBack = () => {
@@ -342,6 +408,40 @@ function ResultsContent() {
             </div>
             <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No samples found</h3>
             <p className="text-gray-500 dark:text-gray-500">Try adjusting your search or category filter</p>
+          </motion.div>
+        )}
+
+        {/* View More Button - Only show for AI-matched results */}
+        {recommendationsParam && filteredSamples.length > 0 && (
+          <motion.div 
+            className="flex justify-center mt-8 mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <motion.button
+              onClick={handleViewMore}
+              disabled={isLoadingMore || !recordedAudioBuffer}
+              className={`px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${
+                isLoadingMore || !recordedAudioBuffer
+                  ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                  : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+              }`}
+              whileHover={!isLoadingMore && recordedAudioBuffer ? { scale: 1.05 } : {}}
+              whileTap={!isLoadingMore && recordedAudioBuffer ? { scale: 0.95 } : {}}
+            >
+              {isLoadingMore ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Finding More Sounds...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>View More Compatible Sounds</span>
+                </>
+              )}
+            </motion.button>
           </motion.div>
         )}
       </div>
