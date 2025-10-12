@@ -653,7 +653,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                   ? "bg-gradient-to-br from-blue-500 to-blue-700"
                   : "bg-gradient-to-br from-green-400 to-green-600"
                 : isRecording
-                  ? "bg-gradient-to-br from-red-500 to-red-700"
+                  ? "bg-gradient-to-br from-green-500 to-green-700"
                   : isProcessing
                     ? "bg-gradient-to-br from-yellow-500 to-yellow-700"
                   : isExtracting
@@ -740,61 +740,42 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         </motion.div>
       )}
 
-      {/* Status text */}
-      {(isRecording || isProcessing || isExtracting || isBPMAnalyzing || (hasListened && recordedAudioBuffer)) && (
-        <motion.div
-          className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-center w-80"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-        >
-          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg px-6 py-4 shadow-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-gray-800 dark:text-gray-200 font-semibold text-lg mb-1">
-              {isRecording 
-                ? "Capturing INTERNAL audio only..." 
-                : isProcessing 
-                  ? "Analyzing..." 
-                  : isExtracting
-                    ? "Extracting best 4 bars..."
-                  : isBPMAnalyzing
-                    ? "Detecting BPM and tempo..."
-                  : hasListened && recordedAudioBuffer
-                    ? (isPlayingRecording ? "Playing extracted audio" : "Ready to play")
-                    : ""
-              }
-            </p>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              {isRecording 
-                ? "Click to stop capturing" 
-                : isProcessing 
-                  ? "Finding matching samples"
-                  : isExtracting
-                    ? "Processing uploaded audio file"
-                  : isBPMAnalyzing
-                    ? "Analyzing musical characteristics for matching"
-                  : hasListened && recordedAudioBuffer
-                    ? (isPlayingRecording ? "Click to stop playback" : `Click to preview extracted audio ${uploadedFileName ? `from ${uploadedFileName}` : ''}`)
-                    : ""
-              }
-            </p>
-            {recordedBPM && (
-              <p className="text-green-600 dark:text-green-400 text-xs mt-2 font-medium">
-                Detected BPM: {recordedBPM}
-                {bpmConfidence > 0 && (
-                  <span className="ml-2 text-gray-500">
-                    ({(bpmConfidence * 100).toFixed(0)}% confidence)
-                  </span>
-                )}
-              </p>
-            )}
-            {bpmError && (
-              <p className="text-red-600 dark:text-red-400 text-xs mt-2 font-medium">
-                BPM Detection Error: {bpmError}
-              </p>
-            )}
-          </div>
-        </motion.div>
-      )}
+      {/* Status messages converted to toast notifications */}
+      {useEffect(() => {
+        if (isRecording) {
+          toast.info("Capturing INTERNAL audio only...", {
+            duration: 2000,
+            position: "bottom-left"
+          })
+        } else if (isProcessing) {
+          toast.info("Analyzing audio...", {
+            duration: 2000,
+            position: "bottom-left"
+          })
+        } else if (isExtracting) {
+          toast.info("Extracting best 4 bars...", {
+            duration: 2000,
+            position: "bottom-left"
+          })
+        } else if (isBPMAnalyzing) {
+          toast.info("Detecting BPM and tempo...", {
+            duration: 2000,
+            position: "bottom-left"
+          })
+        } else if (hasListened && recordedAudioBuffer) {
+          if (isPlayingRecording) {
+            toast.success("Playing extracted audio", {
+              duration: 1500,
+              position: "bottom-left"
+            })
+          } else {
+            toast.success("Ready to play", {
+              duration: 1500,
+              position: "bottom-left"
+            })
+          }
+        }
+      }, [isRecording, isProcessing, isExtracting, isBPMAnalyzing, hasListened, recordedAudioBuffer, isPlayingRecording])}
 
     </div>
   )

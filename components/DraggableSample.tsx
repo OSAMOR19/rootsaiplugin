@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { motion } from "framer-motion"
-import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2 } from "lucide-react"
+import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
@@ -257,18 +257,21 @@ export default function DraggableSample({
     }
   }
 
-  const handleDragStart = (e: React.DragEvent) => {
+  const handleDragStart = async (e: React.DragEvent) => {
     setIsDragging(true)
 
+    // Get the real audio URL from the sample
+    const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+    
     // Create drag data for DAW integration
     const dragData = {
       type: "audio/sample",
-      name: sample.name,
-      artist: sample.artist,
+      name: sample.name || sample.filename,
+      artist: sample.artist || "Roots AI",
       category: sample.category,
       bpm: sample.bpm,
       duration: sample.duration,
-      url: `/samples/${sample.id}.wav`, // Mock URL
+      url: realAudioUrl, // Real audio URL
       metadata: {
         genre: "Afrobeat",
         tags: ["afrobeat", "percussion", "loop", sample.category],
@@ -278,9 +281,29 @@ export default function DraggableSample({
     }
 
     // Set drag data for different formats
-    e.dataTransfer.setData("text/plain", sample.name)
+    e.dataTransfer.setData("text/plain", sample.name || sample.filename)
     e.dataTransfer.setData("application/json", JSON.stringify(dragData))
-    e.dataTransfer.setData("audio/wav", `/samples/${sample.id}.wav`)
+    e.dataTransfer.setData("audio/wav", realAudioUrl)
+    
+    // Add file data for better DAW compatibility
+    try {
+      // Fetch the actual audio file
+      const response = await fetch(realAudioUrl)
+      const audioBlob = await response.blob()
+      
+      // Create a File object for proper drag and drop
+      const audioFile = new File([audioBlob], sample.name || sample.filename, {
+        type: audioBlob.type || 'audio/wav'
+      })
+      
+      // Use DataTransferItemList for file dragging
+      const dataTransferItemList = e.dataTransfer.items
+      dataTransferItemList.add(audioFile)
+      
+    } catch (error) {
+      console.warn('Could not fetch audio file for drag:', error)
+      // Fallback to URL-based dragging
+    }
 
     // Create custom drag image
     const dragImage = document.createElement("div")
@@ -318,6 +341,41 @@ export default function DraggableSample({
 
   const handleDragEnd = () => {
     setIsDragging(false)
+  }
+
+  const handleDownload = async () => {
+    try {
+      // Get the real audio URL
+      const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+      
+      // Fetch the audio file
+      const response = await fetch(realAudioUrl)
+      if (!response.ok) {
+        throw new Error('Failed to fetch audio file')
+      }
+      
+      const audioBlob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(audioBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = sample.name || sample.filename || 'sample.wav'
+      
+      // Trigger download
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+    } catch (error) {
+      console.error('Download failed:', error)
+      // Fallback: open in new tab
+      const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+      window.open(realAudioUrl, '_blank')
+    }
   }
 
   return (
@@ -445,6 +503,16 @@ export default function DraggableSample({
             whileTap={{ scale: 0.9 }}
           >
             <Heart className={`w-3.5 h-3.5 ${isLiked ? "fill-current" : ""}`} />
+          </motion.button>
+
+          <motion.button
+            onClick={handleDownload}
+            className="p-1.5 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            title="Download audio file"
+          >
+            <Download className="w-3.5 h-3.5" />
           </motion.button>
 
           <motion.button
