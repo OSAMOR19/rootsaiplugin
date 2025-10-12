@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search, RefreshCw } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -13,6 +14,7 @@ import { blobToAudioBuffer, detectBPM, syncEngine } from "@/lib/syncEngine"
 function ResultsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { theme, setTheme } = useTheme()
   const query = searchParams.get("query") || ""
   const sessionKey = searchParams.get("key") || "F MAJOR"
   const detectedBPM = searchParams.get("bpm")
@@ -51,7 +53,24 @@ function ResultsContent() {
             tags: ['audio-analysis', 'matching-bpm', 'matching-key'],
             waveform: Array.from({ length: 50 }, () => Math.random() * 100) // Generate random waveform data
           }))
-          setSamples(audioAnalysisSamples)
+          
+          // Add the recently played song as the first card
+          const recentSong = {
+            id: 'recent-song',
+            name: 'Your Recording',
+            artist: 'Recently Played',
+            category: 'recording',
+            bpm: parseInt(detectedBPM || '120'),
+            key: detectedKey || 'C',
+            audioUrl: null, // Will use recordedAudioBuffer
+            imageUrl: '/placeholder.jpg',
+            duration: '4 bars',
+            tags: ['recording', 'recent', 'your-audio'],
+            waveform: Array.from({ length: 50 }, () => Math.random() * 100),
+            isRecentSong: true
+          }
+          
+          setSamples([recentSong, ...audioAnalysisSamples])
           
           // Set recorded BPM from URL params
           if (detectedBPM) {
@@ -346,6 +365,21 @@ function ResultsContent() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Theme Toggle */}
+            <motion.button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <Moon className="w-5 h-5 text-blue-600" />
+              )}
+            </motion.button>
+            
             {/* Search Filter */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />

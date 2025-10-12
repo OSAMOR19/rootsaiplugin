@@ -115,11 +115,70 @@ export default function DraggableSample({
           })
         }
 
-        // Load audio if URL is available
+        // Load audio if URL is available or if it's the recent song with recorded buffer
         if (audioUrl) {
           ws.load(audioUrl).catch((error) => {
             console.error('Error loading audio:', error)
           })
+        } else if (sample.isRecentSong && recordedAudioBuffer) {
+          // For the recent song, use the recorded audio buffer
+          try {
+            // Convert AudioBuffer to blob for WaveSurfer
+            const numberOfChannels = recordedAudioBuffer.numberOfChannels
+            const sampleRate = recordedAudioBuffer.sampleRate
+            const length = recordedAudioBuffer.length
+            
+            // Create WAV file from AudioBuffer
+            const buffer = new ArrayBuffer(44 + length * numberOfChannels * 2)
+            const view = new DataView(buffer)
+            
+            // WAV header
+            const writeString = (offset: number, string: string) => {
+              for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i))
+              }
+            }
+            
+            writeString(0, 'RIFF')
+            view.setUint32(4, 36 + length * numberOfChannels * 2, true)
+            writeString(8, 'WAVE')
+            writeString(12, 'fmt ')
+            view.setUint32(16, 16, true)
+            view.setUint16(20, 1, true)
+            view.setUint16(22, numberOfChannels, true)
+            view.setUint32(24, sampleRate, true)
+            view.setUint32(28, sampleRate * numberOfChannels * 2, true)
+            view.setUint16(32, numberOfChannels * 2, true)
+            view.setUint16(34, 16, true)
+            writeString(36, 'data')
+            view.setUint32(40, length * numberOfChannels * 2, true)
+            
+            // Convert audio data
+            let offset = 44
+            for (let i = 0; i < length; i++) {
+              for (let channel = 0; channel < numberOfChannels; channel++) {
+                const sample = Math.max(-1, Math.min(1, recordedAudioBuffer.getChannelData(channel)[i]))
+                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+                offset += 2
+              }
+            }
+            
+            const blob = new Blob([buffer], { type: 'audio/wav' })
+            ws.loadBlob(blob).catch((error) => {
+              console.error('Error loading recorded audio:', error)
+            })
+          } catch (error) {
+            console.error('Error converting recorded audio buffer:', error)
+            // Fallback to mock waveform
+            const mockAudioData = new Float32Array(sample.waveform.length)
+            sample.waveform.forEach((val: number, i: number) => {
+              mockAudioData[i] = (val / 100 - 0.5) * 2
+            })
+            const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
+            ws.loadBlob(blob).catch((error) => {
+              console.error('Error loading mock audio:', error)
+            })
+          }
         } else {
           // Generate mock waveform for samples without real audio
           const mockAudioData = new Float32Array(sample.waveform.length)
