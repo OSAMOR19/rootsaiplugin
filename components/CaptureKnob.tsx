@@ -3,8 +3,9 @@
 import { motion } from "framer-motion"
 import { Play, Square, Mic, MicOff, Upload, FileAudio } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
-import { syncEngine, blobToAudioBuffer, detectBPM, fileToAudioBuffer, extractBest4Bars } from "@/lib/syncEngine"
+import { syncEngine, blobToAudioBuffer, fileToAudioBuffer, extractBest4Bars } from "@/lib/syncEngine"
 import { toast } from "sonner"
+import { useBPMDetection } from "@/hooks/useBPMDetection"
 
 interface CaptureKnobProps {
   isListening: boolean
@@ -25,6 +26,21 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
   const [mode, setMode] = useState<'capture' | 'upload'>('capture')
   const [uploadedFileName, setUploadedFileName] = useState<string>('')
   const [isExtracting, setIsExtracting] = useState(false)
+  
+  // Real BPM Detection Hook
+  const {
+    analyzeAudioBuffer,
+    quickDetect,
+    isAnalyzing: isBPMAnalyzing,
+    error: bpmError,
+    confidence: bpmConfidence,
+    resetAnalysis
+  } = useBPMDetection({
+    continuousAnalysis: false,
+    stabilityThreshold: 3,
+    minBPM: 60,
+    maxBPM: 200,
+  })
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -179,13 +195,27 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           duration: audioBlob.size / (48000 * 2 * 2) // Rough duration calculation
         })
         
-        // Convert to AudioBuffer and detect BPM
+        // Convert to AudioBuffer and detect BPM with real detection
         try {
           const audioBuffer = await blobToAudioBuffer(audioBlob)
-          const bpm = detectBPM(audioBuffer)
+          
+          // Reset previous BPM analysis
+          resetAnalysis()
+          
+          // Use real BPM detection
+          console.log('Starting real BPM detection...')
+          const bpmResult = await analyzeAudioBuffer(audioBuffer)
+          
+          console.log('BPM Detection Result:', {
+            bpm: bpmResult.bpm,
+            confidence: bpmResult.confidence,
+            isStable: bpmResult.isStable
+          })
           
           setRecordedAudioBuffer(audioBuffer)
-          setRecordedBPM(bpm)
+          setRecordedBPM(bpmResult.bpm)
+          
+          toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`)
           
           await processAudio(audioBlob, audioBuffer)
         } catch (error) {
@@ -409,11 +439,16 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       
       // Extract the best 4 bars
       const extractedBuffer = await extractBest4Bars(audioBuffer)
-      const bpm = detectBPM(extractedBuffer)
+      
+      // Use real BPM detection for extracted audio
+      resetAnalysis()
+      console.log('Starting real BPM detection on extracted audio...')
+      const bpmResult = await analyzeAudioBuffer(extractedBuffer)
       
       console.log('Extraction complete:', {
         extractedDuration: extractedBuffer.duration,
-        detectedBPM: bpm,
+        detectedBPM: bpmResult.bpm,
+        confidence: bpmResult.confidence,
         extractedLength: extractedBuffer.length
       })
       
@@ -431,8 +466,10 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       // Store the extracted audio and blob
       setRecordedAudioBuffer(extractedBuffer) 
       setRecordedAudioBlob(extractedBlob)
-      setRecordedBPM(bpm)
+      setRecordedBPM(bpmResult.bpm)
       setUploadedFileName(file.name)
+      
+      toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`)
       
       // Mark as listened so the UI shows preview options
       onListen()
@@ -536,7 +573,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       <motion.button
         className="absolute -top-8 -right-8 w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center z-30"
         onClick={toggleMode}
-        disabled={isRecording || isProcessing || isExtracting}
+        disabled={isRecording || isProcessing || isExtracting || isBPMAnalyzing}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
@@ -551,9 +588,9 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       <motion.button
         className="relative w-64 h-64 rounded-full group overflow-hidden"
         onClick={handleMainClick}
-        disabled={disabled || isProcessing || isExtracting}
-        whileHover={!disabled && !isProcessing && !isExtracting ? { scale: 1.02 } : {}}
-        whileTap={!disabled && !isProcessing && !isExtracting ? { scale: 0.98 } : {}}
+        disabled={disabled || isProcessing || isExtracting || isBPMAnalyzing}
+        whileHover={!disabled && !isProcessing && !isExtracting && !isBPMAnalyzing ? { scale: 1.02 } : {}}
+        whileTap={!disabled && !isProcessing && !isExtracting && !isBPMAnalyzing ? { scale: 0.98 } : {}}
         style={{
           background: `
             radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, transparent 50%),
@@ -571,7 +608,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         }}
       >
         {/* Rotating disc pattern when recording/processing/extracting */}
-        {(isRecording || isProcessing || isExtracting) && (
+        {(isRecording || isProcessing || isExtracting || isBPMAnalyzing) && (
                 <motion.div
             className="absolute inset-4 rounded-full"
             animate={{ rotate: 360 }}
@@ -621,13 +658,15 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                     ? "bg-gradient-to-br from-yellow-500 to-yellow-700"
                   : isExtracting
                     ? "bg-gradient-to-br from-purple-500 to-purple-700"
+                  : isBPMAnalyzing
+                    ? "bg-gradient-to-br from-orange-500 to-orange-700"
                   : mode === 'upload'
                     ? "bg-gradient-to-br from-blue-500 to-blue-700"
                     : "bg-gradient-to-br from-green-500 to-green-700"
             } shadow-2xl`}
             whileHover={{ scale: 1.1 }}
-            animate={(isRecording || isExtracting) ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 1, repeat: (isRecording || isExtracting) ? Infinity : 0 }}
+            animate={(isRecording || isExtracting || isBPMAnalyzing) ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 1, repeat: (isRecording || isExtracting || isBPMAnalyzing) ? Infinity : 0 }}
           >
             {hasListened && recordedAudioBuffer ? (
               isPlayingRecording ? (
@@ -637,7 +676,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
               )
             ) : isRecording ? (
               <MicOff className="w-8 h-8 text-white" />
-            ) : isProcessing || isExtracting ? (
+            ) : isProcessing || isExtracting || isBPMAnalyzing ? (
               <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : mode === 'upload' ? (
               <Upload className="w-10 h-10 text-white" />
@@ -669,6 +708,8 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                         ? "ANALYZING AUDIO • PROCESSING • ANALYZING AUDIO • "
                         : isExtracting
                           ? "EXTRACTING BEST 4 BARS • PROCESSING UPLOAD • "
+                        : isBPMAnalyzing
+                          ? "BPM DETECTION • ANALYZING TEMPO • BPM DETECTION • "
                           : mode === 'upload'
                             ? "CLICK TO UPLOAD • CHOOSE AUDIO FILE • CLICK TO UPLOAD • "
                             : "CLICK TO LISTEN • ANALYZE INTERNAL AUDIO • CLICK TO LISTEN • "}
@@ -700,7 +741,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       )}
 
       {/* Status text */}
-      {(isRecording || isProcessing || isExtracting || (hasListened && recordedAudioBuffer)) && (
+      {(isRecording || isProcessing || isExtracting || isBPMAnalyzing || (hasListened && recordedAudioBuffer)) && (
         <motion.div
           className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-center w-80"
           initial={{ opacity: 0, y: 10 }}
@@ -715,6 +756,8 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                   ? "Analyzing..." 
                   : isExtracting
                     ? "Extracting best 4 bars..."
+                  : isBPMAnalyzing
+                    ? "Detecting BPM and tempo..."
                   : hasListened && recordedAudioBuffer
                     ? (isPlayingRecording ? "Playing extracted audio" : "Ready to play")
                     : ""
@@ -727,6 +770,8 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                   ? "Finding matching samples"
                   : isExtracting
                     ? "Processing uploaded audio file"
+                  : isBPMAnalyzing
+                    ? "Analyzing musical characteristics for matching"
                   : hasListened && recordedAudioBuffer
                     ? (isPlayingRecording ? "Click to stop playback" : `Click to preview extracted audio ${uploadedFileName ? `from ${uploadedFileName}` : ''}`)
                     : ""
@@ -735,6 +780,16 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             {recordedBPM && (
               <p className="text-green-600 dark:text-green-400 text-xs mt-2 font-medium">
                 Detected BPM: {recordedBPM}
+                {bpmConfidence > 0 && (
+                  <span className="ml-2 text-gray-500">
+                    ({(bpmConfidence * 100).toFixed(0)}% confidence)
+                  </span>
+                )}
+              </p>
+            )}
+            {bpmError && (
+              <p className="text-red-600 dark:text-red-400 text-xs mt-2 font-medium">
+                BPM Detection Error: {bpmError}
               </p>
             )}
           </div>
