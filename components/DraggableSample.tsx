@@ -97,7 +97,7 @@ export default function DraggableSample({
           barWidth: 2,
           barGap: 1,
           barRadius: 2,
-          height: 24,
+          height: 32, // Increased height for better visibility
           normalize: true,
           backend: 'WebAudio',
           mediaControls: false,
@@ -110,7 +110,7 @@ export default function DraggableSample({
         // Set dark mode colors if needed
         if (document.documentElement.classList.contains('dark')) {
           ws.setOptions({
-            waveColor: 'rgb(75, 85, 99)', // gray-600 for dark mode
+            waveColor: 'rgb(107, 114, 128)', // gray-500 for better contrast in dark mode
             progressColor: 'rgb(34, 197, 94)', // green-500 stays same
           })
         }
@@ -453,15 +453,18 @@ export default function DraggableSample({
       onDragStart={(e) => handleDragStart(e as any)}
       onDragEnd={handleDragEnd}
     >
-
-      <div className="flex items-center p-3 space-x-3">
-        {/* Drag Handle */}
-        <div className="flex-shrink-0 text-gray-400 dark:text-gray-500 group-hover:text-green-500 transition-colors">
-          <GripVertical className="w-5 h-5" />
+      {/* Splice-style horizontal layout */}
+      <div className="flex items-center p-4 space-x-4">
+        {/* Selection checkbox on the far left */}
+        <div className="flex-shrink-0">
+          <input
+            type="checkbox"
+            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+          />
         </div>
 
-        {/* Drum Image with Waveform */}
-        <div className="flex-shrink-0 w-16 h-10 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg relative overflow-hidden border border-gray-200 dark:border-gray-700">
+        {/* Artwork (square) */}
+        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 relative overflow-hidden border border-gray-200 dark:border-gray-700">
           <Image
             src={getDrumImage(sample.category)}
             alt={sample.category || "Drum"}
@@ -469,120 +472,101 @@ export default function DraggableSample({
             className="object-cover"
           />
           <div className="absolute inset-0 bg-black/10" />
-          
-          {/* Compact Waveform Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 bg-black/30 backdrop-blur-sm">
-            <div className="flex items-end justify-center px-1 h-full">
-              <div className="flex items-end space-x-0.5 h-full w-full">
-                {(sample.waveform || []).slice(0, 12).map((height: number, i: number) => (
-                  <div
-                    key={i}
-                    className={`w-0.5 rounded-full ${
-                      isPlaying ? 'bg-green-400' : 'bg-white/60'
-                    }`}
-                    style={{ height: `${Math.max(30, height * 0.6)}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Sample Info with Always-Visible Waveform */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-0.5">
-                {sample.name}
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{sample.artist}</p>
-            </div>
-          </div>
-
-          {/* WaveSurfer.js Waveform - Professional Audio Visualization */}
-          <div className="w-full mb-1">
-            <div 
-              ref={waveformRef}
-              className="w-full h-6 rounded-lg overflow-hidden cursor-pointer transition-all duration-300"
-              style={{
-                background: 'transparent',
-              }}
-            >
-              {/* WaveSurfer will render here */}
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
-              Afrobeat
-            </span>
-            <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs rounded-full">
-              Drums
-            </span>
-          </div>
-        </div>
-
-        {/* Parameters */}
-        <div className="flex-shrink-0 flex justify-center text-xs relative z-20">
-          <div className="bg-gray-100 dark:bg-gray-700 rounded px-3 py-1.5 text-center border border-gray-200 dark:border-gray-600 min-w-[70px]">
-            <div className="text-gray-600 dark:text-gray-400 text-xs">BPM</div>
-            <div className="text-green-600 dark:text-green-400 font-mono font-semibold">{sample.bpm}</div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex-shrink-0 flex items-center space-x-1.5 relative z-20">
+        {/* Play button beside the artwork */}
+        <div className="flex-shrink-0">
           <motion.button
             onClick={onPlayPause}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
               isPlaying
-                ? "bg-green-500 text-white shadow-lg"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400"
+                ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 hover:shadow-md"
             }`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </motion.button>
+        </div>
 
+        {/* Filename and Tags */}
+        <div className="flex-shrink-0 min-w-0" style={{ width: '200px' }}>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-1">
+            {sample.name}
+          </h3>
+          <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">afrobeat</span>
+            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">drums</span>
+            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">percussion</span>
+          </div>
+        </div>
+
+        {/* Waveform visualization stretched horizontally to occupy most of the row width */}
+        <div className="flex-1 min-w-0 mx-4">
+          <div 
+            ref={waveformRef}
+            className="w-full h-8 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            style={{
+              background: 'transparent',
+            }}
+          >
+            {/* WaveSurfer will render here */}
+          </div>
+        </div>
+
+        {/* Time duration displayed to the right of the waveform */}
+        <div className="flex-shrink-0 text-right">
+          <div className="text-sm font-mono text-gray-600 dark:text-gray-400">
+            {audioDuration > 0 ? `${Math.round(audioDuration)}s` : sample.duration}
+          </div>
+        </div>
+
+        {/* BPM value placed next to the time */}
+        <div className="flex-shrink-0">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[60px]">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">BPM</div>
+            <div className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">{sample.bpm}</div>
+          </div>
+        </div>
+
+        {/* Action Icons - Heart, Checkmark, Three Dots */}
+        <div className="flex-shrink-0 flex items-center space-x-2">
+          {/* Heart (Favorite) */}
           <motion.button
             onClick={() => setIsLiked(!isLiked)}
-            className={`p-1.5 rounded-full transition-colors ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               isLiked
                 ? "text-red-500 bg-red-50 dark:bg-red-900/20"
                 : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
             }`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <Heart className={`w-3.5 h-3.5 ${isLiked ? "fill-current" : ""}`} />
+            <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
           </motion.button>
 
+          {/* Checkmark (Download/Select) */}
           <motion.button
             onClick={handleDownload}
-            className="p-1.5 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="w-8 h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             title="Download audio file"
           >
-            <Download className="w-3.5 h-3.5" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </motion.button>
 
+          {/* Three Dots (More Options) */}
           <motion.button
-            className="p-1.5 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="w-8 h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <MoreHorizontal className="w-3.5 h-3.5" />
+            <MoreHorizontal className="w-4 h-4" />
           </motion.button>
-        </div>
-
-        {/* Drag Instruction */}
-        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded border border-gray-200 dark:border-gray-600">
-            Drag to DAW or Desktop
-          </div>
         </div>
       </div>
 
