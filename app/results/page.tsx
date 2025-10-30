@@ -39,8 +39,8 @@ function ResultsContent() {
       if (recommendationsParam) {
         try {
           const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
-          // Convert recommendations to sample format
-          const audioAnalysisSamples = recommendations.map((rec: any, index: number) => ({
+          // Convert recommendations to sample format and limit to 10 results
+          const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => ({
             id: `audio-analysis-${index}`,
             name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
             artist: 'Audio Analysis Match',
@@ -316,7 +316,7 @@ function ResultsContent() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="flex items-center justify-between p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between p-4 space-y-4 lg:space-y-0">
           <div className="flex items-center space-x-4">
             <motion.button
               onClick={handleBack}
@@ -326,45 +326,26 @@ function ResultsContent() {
             >
               <ArrowLeft className="w-5 h-5 text-green-600 dark:text-green-400" />
             </motion.button>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent truncate">
                 {recommendationsParam ? "Compatible Sounds" : (query || "Search Results")}
               </h1>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {recommendationsParam ? (
-                  <>
-                    {filteredSamples.length} naturally compatible Afrobeat loops • Source: {detectedBPM} BPM, {detectedKey} key
-                    {currentlyPlaying && (
-                      <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
-                        <motion.div
-                          className="w-2 h-2 bg-green-500 rounded-full mr-2"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                        />
-                        Playing
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {filteredSamples.length} Afrobeat drum loops found • Drag to your DAW
-                    {currentlyPlaying && (
-                      <span className="ml-2 inline-flex items-center text-green-600 dark:text-green-400">
-                        <motion.div
-                          className="w-2 h-2 bg-green-500 rounded-full mr-2"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
-                        />
-                        Playing
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
+              {currentlyPlaying && (
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="inline-flex items-center text-green-600 dark:text-green-400">
+                    <motion.div
+                      className="w-2 h-2 bg-green-500 rounded-full mr-2"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+                    />
+                    Playing
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center gap-2 lg:gap-4">
             {/* Theme Toggle */}
             <motion.button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -381,19 +362,19 @@ function ResultsContent() {
             </motion.button>
             
             {/* Search Filter */}
-            <div className="relative">
+            <div className="relative order-1 lg:order-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Filter samples..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-48 text-sm"
+                className="pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-full sm:w-48 text-sm"
               />
             </div>
 
-            {/* Volume Control */}
-            <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
+            {/* Volume Control - Hidden on mobile, visible on tablet+ */}
+            <div className="hidden md:flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
               <Volume2 className="w-4 h-4 text-green-600 dark:text-green-400" />
               <input
                 type="range"
@@ -406,10 +387,10 @@ function ResultsContent() {
               <span className="text-xs text-gray-600 dark:text-gray-400 w-8">{volume}</span>
             </div>
 
-            {/* Session Info */}
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
+            {/* Session Info - Responsive sizing */}
+            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-2 sm:px-3 py-2 border border-gray-200 dark:border-gray-600">
               <div className="text-xs text-gray-600 dark:text-gray-400">SESSION KEY</div>
-              <div className="font-semibold text-green-600 dark:text-green-400">{sessionKey}</div>
+              <div className="font-semibold text-green-600 dark:text-green-400 text-sm">{sessionKey}</div>
             </div>
 
           </div>
@@ -418,9 +399,9 @@ function ResultsContent() {
       </motion.header>
 
       {/* Sample List - Row Layout */}
-      <div className="p-6">
+      <div className="p-3 sm:p-4 lg:p-6">
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {filteredSamples.map((sample, index) => (
             <DraggableSample
               key={sample.id}

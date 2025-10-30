@@ -39,14 +39,14 @@ export default function SessionKeyModal({ isOpen, onClose, value, onChange }: Se
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[9999] p-3 sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
           <motion.div
-            className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-sm"
+            className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 w-full max-w-sm mx-2 sm:mx-0"
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -97,7 +97,7 @@ export default function SessionKeyModal({ isOpen, onClose, value, onChange }: Se
             </div>
 
             {/* Key Grid */}
-            <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-4">
               {keys.map((key) => {
                 const isSelected = value.includes(key.note)
 
@@ -105,7 +105,7 @@ export default function SessionKeyModal({ isOpen, onClose, value, onChange }: Se
                   <motion.button
                     key={key.note}
                     onClick={() => handleKeySelect(key.note)}
-                    className={`p-2 rounded-lg text-center transition-all duration-200 ${
+                    className={`p-1.5 sm:p-2 rounded-lg text-center transition-all duration-200 ${
                       isSelected
                         ? "bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg"
                         : "bg-gray-50 dark:bg-gray-800 hover:bg-green-50 dark:hover:bg-green-900/30 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 border border-gray-200 dark:border-gray-700 hover:border-green-200 dark:hover:border-green-700"
@@ -113,7 +113,7 @@ export default function SessionKeyModal({ isOpen, onClose, value, onChange }: Se
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <div className="font-bold text-sm">{key.note}</div>
+                    <div className="font-bold text-xs sm:text-sm">{key.note}</div>
                     <div className="text-xs opacity-75">{mode === "Major" ? "Maj" : "Min"}</div>
                   </motion.button>
                 )

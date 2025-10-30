@@ -97,7 +97,7 @@ export default function DraggableSample({
           barWidth: 2,
           barGap: 1,
           barRadius: 2,
-          height: 32, // Increased height for better visibility
+          height: 32, // Keep consistent height, CSS will handle responsive sizing
           normalize: true,
           backend: 'WebAudio',
           mediaControls: false,
@@ -442,7 +442,11 @@ export default function DraggableSample({
 
   return (
     <motion.div
-      className={`bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-green-500/50 transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${
+      className={`backdrop-blur-sm rounded-xl border overflow-hidden transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${
+        sample.isRecentSong 
+          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400" 
+          : "bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-green-500/50"
+      } ${
         isDragging ? "opacity-50 scale-95" : ""
       }`}
       initial={{ opacity: 0, x: -20 }}
@@ -453,8 +457,8 @@ export default function DraggableSample({
       onDragStart={(e) => handleDragStart(e as any)}
       onDragEnd={handleDragEnd}
     >
-      {/* Splice-style horizontal layout */}
-      <div className="flex items-center p-4 space-x-4">
+      {/* Splice-style horizontal layout - Responsive */}
+      <div className="flex items-center p-2 sm:p-3 lg:p-4 space-x-2 sm:space-x-3 lg:space-x-4">
         {/* Selection checkbox on the far left */}
         <div className="flex-shrink-0">
           <input
@@ -463,22 +467,38 @@ export default function DraggableSample({
           />
         </div>
 
-        {/* Artwork (square) */}
-        <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 relative overflow-hidden border border-gray-200 dark:border-gray-700">
-          <Image
-            src={getDrumImage(sample.category)}
-            alt={sample.category || "Drum"}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-black/10" />
+        {/* Artwork (square) - Responsive sizing */}
+        <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 relative overflow-hidden border ${
+          sample.isRecentSong 
+            ? "bg-gradient-to-br from-blue-500/30 to-purple-500/30 border-blue-400/50 dark:border-blue-500/50" 
+            : "bg-gradient-to-br from-green-500/20 to-green-600/20 border-gray-200 dark:border-gray-700"
+        }`}>
+          {sample.isRecentSong ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Image
+                src={getDrumImage(sample.category)}
+                alt={sample.category || "Drum"}
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-black/10" />
+            </>
+          )}
         </div>
 
-        {/* Play button beside the artwork */}
+        {/* Play button beside the artwork - Responsive sizing */}
         <div className="flex-shrink-0">
           <motion.button
             onClick={onPlayPause}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
               isPlaying
                 ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
                 : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 hover:shadow-md"
@@ -486,27 +506,50 @@ export default function DraggableSample({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            {isPlaying ? <Pause className="w-3 h-3 sm:w-4 sm:h-4" /> : <Play className="w-3 h-3 sm:w-4 sm:h-4 ml-0.5" />}
           </motion.button>
         </div>
 
-        {/* Filename and Tags */}
-        <div className="flex-shrink-0 min-w-0" style={{ width: '200px' }}>
-          <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate text-sm mb-1">
+        {/* Filename and Tags - Responsive */}
+        <div className="flex-shrink-0 min-w-0 hidden sm:block" style={{ width: '150px' }}>
+          <h3 className={`font-semibold truncate text-xs sm:text-sm mb-1 ${
+            sample.isRecentSong 
+              ? "text-blue-700 dark:text-blue-300" 
+              : "text-gray-800 dark:text-gray-200"
+          }`}>
             {sample.name}
           </h3>
           <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
-            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">afrobeat</span>
-            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">drums</span>
-            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">percussion</span>
+            {sample.isRecentSong ? (
+              <>
+                <span className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">your recording</span>
+                <span className="px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">captured</span>
+              </>
+            ) : (
+              <>
+                <span className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">afrobeat</span>
+                <span className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">drums</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Waveform visualization stretched horizontally to occupy most of the row width */}
-        <div className="flex-1 min-w-0 mx-4">
+        {/* Mobile filename - shown only on mobile */}
+        <div className="flex-shrink-0 min-w-0 sm:hidden">
+          <h3 className={`font-semibold truncate text-xs ${
+            sample.isRecentSong 
+              ? "text-blue-700 dark:text-blue-300" 
+              : "text-gray-800 dark:text-gray-200"
+          }`}>
+            {sample.name}
+          </h3>
+        </div>
+
+        {/* Waveform visualization stretched horizontally to occupy most of the row width - Responsive */}
+        <div className="flex-1 min-w-0 mx-2 sm:mx-3 lg:mx-4">
           <div 
             ref={waveformRef}
-            className="w-full h-8 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            className="w-full h-6 sm:h-7 lg:h-8 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
             style={{
               background: 'transparent',
             }}
@@ -515,27 +558,27 @@ export default function DraggableSample({
           </div>
         </div>
 
-        {/* Time duration displayed to the right of the waveform */}
-        <div className="flex-shrink-0 text-right">
-          <div className="text-sm font-mono text-gray-600 dark:text-gray-400">
+        {/* Time duration displayed to the right of the waveform - Hidden on mobile */}
+        <div className="flex-shrink-0 text-right hidden sm:block">
+          <div className="text-xs sm:text-sm font-mono text-gray-600 dark:text-gray-400">
             {audioDuration > 0 ? `${Math.round(audioDuration)}s` : sample.duration}
           </div>
         </div>
 
-        {/* BPM value placed next to the time */}
+        {/* BPM value placed next to the time - Responsive sizing */}
         <div className="flex-shrink-0">
-          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[60px]">
+          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px] sm:min-w-[60px]">
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">BPM</div>
-            <div className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">{sample.bpm}</div>
+            <div className="text-xs sm:text-sm font-mono font-semibold text-green-600 dark:text-green-400">{sample.bpm}</div>
           </div>
         </div>
 
-        {/* Action Icons - Heart, Checkmark, Three Dots */}
-        <div className="flex-shrink-0 flex items-center space-x-2">
+        {/* Action Icons - Heart, Checkmark, Three Dots - Responsive sizing */}
+        <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2">
           {/* Heart (Favorite) */}
           <motion.button
             onClick={() => setIsLiked(!isLiked)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               isLiked
                 ? "text-red-500 bg-red-50 dark:bg-red-900/20"
                 : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -543,29 +586,29 @@ export default function DraggableSample({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+            <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${isLiked ? "fill-current" : ""}`} />
           </motion.button>
 
-          {/* Checkmark (Download/Select) */}
+          {/* Checkmark (Download/Select) - Hidden on mobile */}
           <motion.button
             onClick={handleDownload}
-            className="w-8 h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors flex items-center justify-center"
+            className="hidden sm:flex w-7 h-7 sm:w-8 sm:h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors items-center justify-center"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title="Download audio file"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </motion.button>
 
           {/* Three Dots (More Options) */}
           <motion.button
-            className="w-8 h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <MoreHorizontal className="w-4 h-4" />
+            <MoreHorizontal className="w-3 h-3 sm:w-4 sm:h-4" />
           </motion.button>
         </div>
       </div>
