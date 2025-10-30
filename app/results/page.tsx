@@ -6,6 +6,7 @@ import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
+import { extractBPMFromString } from "@/lib/utils"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
@@ -45,7 +46,7 @@ function ResultsContent() {
             name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
             artist: 'Audio Analysis Match',
             category: 'audio-analysis',
-            bpm: rec.bpm,
+            bpm: rec.bpm ?? extractBPMFromString(rec.filename) ?? extractBPMFromString(rec.url),
             key: rec.key,
             audioUrl: rec.url,
             imageUrl: '/placeholder.jpg',
@@ -57,10 +58,10 @@ function ResultsContent() {
           // Add the recently played song as the first card
           const recentSong = {
             id: 'recent-song',
-            name: 'Your Recording',
+            name: 'YOUR AUDIO',
             artist: 'Recently Played',
             category: 'recording',
-            bpm: parseInt(detectedBPM || '120'),
+            bpm: detectedBPM ? parseInt(detectedBPM) : null,
             key: detectedKey || 'C',
             audioUrl: null, // Will use recordedAudioBuffer
             imageUrl: '/placeholder.jpg',
@@ -148,13 +149,13 @@ function ResultsContent() {
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // Generate additional mock recommendations
-      const additionalSamples = [
+          const additionalSamples = [
         {
           id: `additional-${Date.now()}-1`,
           name: "Extended Afrobeat Loop",
           artist: 'AI Generated Match',
           category: 'extended',
-          bpm: recordedBPM || 120,
+              bpm: recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav') ?? 113,
           key: detectedKey || 'C',
           audioUrl: '/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav',
           imageUrl: '/placeholder.jpg',
@@ -168,7 +169,7 @@ function ResultsContent() {
           name: "Variation Pattern",
           artist: 'AI Generated Match',
           category: 'variation',
-          bpm: (recordedBPM || 120) + 5,
+              bpm: (recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav') ?? 116) + 0,
           key: detectedKey || 'C',
           audioUrl: '/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav',
           imageUrl: '/placeholder.jpg',
@@ -182,7 +183,7 @@ function ResultsContent() {
           name: "Complementary Rhythm",
           artist: 'AI Generated Match',
           category: 'complementary',
-          bpm: (recordedBPM || 120) - 3,
+              bpm: recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav') ?? 104,
           key: detectedKey || 'C',
           audioUrl: '/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav',
           imageUrl: '/placeholder.jpg',

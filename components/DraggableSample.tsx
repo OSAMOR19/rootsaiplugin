@@ -7,6 +7,7 @@ import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download } f
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
+import { extractBPMFromString } from "@/lib/utils"
 import WaveSurfer from "wavesurfer.js"
 
 // Import drum images
@@ -291,6 +292,10 @@ export default function DraggableSample({
   // Use real audio progress
   const currentProgress = audioProgress
 
+  // Derive BPM from provided data or filename as fallback
+  const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename)
+  const displayBpm = sample?.bpm ?? inferredBpmFromName ?? recordedBPM ?? null
+
   // Function to get the appropriate image for each drum type
   const getDrumImage = (category: string) => {
     switch (category?.toLowerCase()) {
@@ -328,7 +333,7 @@ export default function DraggableSample({
       name: sample.name || sample.filename,
       artist: sample.artist || "Roots AI",
       category: sample.category,
-      bpm: sample.bpm,
+      bpm: sample.bpm ?? inferredBpmFromName ?? recordedBPM ?? undefined,
       duration: sample.duration,
       url: realAudioUrl, // Real audio URL
       metadata: {
@@ -522,7 +527,7 @@ export default function DraggableSample({
           <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
             {sample.isRecentSong ? (
               <>
-                <span className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">your recording</span>
+                <span className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs"></span>
                 <span className="px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">captured</span>
               </>
             ) : (
@@ -569,7 +574,7 @@ export default function DraggableSample({
         <div className="flex-shrink-0">
           <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-center border border-gray-200 dark:border-gray-600 min-w-[50px] sm:min-w-[60px]">
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">BPM</div>
-            <div className="text-xs sm:text-sm font-mono font-semibold text-green-600 dark:text-green-400">{sample.bpm}</div>
+            <div className="text-xs sm:text-sm font-mono font-semibold text-green-600 dark:text-green-400">{displayBpm ?? "--"}</div>
           </div>
         </div>
 
