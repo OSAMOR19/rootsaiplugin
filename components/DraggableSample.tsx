@@ -7,7 +7,7 @@ import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download } f
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
-import { extractBPMFromString } from "@/lib/utils"
+import { extractBPMFromString, formatTimeSeconds } from "@/lib/utils"
 import WaveSurfer from "wavesurfer.js"
 
 // Import drum images
@@ -566,7 +566,7 @@ export default function DraggableSample({
         {/* Time duration displayed to the right of the waveform - Hidden on mobile */}
         <div className="flex-shrink-0 text-right hidden sm:block">
           <div className="text-xs sm:text-sm font-mono text-gray-600 dark:text-gray-400">
-            {audioDuration > 0 ? `${Math.round(audioDuration)}s` : sample.duration}
+            {audioDuration > 0 ? formatTimeSeconds(audioDuration) : sample.duration}
           </div>
         </div>
 

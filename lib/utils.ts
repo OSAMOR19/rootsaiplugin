@@ -15,3 +15,12 @@ export function extractBPMFromString(source: string | undefined | null): number 
   }
   return null
 }
+
+// Format seconds into m:ss (e.g., 0:12, 3:05)
+export function formatTimeSeconds(totalSeconds: number | null | undefined): string {
+  if (totalSeconds == null || !Number.isFinite(totalSeconds)) return "0:00"
+  const clamped = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(clamped / 60)
+  const seconds = clamped % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
