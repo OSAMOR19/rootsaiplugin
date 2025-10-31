@@ -198,27 +198,37 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         
         // Convert to AudioBuffer and detect BPM with real detection
         try {
-          const audioBuffer = await blobToAudioBuffer(audioBlob)
+          const fullAudioBuffer = await blobToAudioBuffer(audioBlob)
+          
+          // Extract exactly 4 bars from the beginning
+          console.log('Extracting 4 bars from beginning of recorded audio...')
+          const extractedBuffer = await extractBest4Bars(fullAudioBuffer)
           
           // Reset previous BPM analysis
           resetAnalysis()
           
-          // Use real BPM detection
-          console.log('Starting real BPM detection...')
-          const bpmResult = await analyzeAudioBuffer(audioBuffer)
+          // Use real BPM detection on the extracted 4 bars
+          console.log('Starting real BPM detection on extracted 4 bars...')
+          const bpmResult = await analyzeAudioBuffer(extractedBuffer)
           
           console.log('BPM Detection Result:', {
             bpm: bpmResult.bpm,
             confidence: bpmResult.confidence,
-            isStable: bpmResult.isStable
+            isStable: bpmResult.isStable,
+            extractedDuration: extractedBuffer.duration.toFixed(2) + 's',
+            originalDuration: fullAudioBuffer.duration.toFixed(2) + 's'
           })
           
-          setRecordedAudioBuffer(audioBuffer)
+          setRecordedAudioBuffer(extractedBuffer) // Store the extracted 4 bars, not full recording
           setRecordedBPM(bpmResult.bpm)
           
-          toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`)
+          toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence) • Extracted 4 bars`)
           
-          await processAudio(audioBlob, audioBuffer, bpmResult.bpm)
+          // Create a new blob from the extracted buffer for API processing
+          // Convert extracted buffer to blob
+          const extractedWavBlob = audioBufferToBlob(extractedBuffer)
+          
+          await processAudio(extractedWavBlob, extractedBuffer, bpmResult.bpm)
         } catch (error) {
           console.error('Error processing recorded audio:', error)
         }

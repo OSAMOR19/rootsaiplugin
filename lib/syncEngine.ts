@@ -1,6 +1,7 @@
 /**
  * Audio Sync Engine - Web Audio API based audio synchronization
- * Provides BPM detection, tempo matching, and synchronized playback
+ * Provides tempo matching and synchronized playback
+ * NOTE: BPM detection is handled by bpmDetection.ts using web-audio-beat-detector
  */
 
 export interface AudioSyncData {
@@ -92,55 +93,9 @@ class AudioSyncEngine {
   }
 
   /**
-   * Simple BPM detection using autocorrelation
+   * REMOVED: BPM detection now handled exclusively by bpmDetection.ts using web-audio-beat-detector
+   * Use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts instead
    */
-  detectBPM(audioBuffer: AudioBuffer): number {
-    const sampleRate = audioBuffer.sampleRate
-    const channelData = audioBuffer.getChannelData(0) // Use first channel
-    
-    // Parameters for BPM detection
-    const minBPM = 60
-    const maxBPM = 200
-    const minPeriod = Math.floor(sampleRate * 60 / maxBPM)
-    const maxPeriod = Math.floor(sampleRate * 60 / minBPM)
-    
-    // Downsample for efficiency (reduced factor for better accuracy)
-    const downsampleFactor = Math.max(1, Math.floor(sampleRate / 44100)) // Better quality
-    const downsampledLength = Math.floor(channelData.length / downsampleFactor)
-    const downsampled = new Float32Array(downsampledLength)
-    
-    for (let i = 0; i < downsampledLength; i++) {
-      let sum = 0
-      for (let j = 0; j < downsampleFactor; j++) {
-        sum += channelData[i * downsampleFactor + j]
-      }
-      downsampled[i] = sum / downsampleFactor
-    }
-    
-    // Apply improved high-pass filter to emphasize transients
-    const filtered = this.highPassFilter(downsampled, 0.05) // Lower cutoff for better transient detection
-    
-    // Autocorrelation
-    let bestPeriod = 0
-    let bestCorrelation = 0
-    
-    for (let period = minPeriod; period <= maxPeriod; period += Math.floor(period * 0.01)) {
-      let correlation = 0
-      const correlationLength = Math.min(downsampledLength - period, 10000)
-      
-      for (let i = 0; i < correlationLength; i++) {
-        correlation += filtered[i] * filtered[i + period]
-      }
-      
-      if (correlation > bestCorrelation) {
-        bestCorrelation = correlation
-        bestPeriod = period
-      }
-    }
-    
-    const detectedBPM = Math.round((sampleRate * 60) / (bestPeriod * downsampleFactor))
-    return Math.max(minBPM, Math.min(maxBPM, detectedBPM))
-  }
 
   /**
    * Detect precise beat positions using onset detection
@@ -302,28 +257,33 @@ class AudioSyncEngine {
   }
 
   /**
-   * Extract the best 4 bars from uploaded audio
-   * Automatically finds the most interesting/musical section
+   * Extract exactly 4 bars from the beginning of the audio
+   * Always starts from the start (sample 0) to ensure consistency
+   * Uses web-audio-beat-detector for accurate BPM detection
    */
   async extractBest4Bars(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     const sampleRate = audioBuffer.sampleRate
-    const channels = audioBuffer.numberOfChannels
     const fullLength = audioBuffer.length
     
-    // Detect BPM and calculate duration of 4 bars
-    const detectedBPM = this.detectBPM(audioBuffer)
+    // Import web-audio-beat-detector for accurate BPM detection
+    const { quickBPMDetection } = await import('@/lib/bpmDetection')
+    
+    // Detect BPM using web-audio-beat-detector (accurate method)
+    const detectedBPM = await quickBPMDetection(audioBuffer)
     const beatsPerBar = 4
-    const totalBeats = beatsPerBar * 4 // 4 bars
+    const totalBeats = beatsPerBar * 4 // 4 bars = 16 beats
     const beatsPerSecond = detectedBPM / 60
     const fourBarsDurationSeconds = totalBeats / beatsPerSecond
     const fourBarsSampleLength = Math.floor(fourBarsDurationSeconds * sampleRate)
     
-    console.log('Extracting audio:', {
+    console.log('Extracting 4 bars from beginning:', {
       detectedBPM,
       fourBarsDurationSeconds: fourBarsDurationSeconds.toFixed(2),
       fourBarsSampleLength,
       originalLength: fullLength,
-      originalDurationSeconds: (fullLength / sampleRate).toFixed(2)
+      originalDurationSeconds: (fullLength / sampleRate).toFixed(2),
+      startSample: 0,
+      endSample: Math.min(fourBarsSampleLength, fullLength)
     })
     
     // If audio is shorter than 4 bars, return the entire audio
@@ -332,54 +292,19 @@ class AudioSyncEngine {
       return audioBuffer
     }
     
-    // Analyze energy/power throughout the audio to find the most interesting section
-    const energyWindowLength = Math.floor(sampleRate * 0.5) // 0.5 second windows
-    const numWindows = Math.floor(fullLength / energyWindowLength)
-    const energyValues = new Float32Array(numWindows)
+    // Always extract from the beginning (startSample = 0)
+    const startSample = 0
+    const extractLength = Math.min(fourBarsSampleLength, fullLength)
     
-    // Calculate energy for each window
-    for (let i = 0; i < numWindows; i++) {
-      const startSample = i * energyWindowLength
-      const endSample = Math.min(startSample + energyWindowLength, fullLength)
-      let totalEnergy = 0
-      
-      for (let channel = 0; channel < channels; channel++) {
-        const channelData = audioBuffer.getChannelData(channel)
-        for (let j = startSample; j < endSample; j++) {
-          const sample = channelData[j]
-          totalEnergy += sample * sample
-        }
-      }
-      
-      energyValues[i] = totalEnergy / ((endSample - startSample) * channels)
-    }
-    
-    // Find the window with highest energy (most interesting part)
-    let bestWindowStartSample = 0
-    let bestEnergy = 0
-    
-    // Only consider windows that can fit 4 bars
-    const maxStartWindow = Math.max(0, numWindows - Math.ceil(fourBarsSampleLength / energyWindowLength))
-    
-    for (let i = 0; i < maxStartWindow; i++) {
-      if (energyValues[i] > bestEnergy) {
-        bestEnergy = energyValues[i]
-        bestWindowStartSample = i * energyWindowLength
-      }
-    }
-    
-    // Ensure we don't exceed audio bounds
-    const startSample = Math.max(0, Math.min(bestWindowStartSample, fullLength - fourBarsSampleLength))
-    
-    console.log('Best section found:', {
-      startSample,
-      energy: bestEnergy.toFixed(6),
-      startTimeSeconds: (startSample / sampleRate).toFixed(2),
-      endTimeSeconds: ((startSample + fourBarsSampleLength) / sampleRate).toFixed(2)
+    console.log('Extracting from start:', {
+      startSample: 0,
+      extractLength,
+      extractDurationSeconds: (extractLength / sampleRate).toFixed(2),
+      expectedBars: (extractLength / sampleRate) / (fourBarsDurationSeconds / 4)
     })
     
-    // Extract the 4 bars
-    return this.extractAudioSlice(audioBuffer, startSample, fourBarsSampleLength)
+    // Extract exactly 4 bars from the beginning
+    return this.extractAudioSlice(audioBuffer, startSample, extractLength)
   }
 
   /**
@@ -506,8 +431,12 @@ class AudioSyncEngine {
       sampleVolume = 0.5 
     } = options
     
-    // Detect BPM for recorded audio (use passed BPM if available)
-    const recordedBPM = options.recordedBPM || this.detectBPM(recordedBuffer)
+    // Use passed BPM - do NOT re-detect (should already be accurately detected via web-audio-beat-detector)
+    if (!options.recordedBPM) {
+      console.warn('No recordedBPM provided to syncPlay - this should be set via bpmDetection.ts')
+      throw new Error('recordedBPM is required for tempo matching. Please provide the BPM detected via web-audio-beat-detector.')
+    }
+    const recordedBPM = options.recordedBPM
     
     // Find the target BPM - use the recorded audio's BPM as the master
     const targetBPM = recordedBPM
@@ -647,7 +576,7 @@ export const syncEngine = new AudioSyncEngine()
 // Export utility functions
 export const loadAudioBuffer = (filePath: string) => syncEngine.loadAudioBuffer(filePath)
 export const blobToAudioBuffer = (blob: Blob) => syncEngine.blobToAudioBuffer(blob)
-export const detectBPM = (audioBuffer: AudioBuffer) => syncEngine.detectBPM(audioBuffer)
+// REMOVED: detectBPM export - use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts instead
 export const extractBest4Bars = (audioBuffer: AudioBuffer) => syncEngine.extractBest4Bars(audioBuffer)
 export const fileToAudioBuffer = (file: File) => syncEngine.fileToAudioBuffer(file)
 export const syncPlay = (recordedBuffer: AudioBuffer, sampleBuffer: AudioBuffer, sampleBPM: number, options?: SyncPlaybackOptions) => 

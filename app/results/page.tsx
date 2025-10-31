@@ -10,7 +10,8 @@ import { extractBPMFromString } from "@/lib/utils"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
-import { blobToAudioBuffer, detectBPM, syncEngine } from "@/lib/syncEngine"
+import { blobToAudioBuffer, syncEngine } from "@/lib/syncEngine"
+import { quickBPMDetection } from "@/lib/bpmDetection"
 
 function ResultsContent() {
   const router = useRouter()
@@ -51,19 +52,24 @@ function ResultsContent() {
           
           // Convert recommendations to sample format and limit to 10 results
           // ALL recommendations should show the detected BPM, not their individual BPMs
-          const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => ({
-            id: `audio-analysis-${index}`,
-            name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
-            artist: 'Audio Analysis Match',
-            category: 'audio-analysis',
-            bpm: universalBPM, // Use detected BPM for all cards
-            key: rec.key,
-            audioUrl: rec.url,
-            imageUrl: '/placeholder.jpg',
-            duration: '4 bars',
-            tags: ['audio-analysis', 'matching-bpm', 'matching-key'],
-            waveform: Array.from({ length: 50 }, () => Math.random() * 100) // Generate random waveform data
-          }))
+          // But we store the actual BPM in originalBpm for tempo matching calculations
+          const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => {
+            const originalBpm = rec.bpm ?? extractBPMFromString(rec.filename) ?? extractBPMFromString(rec.url)
+            return {
+              id: `audio-analysis-${index}`,
+              name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+              artist: 'Audio Analysis Match',
+              category: 'audio-analysis',
+              bpm: universalBPM, // Use detected BPM for display
+              originalBpm: originalBpm, // Store actual BPM for tempo matching
+              key: rec.key,
+              audioUrl: rec.url,
+              imageUrl: '/placeholder.jpg',
+              duration: '4 bars',
+              tags: ['audio-analysis', 'matching-bpm', 'matching-key'],
+              waveform: Array.from({ length: 50 }, () => Math.random() * 100) // Generate random waveform data
+            }
+          })
           
           // Add the recently played song as the first card
           const recentSong = {
@@ -145,68 +151,157 @@ function ResultsContent() {
   }
 
   const handleViewMore = async () => {
-    if (!recordedAudioBuffer || isLoadingMore) return
+    if (!recordedAudioBuffer || isLoadingMore || !recordedBPM || !detectedKey) return
     
     setIsLoadingMore(true)
     
     try {
-      // Simulate API call to get more recommendations
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Load real metadata from local library
+      const metadataResponse = await fetch('/audio/metadata.json')
+      if (!metadataResponse.ok) {
+        throw new Error('Failed to load audio metadata')
+      }
       
-      // Generate additional mock recommendations
-          // All additional samples should also show the detected BPM
-          const universalBPMForAdditional = recordedBPM
-          
-          const additionalSamples = [
-            {
-              id: `additional-${Date.now()}-1`,
-              name: "Extended Afrobeat Loop",
-              artist: 'AI Generated Match',
-              category: 'extended',
-              bpm: universalBPMForAdditional, // Use detected BPM
-              key: detectedKey || 'C',
-              audioUrl: '/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav',
-              imageUrl: '/placeholder.jpg',
-              duration: '8 bars',
-              tags: ['extended', 'afrobeat', 'ai-generated'],
-              audioBuffer: null,
-              waveform: [0.2, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.8, 0.2, 0.6, 0.4, 0.7, 0.3, 0.9, 0.5, 0.8]
-            },
-            {
-              id: `additional-${Date.now()}-2`,
-              name: "Variation Pattern",
-              artist: 'AI Generated Match',
-              category: 'variation',
-              bpm: universalBPMForAdditional, // Use detected BPM
-              key: detectedKey || 'C',
-              audioUrl: '/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav',
-              imageUrl: '/placeholder.jpg',
-              duration: '4 bars',
-              tags: ['variation', 'afrobeat', 'ai-generated'],
-              audioBuffer: null,
-              waveform: [0.3, 0.7, 0.5, 0.8, 0.4, 0.9, 0.2, 0.6, 0.5, 0.8, 0.3, 0.7, 0.4, 0.9, 0.2, 0.6]
-            },
-            {
-              id: `additional-${Date.now()}-3`,
-              name: "Complementary Rhythm",
-              artist: 'AI Generated Match',
-              category: 'complementary',
-              bpm: universalBPMForAdditional, // Use detected BPM
-              key: detectedKey || 'C',
-              audioUrl: '/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav',
-              imageUrl: '/placeholder.jpg',
-              duration: '4 bars',
-              tags: ['complementary', 'afrobeat', 'ai-generated'],
-              audioBuffer: null,
-              waveform: [0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9, 0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9]
-            }
-          ]
+      const allLoops: any[] = await metadataResponse.json()
+      
+      // Get already displayed sample URLs to exclude them
+      const existingUrls = new Set(samples.map((s: any) => s.audioUrl).filter(Boolean))
+      
+      // Calculate compatibility scores for all loops (same algorithm as API)
+      const calculateCompatibilityScore = (
+        detectedBPM: number,
+        detectedKey: string,
+        loopBPM: number,
+        loopKey: string,
+        loopFilename: string
+      ): number => {
+        let totalScore = 0
+        
+        // 1. Musical Compatibility
+        let musicalScore = 0
+        if (detectedKey === loopKey) {
+          musicalScore += 25
+        } else {
+          const harmonicRelationships: { [key: string]: { [relatedKey: string]: number } } = {
+            'C': { 'Am': 35, 'F': 30, 'G': 32, 'Dm': 25, 'Em': 20 },
+            'Am': { 'C': 35, 'F': 32, 'G': 28, 'Dm': 30, 'Em': 25 },
+            'F': { 'C': 30, 'Am': 32, 'Dm': 35, 'Bb': 25, 'G': 20 },
+            'G': { 'C': 32, 'Am': 28, 'Em': 35, 'D': 30, 'F': 20 },
+            'Dm': { 'F': 35, 'Am': 30, 'Bb': 32, 'C': 25, 'G': 18 },
+            'F#m': { 'A': 35, 'D': 32, 'E': 30, 'Bm': 25, 'C#m': 20 }
+          }
+          musicalScore += harmonicRelationships[detectedKey]?.[loopKey] || 10
+        }
+        
+        const bpmRatio = loopBPM / detectedBPM
+        if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
+          musicalScore += 15
+        } else if (bpmRatio >= 0.5 && bpmRatio <= 0.52 || bpmRatio >= 1.98 && bpmRatio <= 2.02) {
+          musicalScore += 25
+        } else if (Math.abs(detectedBPM - loopBPM) <= 5) {
+          musicalScore += 18
+        } else if (Math.abs(detectedBPM - loopBPM) <= 10) {
+          musicalScore += 12
+        } else {
+          musicalScore += Math.max(0, 15 - Math.abs(detectedBPM - loopBPM) / 2)
+        }
+        
+        totalScore += musicalScore
+        
+        // 2. Rhythmic Complexity
+        const filename = loopFilename.toLowerCase()
+        let rhythmScore = 0
+        if (filename.includes('fill') || filename.includes('roll')) {
+          rhythmScore += 20
+        } else if (filename.includes('kick') || filename.includes('bass')) {
+          rhythmScore += 25
+        } else if (filename.includes('shaker') || filename.includes('hi') || filename.includes('perc')) {
+          rhythmScore += 30
+        } else if (filename.includes('full') || filename.includes('complete')) {
+          rhythmScore += 15
+        } else if (filename.includes('top') || filename.includes('melody')) {
+          rhythmScore += 22
+        }
+        totalScore += rhythmScore
+        
+        // 3. Timbral Compatibility
+        let timbreScore = 0
+        if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
+          timbreScore += 15
+        }
+        if (filename.includes('kick') || filename.includes('bass') || filename.includes('low')) {
+          timbreScore += 10
+        } else if (filename.includes('hi') || filename.includes('cymbal') || filename.includes('shaker')) {
+          timbreScore += 12
+        } else if (filename.includes('mid') || filename.includes('tom') || filename.includes('snare')) {
+          timbreScore += 8
+        }
+        totalScore += timbreScore
+        
+        // 4. Cultural/Stylistic Coherence
+        let styleScore = 15
+        if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
+            (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
+            (filename.includes('shekere') && filename.includes('perc'))) {
+          styleScore += 10
+        }
+        totalScore += styleScore
+        
+        const finalScore = Math.min(100, totalScore)
+        return finalScore >= 75 ? finalScore : 0
+      }
+      
+      // Score all loops and filter out already shown ones
+      const scoredLoops = allLoops
+        .filter(loop => !existingUrls.has(loop.url)) // Exclude already shown
+        .map(loop => ({
+          ...loop,
+          score: calculateCompatibilityScore(
+            recordedBPM,
+            detectedKey,
+            loop.bpm,
+            loop.key,
+            loop.filename
+          )
+        }))
+        .filter(loop => loop.score > 0) // Only compatible matches
+        .sort((a, b) => b.score - a.score) // Sort by compatibility
+      
+      // Get top 5-10 additional matches
+      const topMatches = scoredLoops.slice(0, 10)
+      
+      // Convert to sample format
+      const universalBPMForAdditional = recordedBPM
+      const additionalSamples = topMatches.map((loop, index) => {
+        const originalBpm = loop.bpm
+        return {
+          id: `additional-${Date.now()}-${index}`,
+          name: loop.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+          artist: 'Audio Library Match',
+          category: loop.category?.toLowerCase() || 'matching',
+          bpm: universalBPMForAdditional, // Use detected BPM for display
+          originalBpm: originalBpm, // Store actual BPM for tempo matching
+          key: loop.key,
+          audioUrl: loop.url,
+          imageUrl: '/placeholder.jpg',
+          duration: '4 bars',
+          tags: ['audio-library', 'matching-bpm', 'matching-key', loop.category?.toLowerCase() || ''],
+          waveform: Array.from({ length: 50 }, () => Math.random() * 100)
+        }
+      })
+      
+      if (additionalSamples.length === 0) {
+        console.warn('No additional compatible samples found')
+        // Could show a message to user here
+      }
       
       // Add new samples to existing ones
       setSamples(prevSamples => [...prevSamples, ...additionalSamples])
       
+      console.log(`Loaded ${additionalSamples.length} additional compatible samples from local library`)
+      
     } catch (error) {
-      console.error('Error loading more samples:', error)
+      console.error('Error loading more samples from local library:', error)
     } finally {
       setIsLoadingMore(false)
     }

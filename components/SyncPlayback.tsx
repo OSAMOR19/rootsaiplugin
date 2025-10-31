@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Play, Pause, Square, Volume2 } from 'lucide-react'
-import { syncEngine, loadAudioBuffer, detectBPM } from '@/lib/syncEngine'
+import { syncEngine, loadAudioBuffer } from '@/lib/syncEngine'
+import { quickBPMDetection } from '@/lib/bpmDetection'
 
 interface SyncPlaybackProps {
   recordedAudioBuffer: AudioBuffer | null

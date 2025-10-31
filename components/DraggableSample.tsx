@@ -199,6 +199,20 @@ export default function DraggableSample({
 
         ws.on('ready', () => {
           setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
+          
+          // Apply tempo matching: adjust playback rate to match detected BPM
+          // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
+          const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+          if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
+            const rate = recordedBPM / actualBPM
+            ws.setPlaybackRate(rate)
+            console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+          } else if (recordedBPM && actualBPM) {
+            console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
+            ws.setPlaybackRate(1.0)
+          } else {
+            ws.setPlaybackRate(1.0) // Reset to normal speed if no tempo match needed
+          }
         })
 
         ws.on('audioprocess', () => {
@@ -297,6 +311,18 @@ export default function DraggableSample({
   const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename)
   // Prioritize recordedBPM when available (this is the detected BPM that should be shown on all recommendation cards)
   const displayBpm = recordedBPM ?? sample?.bpm ?? inferredBpmFromName ?? null
+  
+  // Get the actual BPM of this sample file (for tempo matching calculation)
+  // This is the sample's natural BPM before tempo adjustment
+  // Use originalBpm if available (stored from metadata), otherwise parse from filename/URL
+  const sampleActualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+  
+  // Calculate playback rate to tempo-match this sample to the detected BPM
+  // Formula: playbackRate = detectedBPM / sampleActualBPM
+  // If detected is 104 and sample is 113, rate = 104/113 = 0.92 (plays slower)
+  const playbackRate = recordedBPM && sampleActualBPM && sampleActualBPM > 0
+    ? recordedBPM / sampleActualBPM 
+    : 1.0 // Default to 1.0 if we can't calculate
 
   // Function to get the appropriate image for each drum type
   const getDrumImage = (category: string) => {
