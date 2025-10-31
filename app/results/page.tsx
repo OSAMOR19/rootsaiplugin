@@ -40,13 +40,23 @@ function ResultsContent() {
       if (recommendationsParam) {
         try {
           const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
+          
+          // Get the detected BPM to use for all recommendation cards
+          const universalBPM = detectedBPM ? parseInt(detectedBPM) : null
+          
+          // Set recorded BPM from URL params (for DraggableSample to use)
+          if (detectedBPM) {
+            setRecordedBPM(parseInt(detectedBPM))
+          }
+          
           // Convert recommendations to sample format and limit to 10 results
+          // ALL recommendations should show the detected BPM, not their individual BPMs
           const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => ({
             id: `audio-analysis-${index}`,
             name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
             artist: 'Audio Analysis Match',
             category: 'audio-analysis',
-            bpm: rec.bpm ?? extractBPMFromString(rec.filename) ?? extractBPMFromString(rec.url),
+            bpm: universalBPM, // Use detected BPM for all cards
             key: rec.key,
             audioUrl: rec.url,
             imageUrl: '/placeholder.jpg',
@@ -61,7 +71,7 @@ function ResultsContent() {
             name: 'YOUR AUDIO',
             artist: 'Recently Played',
             category: 'recording',
-            bpm: detectedBPM ? parseInt(detectedBPM) : null,
+            bpm: universalBPM, // Use detected BPM
             key: detectedKey || 'C',
             audioUrl: null, // Will use recordedAudioBuffer
             imageUrl: '/placeholder.jpg',
@@ -72,11 +82,6 @@ function ResultsContent() {
           }
           
           setSamples([recentSong, ...audioAnalysisSamples])
-          
-          // Set recorded BPM from URL params
-          if (detectedBPM) {
-            setRecordedBPM(parseInt(detectedBPM))
-          }
           
           // Load recorded audio buffer from localStorage
           try {
@@ -149,50 +154,53 @@ function ResultsContent() {
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // Generate additional mock recommendations
+          // All additional samples should also show the detected BPM
+          const universalBPMForAdditional = recordedBPM
+          
           const additionalSamples = [
-        {
-          id: `additional-${Date.now()}-1`,
-          name: "Extended Afrobeat Loop",
-          artist: 'AI Generated Match',
-          category: 'extended',
-              bpm: recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav') ?? 113,
-          key: detectedKey || 'C',
-          audioUrl: '/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav',
-          imageUrl: '/placeholder.jpg',
-          duration: '8 bars',
-          tags: ['extended', 'afrobeat', 'ai-generated'],
-          audioBuffer: null,
-          waveform: [0.2, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.8, 0.2, 0.6, 0.4, 0.7, 0.3, 0.9, 0.5, 0.8]
-        },
-        {
-          id: `additional-${Date.now()}-2`,
-          name: "Variation Pattern",
-          artist: 'AI Generated Match',
-          category: 'variation',
-              bpm: (recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav') ?? 116) + 0,
-          key: detectedKey || 'C',
-          audioUrl: '/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav',
-          imageUrl: '/placeholder.jpg',
-          duration: '4 bars',
-          tags: ['variation', 'afrobeat', 'ai-generated'],
-          audioBuffer: null,
-          waveform: [0.3, 0.7, 0.5, 0.8, 0.4, 0.9, 0.2, 0.6, 0.5, 0.8, 0.3, 0.7, 0.4, 0.9, 0.2, 0.6]
-        },
-        {
-          id: `additional-${Date.now()}-3`,
-          name: "Complementary Rhythm",
-          artist: 'AI Generated Match',
-          category: 'complementary',
-              bpm: recordedBPM ?? extractBPMFromString('/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav') ?? 104,
-          key: detectedKey || 'C',
-          audioUrl: '/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav',
-          imageUrl: '/placeholder.jpg',
-          duration: '4 bars',
-          tags: ['complementary', 'afrobeat', 'ai-generated'],
-          audioBuffer: null,
-          waveform: [0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9, 0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9]
-        }
-      ]
+            {
+              id: `additional-${Date.now()}-1`,
+              name: "Extended Afrobeat Loop",
+              artist: 'AI Generated Match',
+              category: 'extended',
+              bpm: universalBPMForAdditional, // Use detected BPM
+              key: detectedKey || 'C',
+              audioUrl: '/audio/Full Drums/Manifxtsounds - Champion Drum Loop 113BPM.wav',
+              imageUrl: '/placeholder.jpg',
+              duration: '8 bars',
+              tags: ['extended', 'afrobeat', 'ai-generated'],
+              audioBuffer: null,
+              waveform: [0.2, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.8, 0.2, 0.6, 0.4, 0.7, 0.3, 0.9, 0.5, 0.8]
+            },
+            {
+              id: `additional-${Date.now()}-2`,
+              name: "Variation Pattern",
+              artist: 'AI Generated Match',
+              category: 'variation',
+              bpm: universalBPMForAdditional, // Use detected BPM
+              key: detectedKey || 'C',
+              audioUrl: '/audio/Full Drums/Manifxtsounds - High Drum Loop 116BPM.wav',
+              imageUrl: '/placeholder.jpg',
+              duration: '4 bars',
+              tags: ['variation', 'afrobeat', 'ai-generated'],
+              audioBuffer: null,
+              waveform: [0.3, 0.7, 0.5, 0.8, 0.4, 0.9, 0.2, 0.6, 0.5, 0.8, 0.3, 0.7, 0.4, 0.9, 0.2, 0.6]
+            },
+            {
+              id: `additional-${Date.now()}-3`,
+              name: "Complementary Rhythm",
+              artist: 'AI Generated Match',
+              category: 'complementary',
+              bpm: universalBPMForAdditional, // Use detected BPM
+              key: detectedKey || 'C',
+              audioUrl: '/audio/Full Drums/Manifxtsounds - Woman Drum Loop 104BPM.wav',
+              imageUrl: '/placeholder.jpg',
+              duration: '4 bars',
+              tags: ['complementary', 'afrobeat', 'ai-generated'],
+              audioBuffer: null,
+              waveform: [0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9, 0.4, 0.6, 0.3, 0.8, 0.5, 0.7, 0.2, 0.9]
+            }
+          ]
       
       // Add new samples to existing ones
       setSamples(prevSamples => [...prevSamples, ...additionalSamples])

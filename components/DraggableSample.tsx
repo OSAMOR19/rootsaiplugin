@@ -293,8 +293,10 @@ export default function DraggableSample({
   const currentProgress = audioProgress
 
   // Derive BPM from provided data or filename as fallback
+  // For recommendation cards, prioritize recordedBPM (detected BPM) so all cards show the same BPM
   const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename)
-  const displayBpm = sample?.bpm ?? inferredBpmFromName ?? recordedBPM ?? null
+  // Prioritize recordedBPM when available (this is the detected BPM that should be shown on all recommendation cards)
+  const displayBpm = recordedBPM ?? sample?.bpm ?? inferredBpmFromName ?? null
 
   // Function to get the appropriate image for each drum type
   const getDrumImage = (category: string) => {

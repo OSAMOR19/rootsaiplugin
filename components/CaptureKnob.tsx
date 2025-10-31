@@ -218,7 +218,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           
           toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`)
           
-          await processAudio(audioBlob, audioBuffer)
+          await processAudio(audioBlob, audioBuffer, bpmResult.bpm)
         } catch (error) {
           console.error('Error processing recorded audio:', error)
         }
@@ -286,16 +286,49 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     }
   }
 
-  const processAudio = async (audioBlob: Blob, audioBuffer: AudioBuffer) => {
+  const processAudio = async (audioBlob: Blob, audioBuffer: AudioBuffer, detectedBPM?: number | null) => {
     setIsProcessing(true)
+    
+    // Use provided BPM or try to get from state, but never default to 120
+    let bpmToUse = detectedBPM ?? recordedBPM
     
     console.log('processAudio called:', {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
       bufferDuration: audioBuffer.duration,
       bufferSampleRate: audioBuffer.sampleRate,
-      recordedBPM
+      recordedBPM,
+      detectedBPM,
+      bpmToUse
     })
+    
+    // If no BPM is available, try to detect it now
+    if (!bpmToUse) {
+      console.warn('No BPM provided, attempting to detect now...')
+      try {
+        resetAnalysis()
+        const bpmResult = await analyzeAudioBuffer(audioBuffer)
+        const finalBPM = bpmResult.bpm
+        setRecordedBPM(finalBPM)
+        console.log('BPM detected during processAudio:', finalBPM)
+        
+        // Continue with detected BPM
+        bpmToUse = finalBPM
+      } catch (bpmError) {
+        console.error('Failed to detect BPM:', bpmError)
+        toast.error('Could not detect BPM. Please try again.')
+        setIsProcessing(false)
+        return
+      }
+    }
+    
+    // Now process with the detected BPM
+    if (!bpmToUse) {
+      console.error('No BPM available after detection attempts')
+      toast.error('Could not detect BPM. Please try again.')
+      setIsProcessing(false)
+      return
+    }
     
     try {
       // For now, let's simulate the API response to avoid server issues
@@ -307,7 +340,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       
       // Mock recommendation data
       const mockData = {
-        detectedBPM: recordedBPM || 120,
+        detectedBPM: bpmToUse,
         detectedKey: 'C',
         recommendations: [
           {
@@ -357,7 +390,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     } catch (error) {
       console.error('Error processing audio:', error)
       
-      toast.error('Analysis failed. Please tryAgain.')
+      toast.error('Analysis failed. Please try again.')
       
       // Show detailed error for debugging
       console.error('Full error details:', {
@@ -477,7 +510,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       
       // Automatically trigger analysis after extraction
       console.log('Auto-triggering analysis after upload extraction...')
-      await processAudio(extractedBlob, extractedBuffer)
+      await processAudio(extractedBlob, extractedBuffer, bpmResult.bpm)
       
       toast.success('Audio processed, extracted, and analyzed!')
       
