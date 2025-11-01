@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
@@ -31,6 +31,8 @@ function ResultsContent() {
   const [searchFilter, setSearchFilter] = useState("")
   const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
   const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
+  const [editedBPM, setEditedBPM] = useState<number | null>(null) // User-edited BPM
+  const [bpmInputValue, setBpmInputValue] = useState<string>("") // Temporary input value for typing
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
@@ -43,15 +45,19 @@ function ResultsContent() {
           const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
           
           // Get the detected BPM to use for all recommendation cards
-          const universalBPM = detectedBPM ? parseInt(detectedBPM) : null
+          // Use edited BPM if available, otherwise fall back to detected BPM
+          const universalBPM = editedBPM ?? (detectedBPM ? parseInt(detectedBPM) : null)
           
           // Set recorded BPM from URL params (for DraggableSample to use)
           if (detectedBPM) {
-            setRecordedBPM(parseInt(detectedBPM))
+            const initialBPM = parseInt(detectedBPM)
+            setRecordedBPM(initialBPM)
+            setEditedBPM(initialBPM) // Initialize edited BPM
+            setBpmInputValue(initialBPM.toString()) // Initialize input value
           }
           
           // Convert recommendations to sample format and limit to 10 results
-          // ALL recommendations should show the detected BPM, not their individual BPMs
+          // ALL recommendations should show the edited/detected BPM, not their individual BPMs
           // But we store the actual BPM in originalBpm for tempo matching calculations
           const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => {
             const originalBpm = rec.bpm ?? extractBPMFromString(rec.filename) ?? extractBPMFromString(rec.url)
@@ -60,7 +66,7 @@ function ResultsContent() {
               name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
               artist: 'Audio Analysis Match',
               category: 'audio-analysis',
-              bpm: universalBPM, // Use detected BPM for display
+              bpm: universalBPM, // Use edited/detected BPM for display
               originalBpm: originalBpm, // Store actual BPM for tempo matching
               key: rec.key,
               audioUrl: rec.url,
@@ -77,7 +83,7 @@ function ResultsContent() {
             name: 'YOUR AUDIO',
             artist: 'Recently Played',
             category: 'recording',
-            bpm: universalBPM, // Use detected BPM
+            bpm: universalBPM, // Use edited/detected BPM
             key: detectedKey || 'C',
             audioUrl: null, // Will use recordedAudioBuffer
             imageUrl: '/placeholder.jpg',
@@ -144,14 +150,44 @@ function ResultsContent() {
 
     const timer = setTimeout(loadData, 1500)
     return () => clearTimeout(timer)
-  }, [query, recommendationsParam, detectedBPM])
+    }, [query, recommendationsParam, detectedBPM])
+
+  // Update sample BPMs when editedBPM changes - this applies the BPM to ALL samples
+  useEffect(() => {
+    if (editedBPM !== null) {
+      // Update all samples immediately with the new BPM
+      setSamples(prevSamples => {
+        // Only update if BPM actually changed to avoid unnecessary re-renders
+        const needsUpdate = prevSamples.some(s => s.bpm !== editedBPM)
+        if (!needsUpdate) return prevSamples
+        
+        return prevSamples.map(sample => ({
+          ...sample,
+          bpm: editedBPM
+        }))
+      })
+      
+      // Also update recordedBPM so playback uses the new BPM
+      setRecordedBPM(editedBPM)
+    }
+  }, [editedBPM])
+
+  // Helper function to apply BPM change (used when user types/edits)
+  const applyBPMChange = (newBPM: number) => {
+    // Clamp to valid range
+    const clampedBPM = Math.max(50, Math.min(300, newBPM))
+    setEditedBPM(clampedBPM)
+    setBpmInputValue(clampedBPM.toString())
+    // The useEffect above will handle updating all samples
+  }
 
   const handlePlayPause = (sampleId: string) => {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
   }
 
   const handleViewMore = async () => {
-    if (!recordedAudioBuffer || isLoadingMore || !recordedBPM || !detectedKey) return
+    const bpmToUse = editedBPM ?? recordedBPM
+    if (!recordedAudioBuffer || isLoadingMore || !bpmToUse || !detectedKey) return
     
     setIsLoadingMore(true)
     
@@ -257,7 +293,7 @@ function ResultsContent() {
         .map(loop => ({
           ...loop,
           score: calculateCompatibilityScore(
-            recordedBPM,
+            bpmToUse,
             detectedKey,
             loop.bpm,
             loop.key,
@@ -271,7 +307,7 @@ function ResultsContent() {
       const topMatches = scoredLoops.slice(0, 10)
       
       // Convert to sample format
-      const universalBPMForAdditional = recordedBPM
+      const universalBPMForAdditional = bpmToUse
       const additionalSamples = topMatches.map((loop, index) => {
         const originalBpm = loop.bpm
         return {
@@ -491,6 +527,70 @@ function ResultsContent() {
               <span className="text-xs text-gray-600 dark:text-gray-400 w-8">{volume}</span>
             </div>
 
+            {/* Tempo Editor - FL Studio Style */}
+            {editedBPM !== null && (
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-2 sm:px-3 py-2 border border-gray-200 dark:border-gray-600 flex items-center space-x-2">
+                <Music className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => {
+                      const newBPM = Math.max(50, editedBPM - 1)
+                      applyBPMChange(newBPM)
+                    }}
+                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    title="Decrease BPM"
+                  >
+                    <Minus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={bpmInputValue}
+                    onChange={(e) => {
+                      const input = e.target.value
+                      // Allow empty string, numbers, and partial input
+                      if (input === "" || /^\d*$/.test(input)) {
+                        setBpmInputValue(input)
+                        // If it's a valid number in range, apply it immediately
+                        const numValue = parseInt(input)
+                        if (!isNaN(numValue) && numValue >= 50 && numValue <= 300) {
+                          applyBPMChange(numValue)
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value)
+                      if (isNaN(value) || value < 50) {
+                        applyBPMChange(50)
+                      } else if (value > 300) {
+                        applyBPMChange(300)
+                      } else {
+                        applyBPMChange(value)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur() // Trigger onBlur validation
+                      }
+                    }}
+                    className="w-16 text-center bg-transparent border-none outline-none font-semibold text-green-600 dark:text-green-400 text-sm focus:ring-1 focus:ring-green-500 focus:bg-gray-50 dark:focus:bg-gray-700 rounded px-1"
+                    title="Edit Tempo (50-300 BPM) - Type and press Enter"
+                  />
+                  <button
+                    onClick={() => {
+                      const newBPM = Math.min(300, editedBPM + 1)
+                      applyBPMChange(newBPM)
+                    }}
+                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    title="Increase BPM"
+                  >
+                    <Plus className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                  </button>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 ml-1">BPM</div>
+              </div>
+            )}
+
             {/* Session Info - Responsive sizing */}
             <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-2 sm:px-3 py-2 border border-gray-200 dark:border-gray-600">
               <div className="text-xs text-gray-600 dark:text-gray-400">SESSION KEY</div>
@@ -515,7 +615,7 @@ function ResultsContent() {
               index={index}
               audioUrl={sample.audioUrl}
               recordedAudioBuffer={recordedAudioBuffer}
-              recordedBPM={recordedBPM}
+              recordedBPM={editedBPM ?? recordedBPM}
             />
           ))}
         </div>

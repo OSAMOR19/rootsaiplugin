@@ -250,6 +250,21 @@ export default function DraggableSample({
     }
   }, [waveformRef.current, sample.waveform, audioUrl])
 
+  // Update playback rate when recordedBPM changes (for tempo matching)
+  useEffect(() => {
+    if (waveSurfer && recordedBPM) {
+      const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename || '')
+      const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+      if (actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
+        const rate = recordedBPM / actualBPM
+        waveSurfer.setPlaybackRate(rate)
+        console.log(`🔄 Updated tempo match for "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+      } else if (actualBPM && actualBPM === recordedBPM) {
+        waveSurfer.setPlaybackRate(1.0)
+      }
+    }
+  }, [recordedBPM, waveSurfer, sample, audioUrl])
+
   // Handle WaveSurfer play/pause 
   useEffect(() => {
     if (waveSurfer && !isInitializingRef.current) {
