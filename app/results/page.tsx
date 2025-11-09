@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music, Heart } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
 import { blobToAudioBuffer, syncEngine } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
+import { getFavoritesCount } from "@/lib/favorites"
 
 function ResultsContent() {
   const router = useRouter()
@@ -31,9 +32,11 @@ function ResultsContent() {
   const [searchFilter, setSearchFilter] = useState("")
   const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
   const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
+  const [originalDetectedBPM, setOriginalDetectedBPM] = useState<number | null>(null) // Store original detected BPM for tempo calculations
   const [editedBPM, setEditedBPM] = useState<number | null>(null) // User-edited BPM
   const [bpmInputValue, setBpmInputValue] = useState<string>("") // Temporary input value for typing
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [favoritesCount, setFavoritesCount] = useState(0)
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
@@ -52,6 +55,7 @@ function ResultsContent() {
           if (detectedBPM) {
             const initialBPM = parseInt(detectedBPM)
             setRecordedBPM(initialBPM)
+            setOriginalDetectedBPM(initialBPM) // Store original detected BPM
             setEditedBPM(initialBPM) // Initialize edited BPM
             setBpmInputValue(initialBPM.toString()) // Initialize input value
           }
@@ -151,6 +155,20 @@ function ResultsContent() {
     const timer = setTimeout(loadData, 1500)
     return () => clearTimeout(timer)
     }, [query, recommendationsParam, detectedBPM])
+
+  // Load favorites count and listen for updates
+  useEffect(() => {
+    const updateFavoritesCount = () => {
+      setFavoritesCount(getFavoritesCount())
+    }
+    
+    updateFavoritesCount()
+    window.addEventListener('favoritesUpdated', updateFavoritesCount)
+    
+    return () => {
+      window.removeEventListener('favoritesUpdated', updateFavoritesCount)
+    }
+  }, [])
 
   // Update sample BPMs when editedBPM changes - this applies the BPM to ALL samples
   useEffect(() => {
@@ -486,6 +504,22 @@ function ResultsContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:gap-4">
+            {/* Favorites Button */}
+            <motion.button
+              onClick={() => router.push('/favorites')}
+              className="relative p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="View Favorites"
+            >
+              <Heart className="w-5 h-5 text-red-500 fill-current" />
+              {favoritesCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
+                  {favoritesCount > 99 ? '99+' : favoritesCount}
+                </span>
+              )}
+            </motion.button>
+
             {/* Theme Toggle */}
             <motion.button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -616,6 +650,7 @@ function ResultsContent() {
               audioUrl={sample.audioUrl}
               recordedAudioBuffer={recordedAudioBuffer}
               recordedBPM={editedBPM ?? recordedBPM}
+              originalDetectedBPM={originalDetectedBPM}
             />
           ))}
         </div>

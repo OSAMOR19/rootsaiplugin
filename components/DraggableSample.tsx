@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
 import { extractBPMFromString, formatTimeSeconds } from "@/lib/utils"
+import { isFavorite, toggleFavorite } from "@/lib/favorites"
 import WaveSurfer from "wavesurfer.js"
 
 // Import drum images
@@ -25,6 +26,7 @@ interface DraggableSampleProps {
   audioUrl?: string // Add audio URL prop for real audio files
   recordedAudioBuffer?: AudioBuffer | null // Add recorded audio buffer for compatibility
   recordedBPM?: number | null // Add recorded BPM for compatibility
+  originalDetectedBPM?: number | null // Original detected BPM for tempo calculations
 }
 
 export default function DraggableSample({ 
@@ -34,11 +36,27 @@ export default function DraggableSample({
   index, 
   audioUrl, 
   recordedAudioBuffer, 
-  recordedBPM 
+  recordedBPM,
+  originalDetectedBPM
 }: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
+  
+  // Load favorite status from localStorage on mount
+  useEffect(() => {
+    setIsLiked(isFavorite(sample.id))
+    
+    // Listen for favorites updates from other components
+    const handleFavoritesUpdate = () => {
+      setIsLiked(isFavorite(sample.id))
+    }
+    window.addEventListener('favoritesUpdated', handleFavoritesUpdate)
+    
+    return () => {
+      window.removeEventListener('favoritesUpdated', handleFavoritesUpdate)
+    }
+  }, [sample.id])
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
   const [audioProgress, setAudioProgress] = useState(0) // Real audio progress from 0-100
   const [audioDuration, setAudioDuration] = useState(0) // Audio duration in seconds
@@ -200,18 +218,26 @@ export default function DraggableSample({
         ws.on('ready', () => {
           setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
           
-          // Apply tempo matching: adjust playback rate to match detected BPM
-          // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
-          const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
-          if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
-            const rate = recordedBPM / actualBPM
+          // Special handling for user's recorded audio
+          if (sample.isRecentSong && originalDetectedBPM && recordedBPM) {
+            // For user's own audio, calculate rate based on BPM change from original detected BPM
+            const rate = recordedBPM / originalDetectedBPM
             ws.setPlaybackRate(rate)
-            console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
-          } else if (recordedBPM && actualBPM) {
-            console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
-            ws.setPlaybackRate(1.0)
+            console.log(`✅ Tempo-adjusted user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
           } else {
-            ws.setPlaybackRate(1.0) // Reset to normal speed if no tempo match needed
+            // Apply tempo matching for library samples: adjust playback rate to match detected BPM
+            // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
+            const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+            if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
+              const rate = recordedBPM / actualBPM
+              ws.setPlaybackRate(rate)
+              console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+            } else if (recordedBPM && actualBPM) {
+              console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
+              ws.setPlaybackRate(1.0)
+            } else {
+              ws.setPlaybackRate(1.0) // Reset to normal speed if no tempo match needed
+            }
           }
         })
 
@@ -253,17 +279,26 @@ export default function DraggableSample({
   // Update playback rate when recordedBPM changes (for tempo matching)
   useEffect(() => {
     if (waveSurfer && recordedBPM) {
-      const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename || '')
-      const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
-      if (actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
-        const rate = recordedBPM / actualBPM
+      // Special handling for user's recorded audio
+      if (sample.isRecentSong && originalDetectedBPM) {
+        // For user's own audio, calculate rate based on BPM change from original detected BPM
+        const rate = recordedBPM / originalDetectedBPM
         waveSurfer.setPlaybackRate(rate)
-        console.log(`🔄 Updated tempo match for "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
-      } else if (actualBPM && actualBPM === recordedBPM) {
-        waveSurfer.setPlaybackRate(1.0)
+        console.log(`🔄 Updated tempo for user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+      } else {
+        // For library samples, match to the new BPM
+        const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename || '')
+        const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+        if (actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
+          const rate = recordedBPM / actualBPM
+          waveSurfer.setPlaybackRate(rate)
+          console.log(`🔄 Updated tempo match for "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+        } else if (actualBPM && actualBPM === recordedBPM) {
+          waveSurfer.setPlaybackRate(1.0)
+        }
       }
     }
-  }, [recordedBPM, waveSurfer, sample, audioUrl])
+  }, [recordedBPM, originalDetectedBPM, waveSurfer, sample, audioUrl])
 
   // Handle WaveSurfer play/pause 
   useEffect(() => {
@@ -625,7 +660,10 @@ export default function DraggableSample({
         <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2">
           {/* Heart (Favorite) */}
           <motion.button
-            onClick={() => setIsLiked(!isLiked)}
+            onClick={() => {
+              const newLikedState = toggleFavorite(sample)
+              setIsLiked(newLikedState)
+            }}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
               isLiked
                 ? "text-red-500 bg-red-50 dark:bg-red-900/20"
@@ -633,6 +671,7 @@ export default function DraggableSample({
             }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            title={isLiked ? "Remove from favorites" : "Add to favorites"}
           >
             <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${isLiked ? "fill-current" : ""}`} />
           </motion.button>
