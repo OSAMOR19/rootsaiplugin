@@ -290,17 +290,32 @@ export async function quickBPMDetection(audioBuffer: AudioBuffer): Promise<numbe
     // Post-processing: Check for common errors and correct them
     finalBPM = applyBPMCorrections(finalBPM, results)
     
+    // Additional validation: Check for consensus among methods
+    const consensusBPM = findConsensusBPM(results)
+    if (consensusBPM && Math.abs(finalBPM - consensusBPM) > 10) {
+      // If there's strong consensus on a different value, prefer it
+      console.log(`Using consensus BPM: ${consensusBPM} instead of ${finalBPM}`)
+      finalBPM = consensusBPM
+    }
+    
     // Round to nearest integer
     finalBPM = Math.round(finalBPM)
     
-    // Final validation
+    // Final validation and clamping
     if (finalBPM < 30 || finalBPM > 400) {
       console.warn('BPM result seems invalid:', finalBPM, 'using best valid result')
       const validResults = results.filter(r => r.bpm >= 30 && r.bpm <= 400)
       if (validResults.length > 0) {
         finalBPM = validResults.sort((a, b) => b.confidence - a.confidence)[0].bpm
+      } else {
+        // Fallback: use median of all results
+        const sorted = results.map(r => r.bpm).sort((a, b) => a - b)
+        finalBPM = sorted[Math.floor(sorted.length / 2)]
       }
     }
+    
+    // Final clamp to reasonable range
+    finalBPM = Math.max(50, Math.min(300, finalBPM))
     
     console.log('Final BPM (improved):', finalBPM, 'BPM from', results.length, 'detection(s)')
     return finalBPM
@@ -308,6 +323,47 @@ export async function quickBPMDetection(audioBuffer: AudioBuffer): Promise<numbe
     console.error('BPM detection failed:', error)
     throw error
   }
+}
+
+// Find consensus BPM when multiple methods agree
+function findConsensusBPM(results: Array<{ bpm: number; confidence: number }>): number | null {
+  if (results.length < 2) return null
+  
+  // Group results by similar BPM (within 3 BPM)
+  const groups: Array<{ bpm: number; count: number; totalConfidence: number }> = []
+  
+  for (const result of results) {
+    let found = false
+    for (const group of groups) {
+      if (Math.abs(group.bpm - result.bpm) <= 3) {
+        // Add to existing group
+        group.count++
+        group.totalConfidence += result.confidence
+        group.bpm = (group.bpm * (group.count - 1) + result.bpm) / group.count // Average
+        found = true
+        break
+      }
+    }
+    
+    if (!found) {
+      groups.push({ bpm: result.bpm, count: 1, totalConfidence: result.confidence })
+    }
+  }
+  
+  // Find group with most members and high confidence
+  const bestGroup = groups
+    .filter(g => g.count >= 2) // At least 2 methods agree
+    .sort((a, b) => {
+      // Sort by count first, then by confidence
+      if (b.count !== a.count) return b.count - a.count
+      return b.totalConfidence - a.totalConfidence
+    })[0]
+  
+  if (bestGroup && bestGroup.count >= 2) {
+    return Math.round(bestGroup.bpm)
+  }
+  
+  return null
 }
 
 // Calculate confidence-weighted BPM from multiple results
@@ -448,20 +504,28 @@ function createAudioBufferSegment(
   return newBuffer
 }
 
-// Improved autocorrelation-based BPM detection with better precision
+// Improved autocorrelation-based BPM detection with better precision and fast tempo handling
 function detectBPMWithImprovedAutocorrelation(audioBuffer: AudioBuffer): { bpm: number; confidence: number } {
   const channelData = audioBuffer.getChannelData(0)
   const sampleRate = audioBuffer.sampleRate
   
-  // Use longer analysis window for better accuracy (up to 15 seconds)
-  const maxSamples = Math.min(channelData.length, sampleRate * 15)
+  // Use longer analysis window for better accuracy (up to 20 seconds for fast tempos)
+  const maxSamples = Math.min(channelData.length, sampleRate * 20)
   const samples = channelData.slice(0, maxSamples)
   
-  // Apply high-pass filter to emphasize rhythmic content (remove low-frequency noise)
-  const filtered = applyHighPassFilter(samples, sampleRate, 80) // 80 Hz cutoff
+  // Apply multiple filters for better beat detection
+  // 1. High-pass filter to remove low-frequency noise
+  let filtered = applyHighPassFilter(samples, sampleRate, 60) // Lower cutoff for fast tempos
   
-  // Downsample for efficiency but keep higher quality (analyze at ~16kHz for better precision)
-  const targetSampleRate = Math.min(16000, sampleRate)
+  // 2. Apply envelope follower to emphasize transients (beats)
+  filtered = applyEnvelopeFollower(filtered, sampleRate)
+  
+  // 3. Apply spectral flux for better beat emphasis
+  filtered = applySpectralFlux(filtered, sampleRate)
+  
+  // Downsample for efficiency but keep higher quality
+  // For fast tempos, we need higher sample rate to detect short intervals
+  const targetSampleRate = Math.min(22050, sampleRate) // Higher sample rate for fast detection
   const downsampleFactor = Math.floor(sampleRate / targetSampleRate)
   const downsampled: number[] = []
   for (let i = 0; i < filtered.length; i += downsampleFactor) {
@@ -471,42 +535,187 @@ function detectBPMWithImprovedAutocorrelation(audioBuffer: AudioBuffer): { bpm: 
   const downsampledSampleRate = sampleRate / downsampleFactor
   
   // Calculate autocorrelation for lag values corresponding to 50-300 BPM
-  // Use finer resolution around common BPMs
-  const minLag = Math.floor((downsampledSampleRate * 60) / 300) // 300 BPM
-  const maxLag = Math.floor((downsampledSampleRate * 60) / 50)   // 50 BPM
+  // Extended range for fast tempos (up to 300 BPM, but also check harmonics)
+  const minLag = Math.floor((downsampledSampleRate * 60) / 350) // 350 BPM max (for harmonics)
+  const maxLag = Math.floor((downsampledSampleRate * 60) / 40)   // 40 BPM min (for half-time detection)
   
   // Store correlation values for peak detection
   const correlations: Array<{ lag: number; value: number }> = []
   
-  // Autocorrelation function with normalization
+  // Improved autocorrelation with better normalization
   for (let lag = minLag; lag <= maxLag && lag < downsampled.length / 2; lag++) {
     let correlation = 0
-    let energy = 0
-    const n = downsampled.length - lag
+    let energy1 = 0
+    let energy2 = 0
+    const n = Math.min(downsampled.length - lag, downsampled.length)
     
+    // Use overlapping windows for better accuracy
     for (let i = 0; i < n; i++) {
-      correlation += downsampled[i] * downsampled[i + lag]
-      energy += downsampled[i] * downsampled[i]
+      const val1 = downsampled[i]
+      const val2 = downsampled[i + lag]
+      correlation += val1 * val2
+      energy1 += val1 * val1
+      energy2 += val2 * val2
     }
     
-    // Normalize by energy (pearson correlation)
-    const normalizedCorr = energy > 0 ? correlation / Math.sqrt(energy * (energy / n)) : 0
-    correlations.push({ lag, value: normalizedCorr })
+    // Better normalization (avoid division by zero)
+    const norm = Math.sqrt(energy1 * energy2)
+    const normalizedCorr = norm > 0 ? correlation / norm : 0
+    
+    // Apply comb filter weighting to emphasize musical intervals
+    const bpm = (downsampledSampleRate * 60) / lag
+    const combWeight = getCombFilterWeight(bpm)
+    
+    correlations.push({ lag, value: normalizedCorr * combWeight })
   }
   
-  // Find peaks in correlation (not just maximum, but well-defined peaks)
-  const peaks = findCorrelationPeaks(correlations, downsampledSampleRate)
+  // Smooth correlations to reduce noise
+  const smoothed = smoothCorrelations(correlations)
   
-  // Select best peak considering both strength and musical context
+  // Find peaks in correlation (improved peak detection)
+  const peaks = findCorrelationPeaks(smoothed, downsampledSampleRate)
+  
+  // Select best peak considering harmonics, especially for fast tempos
   const bestPeak = selectBestBPM(peaks, downsampledSampleRate)
   
   // Calculate confidence based on peak strength and sharpness
-  const confidence = calculatePeakConfidence(bestPeak, peaks, correlations)
+  const confidence = calculatePeakConfidence(bestPeak, peaks, smoothed)
+  
+  // Validate result - check if it's a harmonic of a better result
+  const validatedBPM = validateAndCorrectBPM(bestPeak.bpm, peaks, confidence)
   
   return {
-    bpm: Math.max(50, Math.min(300, bestPeak.bpm)),
+    bpm: Math.max(50, Math.min(300, validatedBPM)),
     confidence: Math.min(0.95, confidence)
   }
+}
+
+// Apply envelope follower to emphasize transients
+function applyEnvelopeFollower(data: Float32Array, sampleRate: number): Float32Array {
+  const attackTime = 0.001 // 1ms attack
+  const releaseTime = 0.1  // 100ms release
+  const attackCoeff = Math.exp(-1 / (attackTime * sampleRate))
+  const releaseCoeff = Math.exp(-1 / (releaseTime * sampleRate))
+  
+  const envelope = new Float32Array(data.length)
+  let envelopeValue = 0
+  
+  for (let i = 0; i < data.length; i++) {
+    const input = Math.abs(data[i])
+    if (input > envelopeValue) {
+      envelopeValue = input + attackCoeff * (envelopeValue - input)
+    } else {
+      envelopeValue = input + releaseCoeff * (envelopeValue - input)
+    }
+    envelope[i] = envelopeValue
+  }
+  
+  return envelope
+}
+
+// Apply spectral flux for beat emphasis
+function applySpectralFlux(data: Float32Array, sampleRate: number): Float32Array {
+  const windowSize = Math.floor(sampleRate * 0.05) // 50ms windows
+  const hopSize = Math.floor(sampleRate * 0.01)    // 10ms hop
+  const flux = new Float32Array(data.length)
+  
+  let prevMagnitude = 0
+  
+  for (let i = 0; i < data.length - windowSize; i += hopSize) {
+    let magnitude = 0
+    for (let j = i; j < i + windowSize && j < data.length; j++) {
+      magnitude += Math.abs(data[j])
+    }
+    magnitude /= windowSize
+    
+    // Spectral flux is the positive difference
+    const diff = Math.max(0, magnitude - prevMagnitude)
+    
+    // Apply to window
+    for (let j = i; j < i + hopSize && j < data.length; j++) {
+      flux[j] = diff
+    }
+    
+    prevMagnitude = magnitude
+  }
+  
+  return flux
+}
+
+// Get comb filter weight to emphasize musical BPMs
+function getCombFilterWeight(bpm: number): number {
+  // Emphasize common BPM values
+  const commonBPMs = [60, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 140, 150, 160, 170, 180, 190, 200]
+  
+  for (const commonBPM of commonBPMs) {
+    const diff = Math.abs(bpm - commonBPM)
+    if (diff <= 2) {
+      return 1.0 + (1.0 - diff / 2) * 0.2 // Up to 20% boost
+    }
+  }
+  
+  return 1.0
+}
+
+// Smooth correlations to reduce noise
+function smoothCorrelations(correlations: Array<{ lag: number; value: number }>): Array<{ lag: number; value: number }> {
+  const smoothed: Array<{ lag: number; value: number }> = []
+  const windowSize = 3 // 3-point moving average
+  
+  for (let i = 0; i < correlations.length; i++) {
+    let sum = 0
+    let count = 0
+    
+    for (let j = Math.max(0, i - Math.floor(windowSize / 2)); 
+         j <= Math.min(correlations.length - 1, i + Math.floor(windowSize / 2)); 
+         j++) {
+      sum += correlations[j].value
+      count++
+    }
+    
+    smoothed.push({
+      lag: correlations[i].lag,
+      value: sum / count
+    })
+  }
+  
+  return smoothed
+}
+
+// Validate and correct BPM, especially for fast tempos
+function validateAndCorrectBPM(
+  initialBPM: number, 
+  peaks: Array<{ lag: number; value: number; bpm: number }>,
+  confidence: number
+): number {
+  // If confidence is low, check if we're detecting a harmonic
+  if (confidence < 0.7 && peaks.length > 1) {
+    // Check if initial BPM is exactly half or double of a stronger peak
+    for (const peak of peaks.slice(0, 5)) { // Check top 5 peaks
+      if (peak.value > 0.3) { // Only consider strong peaks
+        const ratio = initialBPM / peak.bpm
+        
+        // If initial is half of a strong peak, prefer the peak (faster tempo)
+        if (ratio >= 0.48 && ratio <= 0.52 && peak.bpm > initialBPM && peak.bpm <= 300) {
+          console.log(`Correcting harmonic: ${initialBPM} → ${peak.bpm} BPM (was detecting half-time)`)
+          return peak.bpm
+        }
+        
+        // If initial is double of a strong peak, check if peak makes more sense
+        if (ratio >= 1.9 && ratio <= 2.1 && peak.bpm < initialBPM && peak.bpm >= 50) {
+          // Prefer the peak if it's a common BPM
+          const commonBPMs = [60, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 140, 150, 160, 170, 180]
+          const isCommon = commonBPMs.some(c => Math.abs(peak.bpm - c) <= 2)
+          if (isCommon) {
+            console.log(`Correcting harmonic: ${initialBPM} → ${peak.bpm} BPM (was detecting double-time)`)
+            return peak.bpm
+          }
+        }
+      }
+    }
+  }
+  
+  return initialBPM
 }
 
 // Apply simple high-pass filter to emphasize rhythmic content
@@ -526,70 +735,137 @@ function applyHighPassFilter(data: Float32Array, sampleRate: number, cutoffFreq:
   return filtered
 }
 
-// Find prominent peaks in autocorrelation
+// Find prominent peaks in autocorrelation with improved detection
 function findCorrelationPeaks(correlations: Array<{ lag: number; value: number }>, sampleRate: number): Array<{ lag: number; value: number; bpm: number }> {
   const peaks: Array<{ lag: number; value: number; bpm: number }> = []
   
-  // Find local maxima
-  for (let i = 1; i < correlations.length - 1; i++) {
-    if (correlations[i].value > correlations[i - 1].value && 
-        correlations[i].value > correlations[i + 1].value &&
-        correlations[i].value > 0.1) { // Minimum threshold
+  // Adaptive threshold based on correlation values
+  const values = correlations.map(c => c.value)
+  const maxValue = Math.max(...values)
+  const meanValue = values.reduce((a, b) => a + b, 0) / values.length
+  const threshold = Math.max(0.15, Math.min(0.3, meanValue + (maxValue - meanValue) * 0.3))
+  
+  // Find local maxima with improved peak detection
+  for (let i = 2; i < correlations.length - 2; i++) {
+    const current = correlations[i].value
+    const prev1 = correlations[i - 1].value
+    const prev2 = correlations[i - 2].value
+    const next1 = correlations[i + 1].value
+    const next2 = correlations[i + 2].value
+    
+    // Check if it's a local maximum (peak)
+    const isPeak = current > prev1 && current > next1 && 
+                   current > prev2 && current > next2 &&
+                   current > threshold
+    
+    if (isPeak) {
       const bpm = (sampleRate * 60) / correlations[i].lag
-      if (bpm >= 50 && bpm <= 300) {
+      
+      // Accept wider range for initial detection (we'll filter later)
+      if (bpm >= 40 && bpm <= 350) {
+        // Calculate peak prominence (how much it stands out)
+        const leftMin = Math.min(...correlations.slice(Math.max(0, i - 10), i).map(c => c.value))
+        const rightMin = Math.min(...correlations.slice(i + 1, Math.min(correlations.length, i + 11)).map(c => c.value))
+        const prominence = current - Math.max(leftMin, rightMin)
+        
         peaks.push({
           lag: correlations[i].lag,
-          value: correlations[i].value,
+          value: current,
           bpm: bpm
         })
       }
     }
   }
   
-  // Sort by value (strength)
-  return peaks.sort((a, b) => b.value - a.value).slice(0, 10) // Top 10 peaks
+  // Sort by value (strength) and return top peaks
+  return peaks.sort((a, b) => b.value - a.value).slice(0, 15) // More peaks for better analysis
 }
 
-// Select best BPM from peaks, considering harmonics and musical context
+// Select best BPM from peaks, considering harmonics and musical context (improved for fast tempos)
 function selectBestBPM(peaks: Array<{ lag: number; value: number; bpm: number }>, sampleRate: number): { lag: number; value: number; bpm: number } {
   if (peaks.length === 0) {
     throw new Error('No peaks found')
   }
   
-  // Common BPM values are more likely correct
-  const commonBPMs = [60, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 140, 150, 160, 170, 180]
+  // Extended common BPM values including fast tempos
+  const commonBPMs = [60, 65, 70, 75, 80, 85, 90, 95, 100, 102, 104, 105, 110, 115, 120, 125, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300]
   
-  // Score each peak
-  const scoredPeaks = peaks.map(peak => {
+  // Score each peak with improved algorithm
+  const scoredPeaks: Array<{ lag: number; value: number; bpm: number; score: number }> = peaks.map(peak => {
     let score = peak.value // Base score from correlation strength
     
-    // Bonus for being close to common BPM
+    // Bonus for being close to common BPM (stronger bonus for exact matches)
     for (const commonBPM of commonBPMs) {
       const diff = Math.abs(peak.bpm - commonBPM)
-      if (diff <= 2) {
-        score += 0.15 * (1 - diff / 2) // Up to 15% bonus
+      if (diff <= 3) {
+        const bonus = 0.2 * (1 - diff / 3) // Up to 20% bonus
+        score += bonus
         break
+      }
+    }
+    
+    // For fast tempos (>150 BPM), check if we're detecting half-time
+    // Fast songs often have strong sub-harmonics
+    if (peak.bpm > 150) {
+      // Check if there's a peak at half the BPM with similar strength
+      const halfBPM = peak.bpm / 2
+      const halfPeak = peaks.find(p => Math.abs(p.bpm - halfBPM) <= 5)
+      if (halfPeak && halfPeak.value > peak.value * 0.8) {
+        // If half-time peak is almost as strong, prefer the faster tempo
+        score += 0.1 // Slight bonus for choosing faster tempo
       }
     }
     
     // Check for harmonic relationships with stronger peaks
     for (const otherPeak of peaks) {
-      if (otherPeak.value > peak.value) {
+      if (otherPeak.value > peak.value * 0.9) { // Similar strength
         const ratio = peak.bpm / otherPeak.bpm
-        // If this is a harmonic of a stronger peak, reduce score
-        if (ratio >= 0.48 && ratio <= 0.52) {
-          score *= 0.7 // Half-time - likely wrong
-        } else if (ratio >= 1.9 && ratio <= 2.1) {
-          score *= 0.8 // Double-time - might be correct but less likely
+        
+        // If this is exactly half of a similar-strength peak, it might be half-time
+        if (ratio >= 0.48 && ratio <= 0.52 && peak.bpm < 120) {
+          // Only penalize if the other peak is in a reasonable range
+          if (otherPeak.bpm >= 50 && otherPeak.bpm <= 300) {
+            score *= 0.6 // Strong penalty for half-time when other is available
+          }
+        }
+        
+        // If this is exactly double, it might be double-time (often correct for fast songs)
+        if (ratio >= 1.9 && ratio <= 2.1) {
+          // For fast songs, double-time might be correct
+          if (peak.bpm > 150) {
+            score *= 0.9 // Small penalty
+          } else {
+            score *= 0.7 // Larger penalty for slower songs
+          }
         }
       }
+    }
+    
+    // Bonus for peaks in the "sweet spot" (80-180 BPM is most common)
+    if (peak.bpm >= 80 && peak.bpm <= 180) {
+      score += 0.05
     }
     
     return { ...peak, score }
   })
   
   // Return peak with highest score
-  return scoredPeaks.sort((a, b) => b.score - a.score)[0]
+  const best = scoredPeaks.sort((a, b) => b.score - a.score)[0]
+  
+  // Final validation: if best peak is very fast (>250 BPM), check if half-time makes more sense
+  if (best.bpm > 250) {
+    const halfBPM = best.bpm / 2
+    const halfPeak = peaks.find(p => Math.abs(p.bpm - halfBPM) <= 3)
+    if (halfPeak && halfPeak.value > best.value * 0.7) {
+      // If half-time is almost as strong and in reasonable range, prefer it
+      if (halfBPM >= 50 && halfBPM <= 200) {
+        console.log(`Preferring half-time: ${best.bpm} → ${halfBPM} BPM`)
+        return halfPeak
+      }
+    }
+  }
+  
+  return best
 }
 
 // Calculate confidence based on peak quality
@@ -621,15 +897,19 @@ function calculatePeakConfidence(
   return Math.min(0.95, confidence)
 }
 
-// Onset detection based BPM detection (alternative method)
+// Onset detection based BPM detection (improved for fast tempos)
 function detectBPMWithOnsetDetection(audioBuffer: AudioBuffer): number {
   const channelData = audioBuffer.getChannelData(0)
   const sampleRate = audioBuffer.sampleRate
   
-  // Detect onsets (transient events)
-  const onsets = detectOnsets(channelData, sampleRate)
+  // Apply preprocessing for better onset detection
+  const filtered = applyHighPassFilter(channelData, sampleRate, 60)
+  const envelope = applyEnvelopeFollower(filtered, sampleRate)
   
-  if (onsets.length < 4) {
+  // Detect onsets with improved algorithm
+  const onsets = detectOnsetsImproved(envelope, sampleRate)
+  
+  if (onsets.length < 6) {
     return 0 // Not enough onsets
   }
   
@@ -639,21 +919,40 @@ function detectBPMWithOnsetDetection(audioBuffer: AudioBuffer): number {
     intervals.push(onsets[i] - onsets[i - 1])
   }
   
-  // Find most common interval (beat duration)
+  // Filter out outliers and find most common intervals
+  const validIntervals = intervals.filter(i => i > 0.1 && i < 2.0) // 30-600 BPM range
+  
+  if (validIntervals.length < 3) {
+    return 0
+  }
+  
+  // Use histogram with finer resolution for fast tempos
   const intervalCounts = new Map<number, number>()
-  for (const interval of intervals) {
-    // Round to nearest 0.1 seconds
-    const rounded = Math.round(interval * 10) / 10
+  for (const interval of validIntervals) {
+    // Round to nearest 0.05 seconds for better precision
+    const rounded = Math.round(interval * 20) / 20
     intervalCounts.set(rounded, (intervalCounts.get(rounded) || 0) + 1)
   }
   
-  // Find interval with highest count
-  let maxCount = 0
-  let bestInterval = 0
-  for (const [interval, count] of intervalCounts.entries()) {
-    if (count > maxCount && interval > 0.2 && interval < 2.0) { // Reasonable beat interval
-      maxCount = count
+  // Find intervals with highest counts (top 3)
+  const sortedIntervals = Array.from(intervalCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+  
+  // Check for harmonic relationships
+  let bestInterval = sortedIntervals[0][0]
+  let bestCount = sortedIntervals[0][1]
+  
+  // If we have multiple strong candidates, prefer the one that makes musical sense
+  for (const [interval, count] of sortedIntervals) {
+    const bpm = 60 / interval
+    // Prefer intervals that result in common BPMs
+    const commonBPMs = [60, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 140, 150, 160, 170, 180, 200]
+    const isCommon = commonBPMs.some(c => Math.abs(bpm - c) <= 2)
+    
+    if (isCommon && count >= bestCount * 0.8) {
       bestInterval = interval
+      bestCount = count
     }
   }
   
@@ -663,7 +962,60 @@ function detectBPMWithOnsetDetection(audioBuffer: AudioBuffer): number {
   
   // Convert interval to BPM
   const bpm = 60 / bestInterval
-  return Math.max(50, Math.min(300, bpm))
+  
+  // Validate: if BPM is very high, check if half-time makes more sense
+  if (bpm > 250) {
+    const halfBPM = bpm / 2
+    const halfInterval = 60 / halfBPM
+    const halfCount = intervalCounts.get(Math.round(halfInterval * 20) / 20) || 0
+    
+    // If half-time has similar count, prefer it
+    if (halfCount >= bestCount * 0.7 && halfBPM >= 50 && halfBPM <= 200) {
+      return Math.max(50, Math.min(300, Math.round(halfBPM)))
+    }
+  }
+  
+  return Math.max(50, Math.min(300, Math.round(bpm)))
+}
+
+// Improved onset detection
+function detectOnsetsImproved(audioData: Float32Array, sampleRate: number): number[] {
+  const onsets: number[] = []
+  const windowSize = Math.floor(sampleRate * 0.05) // 50ms windows
+  const hopSize = Math.floor(sampleRate * 0.01)    // 10ms hop
+  
+  let prevEnergy = 0
+  let prevDiff = 0
+  
+  for (let i = 0; i < audioData.length - windowSize; i += hopSize) {
+    // Calculate energy in window
+    let energy = 0
+    for (let j = i; j < i + windowSize && j < audioData.length; j++) {
+      energy += audioData[j] * audioData[j]
+    }
+    energy = Math.sqrt(energy / windowSize)
+    
+    // Detect sudden increase in energy (onset)
+    const diff = energy - prevEnergy
+    const diffDiff = diff - prevDiff // Second derivative for sharper detection
+    
+    // Adaptive threshold
+    const threshold = 0.01 + (energy * 0.1)
+    
+    // Onset if: positive energy change AND positive acceleration
+    if (diff > threshold && diffDiff > 0 && energy > 0.05) {
+      const time = i / sampleRate
+      // Only add if not too close to previous onset (min 50ms apart for fast tempos)
+      if (onsets.length === 0 || time - onsets[onsets.length - 1] > 0.05) {
+        onsets.push(time)
+      }
+    }
+    
+    prevDiff = diff
+    prevEnergy = energy
+  }
+  
+  return onsets
 }
 
 // Detect onset events in audio
