@@ -197,40 +197,76 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         })
         
         // Convert to AudioBuffer and detect BPM with real detection
+        let toastId: any = null
         try {
           const fullAudioBuffer = await blobToAudioBuffer(audioBlob)
           
-          // Extract exactly 4 bars from the beginning
-          console.log('Extracting 4 bars from beginning of recorded audio...')
-          const extractedBuffer = await extractBest4Bars(fullAudioBuffer)
+          // ⚡ OPTIMIZED: Skip extraction, send directly to backend!
+          console.log('⚡ Fast mode: Sending audio directly to backend (no pre-processing)...')
           
           // Reset previous BPM analysis
           resetAnalysis()
           
-          // Use real BPM detection on the extracted 4 bars
-          console.log('Starting real BPM detection on extracted 4 bars...')
-          const bpmResult = await analyzeAudioBuffer(extractedBuffer)
+          // Show persistent toast that stays until BPM is detected
+          toastId = toast.loading('🎵 Analyzing BPM with backend... Please wait (this may take up to 60 seconds)', {
+            duration: Infinity // Stays visible until we dismiss it
+          })
           
-          console.log('BPM Detection Result:', {
+          // ⚡ Direct BPM detection - backend handles everything!
+          const bpmResult = await analyzeAudioBuffer(fullAudioBuffer)
+          
+          console.log('⚡ Fast BPM Detection Result:', {
             bpm: bpmResult.bpm,
             confidence: bpmResult.confidence,
             isStable: bpmResult.isStable,
-            extractedDuration: extractedBuffer.duration.toFixed(2) + 's',
-            originalDuration: fullAudioBuffer.duration.toFixed(2) + 's'
+            duration: fullAudioBuffer.duration.toFixed(2) + 's'
           })
           
-          setRecordedAudioBuffer(extractedBuffer) // Store the extracted 4 bars, not full recording
+          setRecordedAudioBuffer(fullAudioBuffer) // Store full recording
           setRecordedBPM(bpmResult.bpm)
           
-          toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence) • Extracted 4 bars`)
+          // Dismiss loading toast and show success
+          toast.dismiss(toastId)
+          toast.success(`✅ BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`, {
+            duration: 5000
+          })
           
-          // Create a new blob from the extracted buffer for API processing
-          // Convert extracted buffer to blob
-          const extractedWavBlob = audioBufferToBlob(extractedBuffer)
+          // ⚡ SKIP processAudio - we already have the BPM!
+          // Just store the data and mark as complete
+          setRecordedAudioBlob(audioBlob)
           
-          await processAudio(extractedWavBlob, extractedBuffer, bpmResult.bpm)
+          // Call onAnalysisComplete directly with mock recommendations
+          // (since we're skipping the backend recommendation API)
+          if (onAnalysisComplete) {
+            onAnalysisComplete({
+              detectedBPM: bpmResult.bpm,
+              detectedKey: 'C', // Default key
+              recommendations: [], // Empty for now
+              recordedAudioBuffer: fullAudioBuffer
+            })
+          }
         } catch (error) {
           console.error('Error processing recorded audio:', error)
+          
+          // Dismiss loading toast
+          if (toastId !== null) {
+            toast.dismiss(toastId)
+          }
+          
+          // Show detailed error message
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          
+          if (errorMessage.includes('Failed to fetch') || errorMessage.includes('backend')) {
+            toast.error('Cannot connect to BPM detection server. Please check:\n1. Backend is running\n2. Try again in 30 seconds (cold start)', {
+              duration: 8000
+            })
+          } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+            toast.error('Backend took too long (>60s). This might be cold start - please try ONE MORE TIME and it should be fast!', {
+              duration: 8000
+            })
+          } else {
+            toast.error(`Failed to detect BPM: ${errorMessage}`)
+          }
         }
         
         // Stop all tracks to release audio capture
@@ -462,6 +498,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       return
     }
 
+    let toastId: any = null
     try {
       setIsExtracting(true)
       toast.info('Processing uploaded audio file...')
@@ -472,61 +509,81 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         fileType: file.type
       })
       
-      // Convert file to AudioBuffer
+      // ⚡ OPTIMIZED: Skip all pre-processing, send directly!
+      console.log('⚡ Fast mode: Processing uploaded file directly...')
+      
+      // Show persistent loading toast
+      toastId = toast.loading('🎵 Analyzing BPM with backend... Please wait (this may take up to 60 seconds)', {
+        duration: Infinity // Stays visible
+      })
+      
+      // Convert file to AudioBuffer (needed for playback)
       const audioBuffer = await fileToAudioBuffer(file)
       console.log('Audio buffer created:', {
         duration: audioBuffer.duration,
-        sampleRate: audioBuffer.sampleRate,
-        numberOfChannels: audioBuffer.numberOfChannels,
-        length: audioBuffer.length
+        sampleRate: audioBuffer.sampleRate
       })
       
-      // Extract the best 4 bars
-      const extractedBuffer = await extractBest4Bars(audioBuffer)
-      
-      // Use real BPM detection for extracted audio
+      // Reset and detect BPM
       resetAnalysis()
-      console.log('Starting real BPM detection on extracted audio...')
-      const bpmResult = await analyzeAudioBuffer(extractedBuffer)
+      const bpmResult = await analyzeAudioBuffer(audioBuffer)
       
-      console.log('Extraction complete:', {
-        extractedDuration: extractedBuffer.duration,
+      console.log('⚡ Fast BPM Detection:', {
         detectedBPM: bpmResult.bpm,
-        confidence: bpmResult.confidence,
-        extractedLength: extractedBuffer.length
+        confidence: bpmResult.confidence
       })
       
-      // For now, let's try sending the original file blob instead of converting
-      // This will help us isolate if the issue is with the blob conversion
-      const arrayBuffer = await file.arrayBuffer()
-      const extractedBlob = new Blob([arrayBuffer], { type: file.type })
-      
-      console.log('Blob conversion complete:', {
-        blobSize: extractedBlob.size,
-        blobType: extractedBlob.type,
-        originalFileSize: file.size
-      })
-      
-      // Store the extracted audio and blob
-      setRecordedAudioBuffer(extractedBuffer) 
-      setRecordedAudioBlob(extractedBlob)
+      // Store results
+      setRecordedAudioBuffer(audioBuffer) 
+      setRecordedAudioBlob(new Blob([await file.arrayBuffer()], { type: file.type }))
       setRecordedBPM(bpmResult.bpm)
       setUploadedFileName(file.name)
       
-      toast.success(`BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`)
+      // Dismiss loading and show success
+      toast.dismiss(toastId)
+      toast.success(`✅ BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`, {
+        duration: 5000
+      })
       
-      // Mark as listened so the UI shows preview options
+      // Mark as listened
       onListen()
       
-      // Automatically trigger analysis after extraction
-      console.log('Auto-triggering analysis after upload extraction...')
-      await processAudio(extractedBlob, extractedBuffer, bpmResult.bpm)
+      // ⚡ SKIP processAudio - we already have BPM!
+      // Call onAnalysisComplete directly
+      if (onAnalysisComplete) {
+        onAnalysisComplete({
+          detectedBPM: bpmResult.bpm,
+          detectedKey: 'C',
+          recommendations: [],
+          recordedAudioBuffer: audioBuffer
+        })
+      }
       
-      toast.success('Audio processed, extracted, and analyzed!')
+      toast.dismiss(toastId)
+      toast.success('✅ Audio analyzed!', { duration: 3000 })
       
     } catch (error) {
       console.error('Error processing uploaded file:', error)
-      toast.error('Failed to process audio file. Please try again.')
+      
+      // Dismiss loading toast
+      if (toastId !== null) {
+        toast.dismiss(toastId)
+      }
+      
+      // Show detailed error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('backend')) {
+        toast.error('Cannot connect to BPM detection server. Please check:\n1. Backend is running at rootsaibackend.onrender.com\n2. CORS is configured\n3. Try again in 30 seconds (cold start)', {
+          duration: 8000
+        })
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        toast.error('Backend took too long (>60s). This might be cold start - please try ONE MORE TIME and it should be fast!', {
+          duration: 8000
+        })
+      } else {
+        toast.error(`Failed to process audio: ${errorMessage}`)
+      }
     } finally {
       setIsExtracting(false)
     }
@@ -602,6 +659,44 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       setIsProcessing(false)
     }
   }
+  
+  // Status toast notifications
+  useEffect(() => {
+    if (isRecording) {
+      toast.info("Capturing INTERNAL audio only...", {
+        duration: 2000,
+        position: "bottom-left"
+      })
+    } else if (isProcessing) {
+      toast.info("Analyzing audio...", {
+        duration: 2000,
+        position: "bottom-left"
+      })
+    } else if (isExtracting) {
+      toast.info("Extracting best 4 bars...", {
+        duration: 2000,
+        position: "bottom-left"
+      })
+    } else if (isBPMAnalyzing) {
+      toast.info("Detecting BPM and tempo...", {
+        duration: 2000,
+        position: "bottom-left"
+      })
+    } else if (hasListened && recordedAudioBuffer) {
+      if (isPlayingRecording) {
+        toast.success("Playing extracted audio", {
+          duration: 1500,
+          position: "bottom-left"
+        })
+      } else {
+        toast.success("Ready to play", {
+          duration: 1500,
+          position: "bottom-left"
+        })
+      }
+    }
+  }, [isRecording, isProcessing, isExtracting, isBPMAnalyzing, hasListened, recordedAudioBuffer, isPlayingRecording])
+  
   return (
     <div className="relative">
       {/* Hidden file input */}
@@ -748,44 +843,6 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           </p>
         </motion.div>
       )}
-
-      {/* Status messages converted to toast notifications */}
-      {useEffect(() => {
-        if (isRecording) {
-          toast.info("Capturing INTERNAL audio only...", {
-            duration: 2000,
-            position: "bottom-left"
-          })
-        } else if (isProcessing) {
-          toast.info("Analyzing audio...", {
-            duration: 2000,
-            position: "bottom-left"
-          })
-        } else if (isExtracting) {
-          toast.info("Extracting best 4 bars...", {
-            duration: 2000,
-            position: "bottom-left"
-          })
-        } else if (isBPMAnalyzing) {
-          toast.info("Detecting BPM and tempo...", {
-            duration: 2000,
-            position: "bottom-left"
-          })
-        } else if (hasListened && recordedAudioBuffer) {
-          if (isPlayingRecording) {
-            toast.success("Playing extracted audio", {
-              duration: 1500,
-              position: "bottom-left"
-            })
-          } else {
-            toast.success("Ready to play", {
-              duration: 1500,
-              position: "bottom-left"
-            })
-          }
-        }
-      }, [isRecording, isProcessing, isExtracting, isBPMAnalyzing, hasListened, recordedAudioBuffer, isPlayingRecording])}
-
     </div>
   )
 }

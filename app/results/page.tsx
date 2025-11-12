@@ -13,11 +13,13 @@ import { mockSamples } from "@/lib/mockData"
 import { blobToAudioBuffer, syncEngine } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
 import { getFavoritesCount } from "@/lib/favorites"
+import { useAudio } from "@/contexts/AudioContext"
 
 function ResultsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { theme, setTheme } = useTheme()
+  const { analysisData } = useAudio()
   const query = searchParams.get("query") || ""
   const sessionKey = searchParams.get("key") || "F MAJOR"
   const detectedBPM = searchParams.get("bpm")
@@ -99,47 +101,21 @@ function ResultsContent() {
           
           setSamples([recentSong, ...audioAnalysisSamples])
           
-          // Load recorded audio buffer from localStorage
+          // ✅ NEW: Load audio buffer from React Context (NOT localStorage!)
           try {
-            const audioDataStr = localStorage.getItem('recordedAudioData')
-            
-            if (audioDataStr) {
-              const storedData = JSON.parse(audioDataStr)
-              
-              if (storedData.wavData) {
-                console.log('Loading stored audio data:', {
-                  sampleRate: storedData.sampleRate,
-                  duration: storedData.duration,
-                  numberOfChannels: storedData.numberOfChannels,
-                  length: storedData.length
-                })
-                
-                // Convert base64 back to blob
-                const base64Data = storedData.wavData.split(',')[1]
-                const binaryString = atob(base64Data)
-                const bytes = new Uint8Array(binaryString.length)
-                for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i)
-                }
-                const blob = new Blob([bytes], { type: 'audio/wav' })
-                
-                // Convert blob back to AudioBuffer
-                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-                const arrayBuffer = await blob.arrayBuffer()
-                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-                
-                console.log('Reconstructed audio buffer:', {
-                  duration: audioBuffer.duration,
-                  sampleRate: audioBuffer.sampleRate,
-                  numberOfChannels: audioBuffer.numberOfChannels,
-                  length: audioBuffer.length
-                })
-                
-                setRecordedAudioBuffer(audioBuffer)
-              }
+            if (analysisData?.recordedAudioBuffer) {
+              console.log('✅ Loading audio buffer from React Context:', {
+                duration: analysisData.recordedAudioBuffer.duration,
+                sampleRate: analysisData.recordedAudioBuffer.sampleRate,
+                numberOfChannels: analysisData.recordedAudioBuffer.numberOfChannels,
+                length: analysisData.recordedAudioBuffer.length
+              })
+              setRecordedAudioBuffer(analysisData.recordedAudioBuffer)
+            } else {
+              console.warn('⚠️ No audio buffer found in React Context')
             }
           } catch (error) {
-            console.error('Error loading recorded audio buffer:', error)
+            console.error('Error loading audio buffer from context:', error)
           }
         } catch (error) {
           console.error('Error parsing recommendations:', error)
@@ -154,7 +130,7 @@ function ResultsContent() {
 
     const timer = setTimeout(loadData, 1500)
     return () => clearTimeout(timer)
-    }, [query, recommendationsParam, detectedBPM])
+    }, [query, recommendationsParam, detectedBPM, analysisData])
 
   // Load favorites count and listen for updates
   useEffect(() => {

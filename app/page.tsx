@@ -10,6 +10,7 @@ import SearchInput from "@/components/SearchInput"
 import GradientButton from "@/components/GradientButton"
 import ThemeToggle from "@/components/ThemeToggle"
 import { useRouter } from "next/navigation"
+import { useAudio } from "@/contexts/AudioContext"
 
 export default function CapturePage() {
   const [isListening, setIsListening] = useState(false)
@@ -17,7 +18,7 @@ export default function CapturePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sessionKey, setSessionKey] = useState("F MAJOR")
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
-  const [analysisData, setAnalysisData] = useState<{ detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer } | null>(null)
+  const { analysisData, setAnalysisData } = useAudio()
   const router = useRouter()
 
   // Convert AudioBuffer to WAV blob
@@ -72,6 +73,7 @@ export default function CapturePage() {
 
   const handleAnalysisComplete = (data: { detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer }) => {
     console.log('Analysis completed on main page:', data)
+    console.log('✅ Storing audio data in React Context (NOT localStorage!)')
     setAnalysisData(data)
     setHasListened(true)
     setIsListening(false)
@@ -80,44 +82,15 @@ export default function CapturePage() {
 
   const handleGoToResults = () => {
     if (analysisData) {
-      // Store recorded audio buffer in localStorage for results page
-      if (analysisData.recordedAudioBuffer) {
-        try {
-          console.log('Storing audio buffer:', {
-            duration: analysisData.recordedAudioBuffer.duration,
-            sampleRate: analysisData.recordedAudioBuffer.sampleRate,
-            numberOfChannels: analysisData.recordedAudioBuffer.numberOfChannels,
-            length: analysisData.recordedAudioBuffer.length
-          })
-          
-          // Create WAV file blob for more reliable storage
-          const wavBlob = audioBufferToWavBlob(analysisData.recordedAudioBuffer)
-          
-          // Convert to base64 for localStorage
-          const reader = new FileReader()
-          reader.onload = () => {
-            const storedAudioData = {
-              wavData: reader.result as string,
-              sampleRate: analysisData.recordedAudioBuffer.sampleRate,
-              duration: analysisData.recordedAudioBuffer.duration,
-              numberOfChannels: analysisData.recordedAudioBuffer.numberOfChannels,
-              length: analysisData.recordedAudioBuffer.length
-            }
-            localStorage.setItem('recordedAudioData', JSON.stringify(storedAudioData))
-          }
-          reader.readAsDataURL(wavBlob)
-          
-        } catch (error) {
-          console.error('Error storing audio data:', error)
-          // Store basic info as fallback
-          localStorage.setItem('recordedAudioData', JSON.stringify({
-            sampleRate: analysisData.recordedAudioBuffer.sampleRate,
-            duration: analysisData.recordedAudioBuffer.duration,
-            error: true
-          }))
-        }
-      }
+      // ✅ NEW: No localStorage - audio data stays in React Context!
+      console.log('Navigating to results with audio data:', {
+        hasBPM: !!analysisData.detectedBPM,
+        hasKey: !!analysisData.detectedKey,
+        hasAudioBuffer: !!analysisData.recordedAudioBuffer,
+        duration: analysisData.recordedAudioBuffer?.duration
+      })
       
+      // Audio data is already in analysisData state, results page will access it
       router.push(
         `/results?query=${encodeURIComponent(searchQuery || "audio analysis")}&key=${encodeURIComponent(sessionKey)}&bpm=${analysisData.detectedBPM}&detectedKey=${analysisData.detectedKey}&recommendations=${encodeURIComponent(JSON.stringify(analysisData.recommendations))}`
       )
@@ -242,7 +215,7 @@ export default function CapturePage() {
         >
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">What Afrobeat drums do you want?</h2>
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">What  drums do you want?</h2>
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
@@ -287,7 +260,7 @@ export default function CapturePage() {
               whileHover={!isListening ? { scale: 1.02 } : {}}
               whileTap={!isListening ? { scale: 0.98 } : {}}
             >
-              Browse Afrobeat Drums
+              Browse  Drums
             </motion.button>
           </div>
         </motion.div>

@@ -44,7 +44,8 @@ function FavoritesContent() {
   }
 
   const handleBack = () => {
-    router.push("/")
+    // ✅ FIX: Go back to previous page (results) instead of home
+    router.back()
   }
 
   const filteredFavorites = favorites.filter((sample) => {

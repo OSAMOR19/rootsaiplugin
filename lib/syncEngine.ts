@@ -1,7 +1,7 @@
 /**
  * Audio Sync Engine - Web Audio API based audio synchronization
  * Provides tempo matching and synchronized playback
- * NOTE: BPM detection is handled by bpmDetection.ts using web-audio-beat-detector
+ * NOTE: BPM detection is handled by bpmDetection.ts using the Python backend with librosa
  */
 
 export interface AudioSyncData {
@@ -93,7 +93,7 @@ class AudioSyncEngine {
   }
 
   /**
-   * REMOVED: BPM detection now handled exclusively by bpmDetection.ts using web-audio-beat-detector
+   * REMOVED: BPM detection now handled exclusively by bpmDetection.ts using the Python backend API
    * Use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts instead
    */
 
@@ -259,16 +259,16 @@ class AudioSyncEngine {
   /**
    * Extract exactly 4 bars from the beginning of the audio
    * Always starts from the start (sample 0) to ensure consistency
-   * Uses web-audio-beat-detector for accurate BPM detection
+   * Uses Python backend with librosa for accurate BPM detection
    */
   async extractBest4Bars(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     const sampleRate = audioBuffer.sampleRate
     const fullLength = audioBuffer.length
     
-    // Import web-audio-beat-detector for accurate BPM detection
+    // Import backend BPM detection for accurate BPM detection
     const { quickBPMDetection } = await import('@/lib/bpmDetection')
     
-    // Detect BPM using web-audio-beat-detector (accurate method)
+    // Detect BPM using Python backend with librosa (accurate method)
     const detectedBPM = await quickBPMDetection(audioBuffer)
     const beatsPerBar = 4
     const totalBeats = beatsPerBar * 4 // 4 bars = 16 beats
@@ -431,10 +431,10 @@ class AudioSyncEngine {
       sampleVolume = 0.5 
     } = options
     
-    // Use passed BPM - do NOT re-detect (should already be accurately detected via web-audio-beat-detector)
+    // Use passed BPM - do NOT re-detect (should already be accurately detected via backend)
     if (!options.recordedBPM) {
       console.warn('No recordedBPM provided to syncPlay - this should be set via bpmDetection.ts')
-      throw new Error('recordedBPM is required for tempo matching. Please provide the BPM detected via web-audio-beat-detector.')
+      throw new Error('recordedBPM is required for tempo matching. Please provide the BPM detected via the Python backend.')
     }
     const recordedBPM = options.recordedBPM
     
@@ -576,7 +576,7 @@ export const syncEngine = new AudioSyncEngine()
 // Export utility functions
 export const loadAudioBuffer = (filePath: string) => syncEngine.loadAudioBuffer(filePath)
 export const blobToAudioBuffer = (blob: Blob) => syncEngine.blobToAudioBuffer(blob)
-// REMOVED: detectBPM export - use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts instead
+// REMOVED: detectBPM export - use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts (uses Python backend)
 export const extractBest4Bars = (audioBuffer: AudioBuffer) => syncEngine.extractBest4Bars(audioBuffer)
 export const fileToAudioBuffer = (file: File) => syncEngine.fileToAudioBuffer(file)
 export const syncPlay = (recordedBuffer: AudioBuffer, sampleBuffer: AudioBuffer, sampleBPM: number, options?: SyncPlaybackOptions) => 

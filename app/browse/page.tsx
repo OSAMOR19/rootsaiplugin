@@ -63,7 +63,7 @@ export default function BrowsePage() {
             </motion.button>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-800 bg-clip-text text-transparent">
-                Afrobeat Drum Library
+                 Drum Library
               </h1>
               <p className="text-sm text-gray-600">
                 {filteredSamples.length} of {mockSamples.length} drum loops

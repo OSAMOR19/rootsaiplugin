@@ -118,13 +118,28 @@ export default function DraggableSample({
           barRadius: 2,
           height: 32, // Keep consistent height, CSS will handle responsive sizing
           normalize: true,
-          backend: 'WebAudio',
+          backend: 'MediaElement', // ✅ CRITICAL FIX: Use MediaElement (HTML5 audio) for pitch preservation
           mediaControls: false,
           interact: true,
           hideScrollbar: true,
           fillParent: true,
           minPxPerSec: 1,
         })
+        
+        // ✅ FIX: Enable pitch-preserving time stretching (tempo changes without pitch changes)
+        // This ensures that when BPM changes, only the tempo changes, NOT the key/pitch
+        // Wait a tiny bit for the media element to be created
+        setTimeout(() => {
+          const mediaElement = ws.getMediaElement() as any
+          if (mediaElement) {
+            mediaElement.preservesPitch = true
+            mediaElement.mozPreservesPitch = true // Firefox
+            mediaElement.webkitPreservesPitch = true // Safari
+            console.log('✅ Pitch-preserving time stretch ENABLED - tempo changes won\'t affect key/pitch!')
+          } else {
+            console.warn('⚠️ Could not enable pitch preservation - media element not found')
+          }
+        }, 100)
 
         // Set dark mode colors if needed
         if (document.documentElement.classList.contains('dark')) {
@@ -218,12 +233,21 @@ export default function DraggableSample({
         ws.on('ready', () => {
           setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
           
+          // ✅ ENSURE pitch preservation is enabled for the media element (all browser variants)
+          const mediaElement = ws.getMediaElement() as any
+          if (mediaElement) {
+            mediaElement.preservesPitch = true
+            mediaElement.mozPreservesPitch = true // Firefox
+            mediaElement.webkitPreservesPitch = true // Safari/older Chrome
+            console.log('✅ Pitch preservation confirmed on ready')
+          }
+          
           // Special handling for user's recorded audio
           if (sample.isRecentSong && originalDetectedBPM && recordedBPM) {
             // For user's own audio, calculate rate based on BPM change from original detected BPM
             const rate = recordedBPM / originalDetectedBPM
             ws.setPlaybackRate(rate)
-            console.log(`✅ Tempo-adjusted user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+            console.log(`✅ Tempo-adjusted user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
           } else {
             // Apply tempo matching for library samples: adjust playback rate to match detected BPM
             // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
@@ -231,7 +255,7 @@ export default function DraggableSample({
             if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
               const rate = recordedBPM / actualBPM
               ws.setPlaybackRate(rate)
-              console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+              console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
             } else if (recordedBPM && actualBPM) {
               console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
               ws.setPlaybackRate(1.0)
@@ -279,12 +303,20 @@ export default function DraggableSample({
   // Update playback rate when recordedBPM changes (for tempo matching)
   useEffect(() => {
     if (waveSurfer && recordedBPM) {
+      // ✅ ENSURE pitch preservation is enabled when BPM changes (all browser variants)
+      const mediaElement = waveSurfer.getMediaElement() as any
+      if (mediaElement) {
+        mediaElement.preservesPitch = true
+        mediaElement.mozPreservesPitch = true // Firefox
+        mediaElement.webkitPreservesPitch = true // Safari/older Chrome
+      }
+      
       // Special handling for user's recorded audio
       if (sample.isRecentSong && originalDetectedBPM) {
         // For user's own audio, calculate rate based on BPM change from original detected BPM
         const rate = recordedBPM / originalDetectedBPM
         waveSurfer.setPlaybackRate(rate)
-        console.log(`🔄 Updated tempo for user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+        console.log(`🔄 Updated tempo for user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
       } else {
         // For library samples, match to the new BPM
         const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename || '')
@@ -292,7 +324,7 @@ export default function DraggableSample({
         if (actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
           const rate = recordedBPM / actualBPM
           waveSurfer.setPlaybackRate(rate)
-          console.log(`🔄 Updated tempo match for "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x)`)
+          console.log(`🔄 Updated tempo match for "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
         } else if (actualBPM && actualBPM === recordedBPM) {
           waveSurfer.setPlaybackRate(1.0)
         }
