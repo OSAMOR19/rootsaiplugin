@@ -464,15 +464,16 @@ class AudioSyncEngine {
     recordedSource.buffer = recordedBuffer
     sampleSource.buffer = sampleBuffer
     
-    // REAL TEMPO MATCHING: Slow down the sample to match recorded audio's BPM exactly
+    // ✅ FIXED: REAL TEMPO MATCHING - Match sample to recorded audio's BPM
     const recordedPlaybackRate = 1.0  // Keep recorded audio at natural speed (master tempo)
-    const samplePlaybackRate = sampleBPM / recordedBPM  // Sample plays slower to match recorded BPM
+    const samplePlaybackRate = recordedBPM / sampleBPM  // ✅ FIXED: Inverted calculation
     
-    console.log('REAL Tempo Matching:', {
+    console.log('✅ REAL Tempo Matching:', {
       recordedBPM: recordedBPM,
       sampleBPM: sampleBPM,
       'Recorded audio rate': recordedPlaybackRate,
       'Sample will play': `${samplePlaybackRate.toFixed(3)}x speed ${samplePlaybackRate < 1 ? '(SLOWER)' : '(FASTER)'}`,
+      'Example': sampleBPM > recordedBPM ? `Sample ${sampleBPM} BPM → ${recordedBPM} BPM (slower)` : `Sample ${sampleBPM} BPM → ${recordedBPM} BPM (faster)`,
       'Result': `Both will beat at ${recordedBPM} BPM exactly!`
     })
     

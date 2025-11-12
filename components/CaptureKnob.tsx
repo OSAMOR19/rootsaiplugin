@@ -227,7 +227,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           
           // Dismiss loading toast and show success
           toast.dismiss(toastId)
-          toast.success(`✅ BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`, {
+          toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
             duration: 5000
           })
           
@@ -541,7 +541,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       
       // Dismiss loading and show success
       toast.dismiss(toastId)
-      toast.success(`✅ BPM detected: ${bpmResult.bpm} (${(bpmResult.confidence * 100).toFixed(0)}% confidence)`, {
+      toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
         duration: 5000
       })
       

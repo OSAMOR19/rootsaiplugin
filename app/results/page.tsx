@@ -10,7 +10,7 @@ import { extractBPMFromString } from "@/lib/utils"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
-import { blobToAudioBuffer, syncEngine } from "@/lib/syncEngine"
+import { blobToAudioBuffer, syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
@@ -39,8 +39,86 @@ function ResultsContent() {
   const [bpmInputValue, setBpmInputValue] = useState<string>("") // Temporary input value for typing
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
+  const [syncPlayingSampleId, setSyncPlayingSampleId] = useState<string | null>(null) // Track which sample is sync playing
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
+
+  // ✅ NEW: Load initial compatible sounds from local library
+  const loadInitialCompatibleSounds = async (bpm: number | null, key: string, limit: number = 10) => {
+    if (!bpm) return []
+    
+    try {
+      const metadataResponse = await fetch('/audio/metadata.json')
+      if (!metadataResponse.ok) {
+        console.warn('Could not load metadata.json')
+        return []
+      }
+      
+      const allLoops: any[] = await metadataResponse.json()
+      
+      // Calculate compatibility scores (same algorithm as handleViewMore)
+      const scoredLoops = allLoops.map((loop: any) => {
+        const loopBPM = loop.bpm ?? extractBPMFromString(loop.filename) ?? 120
+        const loopKey = loop.key || 'C'
+        
+        let score = 0
+        
+        // BPM matching
+        const bpmRatio = loopBPM / bpm
+        if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
+          score += 40
+        } else if (Math.abs(bpm - loopBPM) <= 5) {
+          score += 30
+        } else if (Math.abs(bpm - loopBPM) <= 10) {
+          score += 20
+        }
+        
+        // Key matching
+        if (key === loopKey) {
+          score += 25
+        }
+        
+        // Rhythmic complexity
+        const filename = loop.filename.toLowerCase()
+        if (filename.includes('kick') || filename.includes('bass')) {
+          score += 15
+        } else if (filename.includes('perc') || filename.includes('shaker')) {
+          score += 20
+        }
+        
+        return { loop, score }
+      })
+      
+      // Sort by compatibility score and take top N
+      const topLoops = scoredLoops
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map((item: any, index: number) => {
+          const originalBpm = item.loop.bpm ?? extractBPMFromString(item.loop.filename)
+          return {
+            id: `compatible-${index}`,
+            name: item.loop.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+            artist: 'Compatible Match',
+            category: item.loop.category || 'audio-analysis',
+            bpm: bpm,
+            originalBpm: originalBpm,
+            key: item.loop.key || key,
+            audioUrl: item.loop.url,
+            imageUrl: '/placeholder.jpg',
+            duration: '4 bars',
+            tags: ['compatible', 'matching-bpm'],
+            waveform: Array.from({ length: 50 }, () => Math.random() * 100),
+            compatibilityScore: item.score
+          }
+        })
+      
+      console.log(`✅ Loaded ${topLoops.length} initial compatible sounds`)
+      return topLoops
+    } catch (error) {
+      console.error('Error loading initial compatible sounds:', error)
+      return []
+    }
+  }
 
   useEffect(() => {
     const loadData = async () => {
@@ -62,27 +140,6 @@ function ResultsContent() {
             setBpmInputValue(initialBPM.toString()) // Initialize input value
           }
           
-          // Convert recommendations to sample format and limit to 10 results
-          // ALL recommendations should show the edited/detected BPM, not their individual BPMs
-          // But we store the actual BPM in originalBpm for tempo matching calculations
-          const audioAnalysisSamples = recommendations.slice(0, 10).map((rec: any, index: number) => {
-            const originalBpm = rec.bpm ?? extractBPMFromString(rec.filename) ?? extractBPMFromString(rec.url)
-            return {
-              id: `audio-analysis-${index}`,
-              name: rec.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
-              artist: 'Audio Analysis Match',
-              category: 'audio-analysis',
-              bpm: universalBPM, // Use edited/detected BPM for display
-              originalBpm: originalBpm, // Store actual BPM for tempo matching
-              key: rec.key,
-              audioUrl: rec.url,
-              imageUrl: '/placeholder.jpg',
-              duration: '4 bars',
-              tags: ['audio-analysis', 'matching-bpm', 'matching-key'],
-              waveform: Array.from({ length: 50 }, () => Math.random() * 100) // Generate random waveform data
-            }
-          })
-          
           // Add the recently played song as the first card
           const recentSong = {
             id: 'recent-song',
@@ -99,7 +156,10 @@ function ResultsContent() {
             isRecentSong: true
           }
           
-          setSamples([recentSong, ...audioAnalysisSamples])
+          // ✅ NEW: Load REAL compatible sounds from local library immediately!
+          const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10)
+          
+          setSamples([recentSong, ...initialCompatibleSounds])
           
           // ✅ NEW: Load audio buffer from React Context (NOT localStorage!)
           try {
@@ -128,8 +188,8 @@ function ResultsContent() {
       setLoading(false)
     }
 
-    const timer = setTimeout(loadData, 1500)
-    return () => clearTimeout(timer)
+    // ✅ FIX: Load compatible sounds IMMEDIATELY (no delay!)
+    loadData()
     }, [query, recommendationsParam, detectedBPM, analysisData])
 
   // Load favorites count and listen for updates
@@ -177,6 +237,48 @@ function ResultsContent() {
 
   const handlePlayPause = (sampleId: string) => {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
+  }
+
+  // ✅ NEW: Handle sync play (play captured audio + sample together)
+  const handleSyncPlay = async (sampleId: string, sampleBPM: number, sampleUrl: string) => {
+    if (syncPlayingSampleId === sampleId) {
+      // Stop sync playback
+      syncEngine.stopAll()
+      setSyncPlayingSampleId(null)
+      setCurrentlyPlaying(null)
+    } else {
+      // Start sync playback
+      if (!recordedAudioBuffer || !recordedBPM) {
+        console.warn('No recorded audio or BPM for sync playback')
+        return
+      }
+
+      try {
+        // Stop any currently playing audio
+        syncEngine.stopAll()
+        setCurrentlyPlaying(null)
+        
+        // Load sample audio
+        const sampleBuffer = await loadAudioBuffer(sampleUrl)
+        
+        // Start sync playback
+        await syncEngine.syncPlay(
+          recordedAudioBuffer,
+          sampleBuffer,
+          sampleBPM,
+          {
+            recordedBPM: recordedBPM,
+            recordedVolume: 0.5,
+            sampleVolume: 0.5
+          }
+        )
+        
+        setSyncPlayingSampleId(sampleId)
+        console.log(`✅ Sync playing: Your audio + ${sampleId}`)
+      } catch (error) {
+        console.error('Error in sync playback:', error)
+      }
+    }
   }
 
   const handleViewMore = async () => {
@@ -623,6 +725,8 @@ function ResultsContent() {
               isPlaying={currentlyPlaying === sample.id}
               onPlayPause={() => handlePlayPause(sample.id)}
               index={index}
+              isSyncPlaying={syncPlayingSampleId === sample.id}
+              onSyncPlay={() => handleSyncPlay(sample.id, sample.originalBpm || sample.bpm, sample.audioUrl)}
               audioUrl={sample.audioUrl}
               recordedAudioBuffer={recordedAudioBuffer}
               recordedBPM={editedBPM ?? recordedBPM}

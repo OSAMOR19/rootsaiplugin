@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { motion } from "framer-motion"
-import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download } from "lucide-react"
+import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download, Layers } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
@@ -27,6 +27,8 @@ interface DraggableSampleProps {
   recordedAudioBuffer?: AudioBuffer | null // Add recorded audio buffer for compatibility
   recordedBPM?: number | null // Add recorded BPM for compatibility
   originalDetectedBPM?: number | null // Original detected BPM for tempo calculations
+  isSyncPlaying?: boolean // NEW: Is this sample currently sync playing with recorded audio?
+  onSyncPlay?: () => void // NEW: Handler for sync play
 }
 
 export default function DraggableSample({ 
@@ -37,7 +39,9 @@ export default function DraggableSample({
   audioUrl, 
   recordedAudioBuffer, 
   recordedBPM,
-  originalDetectedBPM
+  originalDetectedBPM,
+  isSyncPlaying = false,
+  onSyncPlay
 }: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
@@ -609,8 +613,8 @@ export default function DraggableSample({
           )}
         </div>
 
-        {/* Play button beside the artwork - Responsive sizing */}
-        <div className="flex-shrink-0">
+        {/* Play button and Sync button beside the artwork - Responsive sizing */}
+        <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2">
           <motion.button
             onClick={onPlayPause}
             className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
@@ -623,6 +627,23 @@ export default function DraggableSample({
           >
             {isPlaying ? <Pause className="w-3 h-3 sm:w-4 sm:h-4" /> : <Play className="w-3 h-3 sm:w-4 sm:h-4 ml-0.5" />}
           </motion.button>
+          
+          {/* ✅ NEW: Sync Play button - Only show if not the "YOUR AUDIO" card and has onSyncPlay handler */}
+          {!sample.isRecentSong && onSyncPlay && recordedAudioBuffer && (
+            <motion.button
+              onClick={onSyncPlay}
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+                isSyncPlaying
+                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-md"
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="Sync play with your audio"
+            >
+              <Layers className="w-3 h-3 sm:w-4 sm:h-4" />
+            </motion.button>
+          )}
         </div>
 
         {/* Filename and Tags - Responsive */}
