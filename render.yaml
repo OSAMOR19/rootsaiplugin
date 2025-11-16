@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: rootsai-plugin
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: NODE_ENV
+        value: production
+      - key: SOUNDSTAT_API_KEY
+        sync: false
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
+    healthCheckPath: /
+    autoDeploy: true
+
