@@ -98,11 +98,19 @@ export default function CapturePage() {
   }
 
   const handleSearch = () => {
-    if (searchQuery.trim() || hasListened) {
-      router.push(
-        `/results?query=${encodeURIComponent(searchQuery || "afrobeat")}&key=${encodeURIComponent(sessionKey)}`,
-      )
-    }
+    // Allow search with just text description, no audio required
+    const query = searchQuery.trim() || "afrobeat drums";
+    
+    console.log('🔍 Text-based search:', {
+      query,
+      sessionKey,
+      hasAudio: hasListened
+    });
+    
+    // Navigate to results with text query
+    router.push(
+      `/results?query=${encodeURIComponent(query)}&key=${encodeURIComponent(sessionKey)}`,
+    )
   }
 
   const handleBrowse = () => {
@@ -215,13 +223,17 @@ export default function CapturePage() {
         >
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">What  drums do you want?</h2>
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">What drums do you want?</h2>
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Describe the drum pattern you want - or leave blank and let us listen to suggest perfect Afrobeat drum loops"
+                onEnter={handleSearch}
+                placeholder="e.g., 'energetic 120 BPM afrobeat', 'mellow percussion loop', 'fast hi-hat pattern'..."
                 disabled={isListening}
               />
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                💡 Describe in your own words or upload/record audio for AI matching
+              </p>
             </div>
           </div>
         </motion.div>
@@ -249,7 +261,11 @@ export default function CapturePage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          <GradientButton onClick={hasListened ? handleGoToResults : handleSearch} disabled={isListening} className="w-full lg:w-auto">
+          <GradientButton 
+            onClick={hasListened ? handleGoToResults : handleSearch} 
+            disabled={isListening} 
+            className="w-full lg:w-auto"
+          >
             {isListening ? "LISTENING..." : hasListened ? "VIEW RESULTS" : "FIND SAMPLES"}
           </GradientButton>
           <div className="mt-4">
