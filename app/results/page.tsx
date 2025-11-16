@@ -14,8 +14,11 @@ import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as up
 import { quickBPMDetection } from "@/lib/bpmDetection"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 function ResultsContent() {
+  const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { theme, setTheme } = useTheme()
@@ -248,10 +251,33 @@ function ResultsContent() {
       syncEngine.stopAll()
       setSyncPlayingSampleId(null)
       setCurrentlyPlaying(null)
+      
+      toast({
+        title: "Sync Stopped",
+        description: "Playback has been stopped.",
+        duration: 2000,
+      })
     } else {
+      // Check if another sample is currently sync playing
+      if (syncPlayingSampleId) {
+        toast({
+          title: "Already Syncing! 🎵",
+          description: "Please stop the current sync playback before starting a new one.",
+          variant: "destructive",
+          duration: 3000,
+        })
+        return
+      }
+      
       // Start sync playback
       if (!recordedAudioBuffer || !recordedBPM) {
         console.warn('No recorded audio or BPM for sync playback')
+        toast({
+          title: "No Audio to Sync",
+          description: "Please record or upload audio first.",
+          variant: "destructive",
+          duration: 3000,
+        })
         return
       }
 
@@ -277,8 +303,20 @@ function ResultsContent() {
         
         setSyncPlayingSampleId(sampleId)
         console.log(`✅ Sync playing: Your audio + ${sampleId}`)
+        
+        toast({
+          title: "Synced! 🎧",
+          description: "Your audio is now playing with the drum sample.",
+          duration: 2000,
+        })
       } catch (error) {
         console.error('Error in sync playback:', error)
+        toast({
+          title: "Sync Failed",
+          description: "Could not sync the audio. Please try again.",
+          variant: "destructive",
+          duration: 3000,
+        })
       }
     }
   }
@@ -903,6 +941,9 @@ function ResultsContent() {
 
       {/* Drag Drop Instructions */}
       <DragDropZone />
+      
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   )
 }

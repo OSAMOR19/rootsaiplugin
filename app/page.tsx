@@ -18,6 +18,7 @@ export default function CapturePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sessionKey, setSessionKey] = useState("F MAJOR")
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
+  const [showWarningModal, setShowWarningModal] = useState(false)
   const { analysisData, setAnalysisData } = useAudio()
   const router = useRouter()
 
@@ -98,7 +99,16 @@ export default function CapturePage() {
   }
 
   const handleSearch = () => {
-    // Allow search with just text description, no audio required
+    // Check if user has either recorded audio OR entered a search query
+    const hasSearchQuery = searchQuery.trim().length > 0;
+    
+    if (!hasListened && !hasSearchQuery) {
+      // Show warning modal if they haven't done either
+      setShowWarningModal(true);
+      return;
+    }
+    
+    // Allow search with text description
     const query = searchQuery.trim() || "afrobeat drums";
     
     console.log('🔍 Text-based search:', {
@@ -291,6 +301,101 @@ export default function CapturePage() {
         value={sessionKey}
         onChange={setSessionKey}
       />
+
+      {/* Warning Modal - No Audio or Text */}
+      {showWarningModal && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowWarningModal(false)}
+        >
+          <motion.div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 border-2 border-green-200 dark:border-green-700"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 rounded-full flex items-center justify-center">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 5, -5, 0]
+                  }}
+                  transition={{ 
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: "reverse"
+                  }}
+                >
+                  <svg 
+                    className="w-10 h-10 text-green-600 dark:text-green-400" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" 
+                    />
+                  </svg>
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-2xl font-bold text-center mb-4 bg-gradient-to-r from-green-600 to-green-800 dark:from-green-400 dark:to-green-300 bg-clip-text text-transparent">
+              Hold On! 🎵
+            </h3>
+
+            {/* Message */}
+            <p className="text-center text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              To find the perfect drum samples, you need to either:
+            </p>
+
+            {/* Options List */}
+            <div className="space-y-3 mb-8">
+              <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                  
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-800 dark:text-gray-200">Record or Upload Audio</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Click the center knob to record or upload your audio</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center text-gray-400 font-semibold">
+                OR
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                  
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-800 dark:text-gray-200">Describe What You Want</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Type a description like "energetic 120 BPM afrobeat"</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowWarningModal(false)}
+              className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+            >
+              Got It! 
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }
