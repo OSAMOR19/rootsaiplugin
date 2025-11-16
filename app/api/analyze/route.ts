@@ -13,6 +13,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import { analyzeTrack } from '@/lib/essentia/analyzeTrack';
+import { simpleDetectBPM, simpleDetectKey, calculateEnergy, estimateDanceability } from '@/lib/essentia/simpleBpmDetection';
 
 // Get ffmpeg path - ffmpeg-static exports the path as a string
 // In Next.js, we need to handle this carefully
@@ -195,9 +196,52 @@ export async function POST(request: NextRequest) {
     // Decode audio to PCM
     const { audioData, sampleRate } = await decodeAudioFile(tempFilePath);
 
-    // Analyze audio with Essentia
-    console.log('🔬 Starting Essentia analysis...');
-    const analysis = await analyzeTrack(audioData, sampleRate);
+    // Analyze audio - try Essentia first, fallback to simple detection
+    console.log('🔬 Starting audio analysis...');
+    let analysis;
+    
+    try {
+      // Try Essentia.js (works locally, might fail on Vercel)
+      analysis = await analyzeTrack(audioData, sampleRate);
+    } catch (essentiaError) {
+      console.warn('⚠️ Essentia.js failed, using simple fallback:', essentiaError);
+      
+      // Fallback to simple detection (works everywhere)
+      const bpm = simpleDetectBPM(audioData, sampleRate);
+      const key = simpleDetectKey(audioData, sampleRate);
+      const energy = calculateEnergy(audioData);
+      const danceability = estimateDanceability(audioData, bpm);
+      
+      analysis = {
+        bpm,
+        alternatives: [
+          { bpm, confidence: 0.8 },
+          { bpm: Math.round(bpm / 2), confidence: 0.5 },
+          { bpm: Math.round(bpm * 2), confidence: 0.5 },
+        ],
+        beats: [],
+        confidence: 0.8,
+        key: {
+          tonic: key.tonic,
+          scale: key.scale,
+          strength: 0.7
+        },
+        danceability,
+        energy,
+        valence: 0.6,
+        moods: {
+          happy: 0.6,
+          sad: 0.4,
+          energetic: energy,
+          relaxed: 1 - energy,
+          aggressive: energy > 0.7 ? energy : 0.3,
+          engagement: danceability
+        },
+        mfcc: null
+      };
+      
+      console.log('✅ Simple analysis complete:', { bpm, key, energy });
+    }
 
     // Clean up temp file
     await cleanupTempFile(tempFilePath);

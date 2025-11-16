@@ -261,22 +261,23 @@ export default function CapturePage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          <GradientButton 
-            onClick={hasListened ? handleGoToResults : handleSearch} 
-            disabled={isListening} 
-            className="w-full lg:w-auto"
-          >
-            {isListening ? "LISTENING..." : hasListened ? "VIEW RESULTS" : "FIND SAMPLES"}
-          </GradientButton>
-          <div className="mt-4">
+          <div className="space-y-4">
+            <GradientButton 
+              onClick={hasListened ? handleGoToResults : handleSearch} 
+              disabled={isListening} 
+              className="w-full"
+            >
+              {isListening ? "LISTENING..." : hasListened ? "VIEW RESULTS" : "FIND SAMPLES"}
+            </GradientButton>
+            
             <motion.button
               onClick={handleBrowse}
               disabled={isListening}
-              className="w-full lg:w-auto px-6 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-700 transition-all duration-300 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-6 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200 dark:hover:border-green-700 transition-all duration-300 text-gray-700 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               whileHover={!isListening ? { scale: 1.02 } : {}}
               whileTap={!isListening ? { scale: 0.98 } : {}}
             >
-              Browse  Drums
+              Browse Drums
             </motion.button>
           </div>
         </motion.div>

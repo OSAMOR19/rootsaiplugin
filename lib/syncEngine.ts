@@ -24,6 +24,8 @@ class AudioSyncEngine {
   private audioContext: AudioContext | null = null
   private masterGainNode: GainNode | null = null
   private activeSources: AudioBufferSourceNode[] = []
+  private currentRecordedGainNode: GainNode | null = null
+  private currentSampleGainNode: GainNode | null = null
 
   constructor() {
     this.initializeAudioContext()
@@ -376,6 +378,9 @@ class AudioSyncEngine {
       }
     })
     this.activeSources = []
+    // Clear gain node references
+    this.currentRecordedGainNode = null
+    this.currentSampleGainNode = null
   }
 
   /**
@@ -535,11 +540,35 @@ class AudioSyncEngine {
     recordedSource.onended = cleanup
     sampleSource.onended = cleanup
     
+    // Store gain nodes for real-time volume control
+    this.currentRecordedGainNode = recordedGain
+    this.currentSampleGainNode = sampleGain
+    
     return { 
       recordedSource, 
       sampleSource,
       recordedGainNode: recordedGain, // Expose gain nodes for real-time control
       sampleGainNode: sampleGain
+    }
+  }
+
+  /**
+   * Update recorded audio volume in real-time during playback
+   */
+  setRecordedVolume(volume: number): void {
+    if (this.currentRecordedGainNode) {
+      this.currentRecordedGainNode.gain.value = Math.max(0, Math.min(1, volume))
+      console.log(`🎵 Recorded audio volume set to: ${(volume * 100).toFixed(0)}%`)
+    }
+  }
+
+  /**
+   * Update sample audio volume in real-time during playback
+   */
+  setSampleVolume(volume: number): void {
+    if (this.currentSampleGainNode) {
+      this.currentSampleGainNode.gain.value = Math.max(0, Math.min(1, volume))
+      console.log(`🥁 Sample audio volume set to: ${(volume * 100).toFixed(0)}%`)
     }
   }
 
@@ -586,3 +615,5 @@ export const playAudioBuffer = (audioBuffer: AudioBuffer, options?: SyncPlayback
   syncEngine.playAudioBuffer(audioBuffer, options)
 export const stopAll = () => syncEngine.stopAll()
 export const setMasterVolume = (volume: number) => syncEngine.setMasterVolume(volume)
+export const setRecordedVolume = (volume: number) => syncEngine.setRecordedVolume(volume)
+export const setSampleVolume = (volume: number) => syncEngine.setSampleVolume(volume)

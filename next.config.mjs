@@ -16,8 +16,25 @@ const nextConfig = {
       config.externals.push({
         'ffmpeg-static': 'commonjs ffmpeg-static'
       });
+      
+      // Allow WASM files for Essentia.js
+      config.experiments = {
+        ...config.experiments,
+        asyncWebAssembly: true,
+        layers: true,
+      };
+      
+      // Handle .wasm files
+      config.module.rules.push({
+        test: /\.wasm$/,
+        type: 'asset/resource',
+      });
     }
     return config;
+  },
+  // Ensure WASM files are copied to output
+  experimental: {
+    serverComponentsExternalPackages: ['essentia.js'],
   },
 }
 

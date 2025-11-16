@@ -10,7 +10,7 @@ import { extractBPMFromString } from "@/lib/utils"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
-import { blobToAudioBuffer, syncEngine, loadAudioBuffer } from "@/lib/syncEngine"
+import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as updateRecordedVolume, setSampleVolume as updateSampleVolume } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
@@ -31,6 +31,8 @@ function ResultsContent() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [volume, setVolume] = useState(75)
+  const [recordedVolume, setRecordedVolume] = useState(50) // Volume for your recorded/uploaded audio
+  const [sampleVolume, setSampleVolume] = useState(50) // Volume for the drum samples
   const [searchFilter, setSearchFilter] = useState("")
   const [recordedAudioBuffer, setRecordedAudioBuffer] = useState<AudioBuffer | null>(null)
   const [recordedBPM, setRecordedBPM] = useState<number | null>(null)
@@ -268,8 +270,8 @@ function ResultsContent() {
           sampleBPM,
           {
             recordedBPM: recordedBPM,
-            recordedVolume: 0.5,
-            sampleVolume: 0.5
+            recordedVolume: recordedVolume / 100, // Convert 0-100 to 0-1
+            sampleVolume: sampleVolume / 100 // Convert 0-100 to 0-1
           }
         )
         
@@ -625,19 +627,79 @@ function ResultsContent() {
               />
             </div>
 
-            {/* Volume Control - Hidden on mobile, visible on tablet+ */}
-            <div className="hidden md:flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
-              <Volume2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={(e) => setVolume(Number.parseInt(e.target.value))}
-                className="w-20 h-1 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
-              />
-              <span className="text-xs text-gray-600 dark:text-gray-400 w-8">{volume}</span>
-            </div>
+            {/* Dual Volume Controls - For Sync Playback */}
+            {syncPlayingSampleId && (
+              <div className="hidden lg:flex items-center gap-3 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 rounded-lg px-4 py-2 border-2 border-blue-200 dark:border-blue-700">
+                {/* Your Audio Volume */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Music className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">You</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={recordedVolume}
+                    onChange={(e) => {
+                      const newVol = Number.parseInt(e.target.value);
+                      setRecordedVolume(newVol);
+                      // Update volume in real-time if playing
+                      if (syncPlayingSampleId) {
+                        updateRecordedVolume(newVol / 100);
+                      }
+                    }}
+                    className="w-16 h-1.5 bg-blue-200 dark:bg-blue-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    title="Your audio volume"
+                  />
+                  <span className="text-xs text-blue-600 dark:text-blue-400 w-7 font-semibold">{recordedVolume}</span>
+                </div>
+                
+                {/* Divider */}
+                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                
+                {/* Sample Volume */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Volume2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    <span className="text-xs font-medium text-green-600 dark:text-green-400">Loop</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={sampleVolume}
+                    onChange={(e) => {
+                      const newVol = Number.parseInt(e.target.value);
+                      setSampleVolume(newVol);
+                      // Update volume in real-time if playing
+                      if (syncPlayingSampleId) {
+                        updateSampleVolume(newVol / 100);
+                      }
+                    }}
+                    className="w-16 h-1.5 bg-green-200 dark:bg-green-800 rounded-lg appearance-none cursor-pointer accent-green-600"
+                    title="Drum loop volume"
+                  />
+                  <span className="text-xs text-green-600 dark:text-green-400 w-7 font-semibold">{sampleVolume}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Regular Volume Control - When not sync playing */}
+            {!syncPlayingSampleId && (
+              <div className="hidden md:flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
+                <Volume2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={(e) => setVolume(Number.parseInt(e.target.value))}
+                  className="w-20 h-1 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400 w-8">{volume}</span>
+              </div>
+            )}
 
             {/* Tempo Editor - FL Studio Style */}
             {editedBPM !== null && (
@@ -713,6 +775,65 @@ function ResultsContent() {
         </div>
 
       </motion.header>
+
+      {/* Mobile Volume Controls - Show only when sync playing */}
+      {syncPlayingSampleId && (
+        <motion.div 
+          className="lg:hidden bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border-b-2 border-blue-200 dark:border-blue-700 p-4"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex flex-col space-y-3 max-w-md mx-auto">
+            {/* Your Audio Volume */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 min-w-[80px]">
+                <Music className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Your Audio</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={recordedVolume}
+                onChange={(e) => {
+                  const newVol = Number.parseInt(e.target.value);
+                  setRecordedVolume(newVol);
+                  if (syncPlayingSampleId) {
+                    updateRecordedVolume(newVol / 100);
+                  }
+                }}
+                className="flex-1 h-2 bg-blue-200 dark:bg-blue-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                title="Your audio volume"
+              />
+              <span className="text-sm text-blue-600 dark:text-blue-400 w-10 font-semibold text-right">{recordedVolume}%</span>
+            </div>
+            
+            {/* Sample Volume */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 min-w-[80px]">
+                <Volume2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-600 dark:text-green-400">Drum Loop</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={sampleVolume}
+                onChange={(e) => {
+                  const newVol = Number.parseInt(e.target.value);
+                  setSampleVolume(newVol);
+                  if (syncPlayingSampleId) {
+                    updateSampleVolume(newVol / 100);
+                  }
+                }}
+                className="flex-1 h-2 bg-green-200 dark:bg-green-800 rounded-lg appearance-none cursor-pointer accent-green-600"
+                title="Drum loop volume"
+              />
+              <span className="text-sm text-green-600 dark:text-green-400 w-10 font-semibold text-right">{sampleVolume}%</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Sample List - Row Layout */}
       <div className="p-3 sm:p-4 lg:p-6">
