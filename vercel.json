@@ -4,14 +4,6 @@
       "memory": 3008,
       "maxDuration": 60
     }
-  },
-  "build": {
-    "env": {
-      "VERCEL_ANALYZE": "true"
-    }
-  },
-  "outputFileTracing": {
-    "enabled": true
   }
 }
 
