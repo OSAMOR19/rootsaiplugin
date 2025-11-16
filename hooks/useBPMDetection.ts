@@ -49,20 +49,20 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Start live analysis from media stream
-  // Note: For live streams, we'll need to record chunks and send them to backend
+  // Note: For live streams, we'll need to record chunks and send them to API
   const startLiveAnalysis = useCallback(async (stream: MediaStream) => {
     try {
       setError(null)
       setIsAnalyzing(true)
       
-      console.log('Live BPM analysis not fully implemented - backend requires complete audio file')
+      console.log('Live BPM analysis not fully implemented - API requires complete audio file')
       // For live analysis, you would need to:
       // 1. Record audio chunks
-      // 2. Send accumulated chunks to backend periodically
+      // 2. Send accumulated chunks to API periodically
       // 3. Update BPM as new data comes in
       
       // This is a placeholder - implement if needed
-      throw new Error('Live BPM analysis requires recording and sending audio chunks to backend')
+      throw new Error('Live BPM analysis requires recording and sending audio chunks to API')
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start live analysis'
@@ -72,7 +72,7 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
     }
   }, [])
 
-  // Analyze audio file using backend
+  // Analyze audio file using SoundStat API
   const analyzeAudioFile = useCallback(async (file: File): Promise<BPMDetectionResult> => {
     try {
       setError(null)
@@ -82,14 +82,14 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
       // Create abort controller for this request
       abortControllerRef.current = new AbortController()
       
-      console.log(`Analyzing audio file via backend: ${file.name}`)
+      console.log(`Analyzing audio file via SoundStat: ${file.name}`)
       
       const bpm = await detectBPMFromFile(file)
       
-      // Backend detection is highly accurate with librosa
+      // SoundStat API is highly accurate
       const result: BPMDetectionResult = {
         bpm,
-        confidence: 0.95, // Backend librosa is very accurate
+        confidence: 0.95, // SoundStat is very accurate
         isStable: true
       }
       
@@ -102,7 +102,7 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
       setIsStable(result.isStable)
       setIsAnalyzing(false)
       
-      console.log('Backend BPM analysis complete:', result)
+      console.log('SoundStat BPM analysis complete:', result)
       return result
       
     } catch (err) {
@@ -116,7 +116,7 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
     }
   }, [])
 
-  // Analyze audio buffer using backend
+  // Analyze audio buffer using SoundStat API
   const analyzeAudioBuffer = useCallback(async (buffer: AudioBuffer): Promise<BPMDetectionResult> => {
     try {
       setError(null)
@@ -126,14 +126,14 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
       // Create abort controller for this request
       abortControllerRef.current = new AbortController()
 
-      console.log(`Analyzing audio buffer via backend: ${buffer.duration}s duration`)
+      console.log(`Analyzing audio buffer via SoundStat: ${buffer.duration}s duration`)
       
       const bpm = await detectBPMFromAudioBuffer(buffer)
       
-      // Backend detection is highly accurate with librosa
+      // SoundStat API is highly accurate
       const result: BPMDetectionResult = {
         bpm,
-        confidence: 0.95, // Backend librosa is very accurate
+        confidence: 0.95, // SoundStat is very accurate
         isStable: true
       }
       
@@ -146,7 +146,7 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
       setIsStable(result.isStable)
       setIsAnalyzing(false)
       
-      console.log('Backend buffer analysis complete:', result)
+      console.log('SoundStat buffer analysis complete:', result)
       return result
       
     } catch (err) {
@@ -160,13 +160,13 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
     }
   }, [])
 
-  // Quick BPM detection (same as full detection for backend)
+  // Quick BPM detection (same as full detection for SoundStat API)
   const quickDetect = useCallback(async (buffer: AudioBuffer): Promise<number> => {
     try {
       setError(null)
       setIsAnalyzing(true)
       
-      console.log('Quick BPM detection via backend...')
+      console.log('Quick BPM detection via SoundStat...')
       
       const bpm = await detectBPMFromAudioBuffer(buffer)
       
@@ -174,11 +174,11 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
       bpmHistoryRef.current.push(bpm)
       
       setCurrentBPM(bpm)
-      setConfidence(0.95) // Backend is highly accurate
+      setConfidence(0.95) // SoundStat is highly accurate
       setIsStable(true)
       setIsAnalyzing(false)
       
-      console.log(`Quick detection result from backend: ${bpm} BPM`)
+      console.log(`Quick detection result from SoundStat: ${bpm} BPM`)
       return bpm
       
     } catch (err) {
@@ -220,7 +220,7 @@ export function useBPMDetection(options?: BPMDetectionOptions): UseBPMDetectionR
   const getStabilityScore = useCallback((): number => {
     if (bpmHistoryRef.current.length === 0) return 0
     
-    // For backend detection, stability is high since each detection is independent and accurate
+    // For SoundStat detection, stability is high since each detection is independent and accurate
     return 0.95
   }, [])
 
@@ -267,7 +267,7 @@ export function useFileBPMDetection() {
       const bpm = await detectBPMFromFile(file)
       const bpmResult: BPMDetectionResult = {
         bpm,
-        confidence: 0.95, // Backend is highly accurate
+        confidence: 0.95, // SoundStat is highly accurate
         isStable: true
       }
       setResult(bpmResult)

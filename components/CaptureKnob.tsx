@@ -201,18 +201,18 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         try {
           const fullAudioBuffer = await blobToAudioBuffer(audioBlob)
           
-          // ⚡ OPTIMIZED: Skip extraction, send directly to backend!
-          console.log('⚡ Fast mode: Sending audio directly to backend (no pre-processing)...')
+          // ⚡ OPTIMIZED: Skip extraction, send directly to API!
+          console.log('⚡ Fast mode: Sending audio directly to SoundStat API (no pre-processing)...')
           
           // Reset previous BPM analysis
           resetAnalysis()
           
           // Show persistent toast that stays until BPM is detected
-          toastId = toast.loading('🎵 Analyzing BPM with backend... Please wait (this may take up to 60 seconds)', {
+          toastId = toast.loading('🎵 Analyzing BPM with SoundStat... Please wait', {
             duration: Infinity // Stays visible until we dismiss it
           })
           
-          // ⚡ Direct BPM detection - backend handles everything!
+          // ⚡ Direct BPM detection - SoundStat API handles everything!
           const bpmResult = await analyzeAudioBuffer(fullAudioBuffer)
           
           console.log('⚡ Fast BPM Detection Result:', {
@@ -236,7 +236,6 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           setRecordedAudioBlob(audioBlob)
           
           // Call onAnalysisComplete directly with mock recommendations
-          // (since we're skipping the backend recommendation API)
           if (onAnalysisComplete) {
             onAnalysisComplete({
               detectedBPM: bpmResult.bpm,
@@ -256,13 +255,13 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           // Show detailed error message
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           
-          if (errorMessage.includes('Failed to fetch') || errorMessage.includes('backend')) {
-            toast.error('Cannot connect to BPM detection server. Please check:\n1. Backend is running\n2. Try again in 30 seconds (cold start)', {
+          if (errorMessage.includes('Failed to fetch')) {
+            toast.error('Cannot connect to BPM detection API. Please check your internet connection and try again.', {
               duration: 8000
             })
           } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-            toast.error('Backend took too long (>60s). This might be cold start - please try ONE MORE TIME and it should be fast!', {
-              duration: 8000
+            toast.error('BPM detection timed out. Try again with a shorter audio clip.', {
+              duration: 10000
             })
           } else {
             toast.error(`Failed to detect BPM: ${errorMessage}`)
@@ -513,7 +512,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       console.log('⚡ Fast mode: Processing uploaded file directly...')
       
       // Show persistent loading toast
-      toastId = toast.loading('🎵 Analyzing BPM with backend... Please wait (this may take up to 60 seconds)', {
+      toastId = toast.loading('🎵 Analyzing BPM with SoundStat... Please wait', {
         duration: Infinity // Stays visible
       })
       
@@ -573,13 +572,13 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       // Show detailed error message
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('backend')) {
-        toast.error('Cannot connect to BPM detection server. Please check:\n1. Backend is running at rootsaibackend.onrender.com\n2. CORS is configured\n3. Try again in 30 seconds (cold start)', {
+      if (errorMessage.includes('Failed to fetch')) {
+        toast.error('Cannot connect to BPM detection API. Please check your internet connection and try again.', {
           duration: 8000
         })
       } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-        toast.error('Backend took too long (>60s). This might be cold start - please try ONE MORE TIME and it should be fast!', {
-          duration: 8000
+        toast.error('BPM detection timed out. Try again with a shorter audio clip.', {
+          duration: 10000
         })
       } else {
         toast.error(`Failed to process audio: ${errorMessage}`)

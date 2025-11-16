@@ -1,10 +1,10 @@
 "use client"
 
 /**
- * BPM Detection Library - Backend-Powered
+ * BPM Detection Library - SoundStat API
  * 
- * This module now uses the Python backend with librosa for accurate BPM detection.
- * All frontend-based BPM detection has been replaced with backend API calls.
+ * This module uses the SoundStat.info API for professional-grade BPM detection.
+ * All detection is handled through our Next.js API route (/api/get-bpm).
  */
 
 import { detectBPMFromAudioBuffer, detectBPMFromFile } from '@/utils/detectBpm'
@@ -40,51 +40,51 @@ export class BPMDetector {
   }
 
   /**
-   * Analyze BPM from an audio buffer using backend API
+   * Analyze BPM from an audio buffer using SoundStat API
    */
   async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<BPMDetectionResult> {
     try {
       this.isAnalyzing = true
-      console.log('Starting backend BPM analysis...')
+      console.log('Starting SoundStat BPM analysis...')
       
       const bpm = await detectBPMFromAudioBuffer(audioBuffer)
       
       // Add to history for tracking
       this.bpmHistory.push(bpm)
       
-      // Backend detection with librosa is highly accurate
+      // SoundStat API provides highly accurate results
       const result: BPMDetectionResult = {
         bpm: Math.round(bpm),
-        confidence: 0.95, // Backend librosa provides very accurate results
+        confidence: 0.95, // SoundStat provides professional-grade accuracy
         isStable: true
       }
       
       this.isAnalyzing = false
-      console.log('Backend BPM analysis complete:', result)
+      console.log('SoundStat BPM analysis complete:', result)
       
       return result
     } catch (error) {
       this.isAnalyzing = false
-      console.error('Backend BPM detection error:', error)
+      console.error('SoundStat BPM detection error:', error)
       throw error
     }
   }
 
   /**
    * Analyze BPM from a live audio stream
-   * Note: For live streams, this would require recording chunks and sending to backend
+   * Note: For live streams, this would require recording chunks and sending to API
    */
   async analyzeLiveStream(stream: MediaStream): Promise<void> {
     try {
-      console.log('Live BPM analysis requires recording audio and sending to backend')
+      console.log('Live BPM analysis requires recording audio and sending to API')
       this.isAnalyzing = true
       
       // For live streams, you would need to:
       // 1. Record audio chunks using MediaRecorder
-      // 2. Send chunks to backend periodically
+      // 2. Send chunks to API periodically
       // 3. Update BPM as new analyses complete
       
-      throw new Error('Live stream analysis not yet implemented for backend API')
+      throw new Error('Live stream analysis not yet implemented for SoundStat API')
 
     } catch (error) {
       console.error('Live stream BPM analysis error:', error)
@@ -124,16 +124,16 @@ export class BPMDetector {
 
   /**
    * Get BPM detection confidence
-   * Backend detection is consistently accurate
+   * SoundStat detection is consistently accurate
    */
   getConfidence(): number {
     if (this.bpmHistory.length === 0) return 0
-    return 0.95 // Backend detection is highly reliable
+    return 0.95 // SoundStat detection is highly reliable
   }
 }
 
 /**
- * Utility function to detect BPM from audio file using backend
+ * Utility function to detect BPM from audio file using SoundStat API
  */
 export async function detectBPMFromFile_Legacy(file: File): Promise<BPMDetectionResult> {
   try {
@@ -151,16 +151,16 @@ export async function detectBPMFromFile_Legacy(file: File): Promise<BPMDetection
 }
 
 /**
- * Quick BPM detection using backend (same as full detection)
- * Backend is fast and accurate, no need for "quick" vs "full" detection
+ * Quick BPM detection using SoundStat API (same as full detection)
+ * SoundStat is fast and accurate, no need for "quick" vs "full" detection
  */
 export async function quickBPMDetection(audioBuffer: AudioBuffer): Promise<number> {
   try {
-    console.log('Quick BPM detection via backend...')
+    console.log('Quick BPM detection via SoundStat...')
     
     const bpm = await detectBPMFromAudioBuffer(audioBuffer)
     
-    console.log('Backend quick detection result:', bpm, 'BPM')
+    console.log('SoundStat quick detection result:', bpm, 'BPM')
     return Math.round(bpm)
   } catch (error) {
     console.error('Quick BPM detection failed:', error)
