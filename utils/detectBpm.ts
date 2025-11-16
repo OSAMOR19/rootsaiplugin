@@ -1,14 +1,19 @@
 /**
- * Backend BPM Detection Utility
- * Uses the Python backend on Render with librosa for accurate BPM detection
+ * BPM Detection Utility using Essentia.js (Server-Side)
+ * 
+ * This utility provides a clean interface for BPM detection using our
+ * Essentia.js-powered backend API route.
  */
-
-// ✅ BACKEND URL - Your Python backend with librosa for ACCURATE BPM detection
-const BACKEND_URL = 'https://rootsaibackend.onrender.com';
-const USE_MOCK_BPM = false; // ✅ Using REAL backend BPM detection with librosa
 
 export interface BPMDetectionResponse {
   bpm: number;
+  confidence?: number;
+  alternatives?: Array<{ bpm: number; confidence: number }>;
+  beats?: number[];
+  key?: { tonic: string | null; scale: string | null; strength: number | null };
+  danceability?: number | null;
+  energy?: number | null;
+  valence?: number | null;
 }
 
 export interface BPMDetectionError {
@@ -17,25 +22,25 @@ export interface BPMDetectionError {
 }
 
 /**
- * Detect BPM from an audio file using the Python backend
+ * Detect BPM from an audio file using Essentia.js backend
  * @param file - Audio file (File object or Blob)
- * @returns Promise with detected BPM
+ * @returns Promise with detected BPM and additional features
  */
 export async function detectBPMFromFile(file: File | Blob): Promise<number> {
-  // TEMPORARY: Mock BPM while backend is broken (remove this later!)
-  if (USE_MOCK_BPM) {
-    console.warn('⚠️ Using MOCK BPM detection - backend is disabled');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
-    return Math.floor(Math.random() * 40) + 100; // Random BPM 100-140
-  }
-  
   try {
     // Validate file
     if (!file) {
       throw new Error('No file provided');
     }
 
-    // Create FormData for file upload
+    console.log('🎵 Starting BPM detection with Essentia.js');
+    console.log('📁 Audio file:', {
+      size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      type: file.type || 'audio/wav',
+      format: file instanceof File ? 'File' : 'Blob'
+    });
+
+    // Create FormData with audio file
     const formData = new FormData();
     
     // If it's a Blob without a name, give it a default name
@@ -45,82 +50,113 @@ export async function detectBPMFromFile(file: File | Blob): Promise<number> {
       formData.append('file', file);
     }
 
-    console.log('🎵 ===== BACKEND BPM DETECTION STARTING =====');
-    console.log('🔗 Backend:', BACKEND_URL);
-    console.log('📍 Endpoint:', `${BACKEND_URL}/detect-bpm`);
-    console.log('📁 Audio file:', {
-      size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-      type: file.type || 'audio/wav',
-      format: file instanceof File ? 'File' : 'Blob'
-    });
-    console.log('⚡ This will use your backend with librosa for ACCURATE BPM detection');
-
-    // Create abort controller for timeout (60 seconds for cold start + processing)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-    console.log('📤 Sending audio to backend for analysis...');
+    console.log('📤 Sending audio to /api/analyze...');
     
-    try {
-      // Send request to backend
-      const response = await fetch(`${BACKEND_URL}/detect-bpm`, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-        mode: 'cors', // Explicitly set CORS mode
-        // Don't set Content-Type header - browser will set it with boundary for FormData
-      });
+    // Send request to our Essentia.js API route
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      body: formData,
+    });
 
-      console.log('✅ Backend responded!');
+    console.log('✅ API responded with status:', response.status);
 
-      clearTimeout(timeoutId);
-
-      console.log('📊 Status:', response.status, response.statusText);
-
-      // Check if request was successful
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.message || 
-          errorData?.error || 
-          `Backend request failed with status ${response.status}`
-        );
-      }
-
-      // Parse response
-      const data: BPMDetectionResponse = await response.json();
-
-      // Validate response
-      if (typeof data.bpm !== 'number' || isNaN(data.bpm)) {
-        throw new Error('Invalid BPM value received from backend');
-      }
-
-      console.log('🎉 ===== BPM DETECTION SUCCESSFUL =====');
-      console.log('🎯 Detected BPM:', data.bpm);
-      console.log('✅ This is REAL, ACCURATE BPM from your librosa backend!');
-      console.log('==========================================');
-
-      return Math.round(data.bpm);
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      // Handle specific error types
-      if (fetchError instanceof Error) {
-        if (fetchError.name === 'AbortError') {
-          throw new Error('Backend request timed out. The server may be starting up (cold start). Please try again in a moment.');
-        }
-        throw fetchError;
-      }
-      throw new Error('Failed to connect to BPM detection backend');
+    // Check if request was successful
+    if (!response.ok) {
+      const errorData: BPMDetectionError = await response.json().catch(() => ({
+        error: `Request failed with status ${response.status}`
+      }));
+      throw new Error(errorData.error || errorData.message || `BPM detection failed with status ${response.status}`);
     }
+
+    // Parse response
+    const data = await response.json();
+
+    // Validate response structure
+    if (!data.success || !data.analysis) {
+      throw new Error('Invalid response format from API');
+    }
+
+    const analysis = data.analysis;
+
+    // Validate BPM value
+    if (typeof analysis.bpm !== 'number' || isNaN(analysis.bpm) || analysis.bpm === null) {
+      throw new Error('Invalid BPM value received from API');
+    }
+
+    console.log('🎉 BPM Detection Successful!');
+    console.log('🎯 Detected BPM:', analysis.bpm);
+    console.log('🎹 Key:', analysis.key?.tonic, analysis.key?.scale);
+    console.log('⚡ Energy:', analysis.energy);
+    console.log('💃 Danceability:', analysis.danceability);
+
+    return Math.round(analysis.bpm);
+
   } catch (error) {
-    console.error('BPM detection error:', error);
+    console.error('❌ BPM detection error:', error);
     
     // Provide helpful error message
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Could not connect to BPM detection backend. Please check your internet connection.');
+      throw new Error('Could not connect to BPM detection API. Please check your internet connection.');
     }
     
+    throw error;
+  }
+}
+
+/**
+ * Detect BPM and get full analysis from an audio file
+ * @param file - Audio file (File object or Blob)
+ * @returns Promise with complete analysis including BPM, key, mood, etc.
+ */
+export async function analyzeAudioFile(file: File | Blob): Promise<BPMDetectionResponse> {
+  try {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    console.log('🔬 Starting full audio analysis with Essentia.js');
+
+    const formData = new FormData();
+    
+    if (file instanceof Blob && !(file instanceof File)) {
+      formData.append('file', file, 'audio.wav');
+    } else {
+      formData.append('file', file);
+    }
+
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData: BPMDetectionError = await response.json().catch(() => ({
+        error: `Request failed with status ${response.status}`
+      }));
+      throw new Error(errorData.error || errorData.message || 'Audio analysis failed');
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.analysis) {
+      throw new Error('Invalid response format from API');
+    }
+
+    const analysis = data.analysis;
+
+    return {
+      bpm: analysis.bpm || 0,
+      confidence: analysis.confidence,
+      alternatives: analysis.alternatives,
+      beats: analysis.beats,
+      key: analysis.key,
+      danceability: analysis.danceability,
+      energy: analysis.energy,
+      valence: analysis.valence,
+    };
+
+  } catch (error) {
+    console.error('❌ Audio analysis error:', error);
     throw error;
   }
 }
@@ -144,18 +180,61 @@ export async function detectBPMFromAudioBuffer(audioBuffer: AudioBuffer): Promis
 }
 
 /**
- * Convert AudioBuffer to WAV Blob for backend processing
+ * Convert AudioBuffer to WAV Blob for API upload
+ * ✅ OPTIMIZED: Limits to 60 seconds, mono, 22050 Hz to reduce file size
  */
 function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
-  const length = audioBuffer.length;
-  const sampleRate = audioBuffer.sampleRate;
+  console.log('🔧 Optimizing audio for API upload:', {
+    originalDuration: audioBuffer.duration.toFixed(2) + 's',
+    originalSampleRate: audioBuffer.sampleRate + 'Hz',
+    originalChannels: audioBuffer.numberOfChannels
+  });
+
+  // ✅ OPTIMIZATION 1: Limit to 60 seconds
+  const maxDuration = 60;
+  const originalSampleRate = audioBuffer.sampleRate;
+  const maxSamples = Math.min(audioBuffer.length, Math.floor(maxDuration * originalSampleRate));
+  
+  // ✅ OPTIMIZATION 2: Resample to 22050 Hz
+  const targetSampleRate = 22050;
+  const resampleRatio = targetSampleRate / originalSampleRate;
+  const resampledLength = Math.floor(maxSamples * resampleRatio);
+  
+  // ✅ OPTIMIZATION 3: Convert to mono
+  const monoData = new Float32Array(maxSamples);
   const numberOfChannels = audioBuffer.numberOfChannels;
   
-  // Create WAV file header (44 bytes)
+  for (let i = 0; i < maxSamples; i++) {
+    let sum = 0;
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel);
+      sum += channelData[i];
+    }
+    monoData[i] = sum / numberOfChannels;
+  }
+  
+  // Simple resampling (linear interpolation)
+  const resampledData = new Float32Array(resampledLength);
+  for (let i = 0; i < resampledLength; i++) {
+    const srcIndex = i / resampleRatio;
+    const srcIndexFloor = Math.floor(srcIndex);
+    const srcIndexCeil = Math.min(srcIndexFloor + 1, maxSamples - 1);
+    const fraction = srcIndex - srcIndexFloor;
+    
+    resampledData[i] = monoData[srcIndexFloor] * (1 - fraction) + monoData[srcIndexCeil] * fraction;
+  }
+  
+  console.log('✅ Audio optimized:', {
+    newDuration: (resampledLength / targetSampleRate).toFixed(2) + 's',
+    newSampleRate: targetSampleRate + 'Hz',
+    newChannels: 1,
+    compressionRatio: ((audioBuffer.length * numberOfChannels) / resampledLength).toFixed(2) + 'x smaller'
+  });
+  
+  // Create WAV file header (44 bytes) for MONO, 22050 Hz
   const header = new ArrayBuffer(44);
   const view = new DataView(header);
   
-  // Helper to write string to DataView
   const writeString = (offset: number, string: string) => {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i));
@@ -164,50 +243,31 @@ function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
   
   // WAV file header structure
   writeString(0, 'RIFF');
-  view.setUint32(4, 36 + length * numberOfChannels * 2, true); // File size
+  view.setUint32(4, 36 + resampledLength * 2, true);
   writeString(8, 'WAVE');
   writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-  view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
-  view.setUint16(22, numberOfChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numberOfChannels * 2, true); // ByteRate
-  view.setUint16(32, numberOfChannels * 2, true); // BlockAlign
-  view.setUint16(34, 16, true); // BitsPerSample
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, targetSampleRate, true);
+  view.setUint32(28, targetSampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
   writeString(36, 'data');
-  view.setUint32(40, length * numberOfChannels * 2, true); // Data chunk size
+  view.setUint32(40, resampledLength * 2, true);
   
-  // Convert audio data to interleaved 16-bit PCM
-  const audioData = new ArrayBuffer(length * numberOfChannels * 2);
+  // Convert audio data to 16-bit PCM
+  const audioData = new ArrayBuffer(resampledLength * 2);
   const audioView = new Int16Array(audioData);
   
-  for (let channel = 0; channel < numberOfChannels; channel++) {
-    const channelData = audioBuffer.getChannelData(channel);
-    for (let i = 0; i < length; i++) {
-      // Clamp and convert to 16-bit integer
-      const sample = Math.max(-1, Math.min(1, channelData[i]));
-      audioView[i * numberOfChannels + channel] = sample * 32767;
-    }
+  for (let i = 0; i < resampledLength; i++) {
+    const sample = Math.max(-1, Math.min(1, resampledData[i]));
+    audioView[i] = sample * 32767;
   }
   
-  // Combine header and audio data into a Blob
-  return new Blob([header, audioData], { type: 'audio/wav' });
+  const blob = new Blob([header, audioData], { type: 'audio/wav' });
+  
+  console.log('📦 Final WAV blob size:', (blob.size / 1024 / 1024).toFixed(2) + ' MB');
+  
+  return blob;
 }
-
-/**
- * Check if the backend is available
- * @returns Promise<boolean>
- */
-export async function checkBackendHealth(): Promise<boolean> {
-  try {
-    const response = await fetch(`${BACKEND_URL}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    });
-    return response.ok;
-  } catch (error) {
-    console.warn('Backend health check failed:', error);
-    return false;
-  }
-}
-
