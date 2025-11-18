@@ -320,5 +320,12 @@
     "key": "Dm",
     "category": "Percussions",
     "url": "/audio/Percussions/Manifxtsounds - War-Raw Perc Loop 86BPM.wav"
+  },
+  {
+    "filename": "Manifxtsounds___Scata_Kick_120BPM.wav",
+    "bpm": 120,
+    "key": "C",
+    "category": "Kick Loops",
+    "url": "/audio/Kick Loops/Manifxtsounds___Scata_Kick_120BPM.wav"
   }
 ]

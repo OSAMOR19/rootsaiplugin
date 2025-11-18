@@ -116,73 +116,59 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
 
   if (viewMode === "grid") {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
         {samples.map((sample, index) => (
           <motion.div
             key={sample.id}
-            className="bg-white/80 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
+            className="bg-white/5 backdrop-blur-2xl rounded-2xl overflow-hidden border border-white/10 hover:border-emerald-500/50 shadow-xl hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 group cursor-pointer"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.02, y: -4 }}
+            transition={{ delay: index * 0.05 }}
+            whileHover={{ scale: 1.03, y: -8 }}
             onClick={() => handleSampleClick(sample.id)}
           >
-            {/* Drum Image Header with Integrated Waveform */}
-            <div className="h-32 bg-gradient-to-br from-green-400 to-green-600 relative overflow-hidden">
+            {/* Premium Drum Image Header with Gradient Overlay */}
+            <div className="h-44 bg-gradient-to-br from-emerald-600/20 via-teal-500/20 to-green-600/20 relative overflow-hidden">
               <Image
                 src={getDrumImage(sample.category)}
                 alt={sample.category || "Drum"}
                 fill
-                className="object-cover opacity-80"
+                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300"
               />
-              <div className="absolute inset-0 bg-black/20" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
               
-              {/* Compact Waveform Overlay */}
-              <div className="absolute bottom-2 left-2 right-2 h-6 bg-black/40 backdrop-blur-sm rounded-lg">
-                <div className="flex items-end justify-center p-1 h-full">
-                  <div className="flex items-end space-x-0.5 h-4 w-full">
-                    {sample.waveform.slice(0, 16).map((height: number, i: number) => (
+              {/* Modern Waveform Overlay */}
+              <div className="absolute bottom-3 left-3 right-3 h-8 bg-black/50 backdrop-blur-md rounded-xl border border-white/10">
+                <div className="flex items-end justify-center px-2 h-full">
+                  <div className="flex items-end space-x-0.5 h-5 w-full">
+                    {sample.waveform.slice(0, 20).map((height: number, i: number) => (
                       <motion.div
                         key={i}
-                        className="w-0.5 bg-white/70 rounded-full relative"
-                        style={{ height: `${height * 0.4}%` }}
+                        className="flex-1 bg-emerald-400/70 rounded-full relative"
+                        style={{ height: `${height * 0.5}%` }}
                         animate={
                           currentlyPlaying === sample.id
                             ? {
-                                scaleY: [1, 1.4, 1],
+                                scaleY: [1, 1.5, 1],
                                 opacity: [0.7, 1, 0.7],
-                                backgroundColor: ["#10b981", "#ffffff", "#10b981"],
+                                backgroundColor: ["#34d399", "#ffffff", "#34d399"],
                               }
                             : {}
                         }
                         transition={{
-                          duration: 0.6,
+                          duration: 0.5,
                           repeat: currentlyPlaying === sample.id ? Number.POSITIVE_INFINITY : 0,
-                          delay: i * 0.03,
+                          delay: i * 0.02,
                         }}
-                      >
-                        {/* Progress overlay for played portion */}
-                        {currentlyPlaying === sample.id && (
-                          <motion.div
-                            className="absolute bottom-0 left-0 w-full bg-green-400 rounded-full"
-                            initial={{ height: "0%" }}
-                            animate={{ height: `${height * 0.4}%` }}
-                            transition={{
-                              duration: 8,
-                              ease: "linear",
-                              repeat: Number.POSITIVE_INFINITY,
-                            }}
-                          />
-                        )}
-                      </motion.div>
+                      />
                     ))}
                   </div>
                 </div>
-                
-                {/* Progress bar overlay */}
+
+                {/* Progress bar */}
                 {currentlyPlaying === sample.id && (
                   <motion.div
-                    className="absolute bottom-0 left-0 h-0.5 bg-green-400"
+                    className="absolute bottom-0 left-0 h-0.5 bg-emerald-400 rounded-full"
                     initial={{ width: "0%" }}
                     animate={{ width: "100%" }}
                     transition={{
@@ -194,205 +180,181 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 )}
               </div>
 
-              {/* Play Button Overlay */}
-              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              {/* Play Button - Always visible, enhanced on hover */}
+              <div className="absolute top-3 right-3 z-10">
                 <motion.button
                   onClick={(e) => {
                     e.stopPropagation()
                     handlePlayPause(sample.id, sample.audioUrl)
                   }}
-                  className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg"
-                  whileHover={{ scale: 1.1 }}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${
+                    currentlyPlaying === sample.id
+                      ? "bg-emerald-500 border-emerald-400 shadow-emerald-500/50"
+                      : "bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40"
+                  }`}
+                  whileHover={{ scale: 1.15 }}
                   whileTap={{ scale: 0.9 }}
                 >
                   {currentlyPlaying === sample.id ? (
-                    <Pause className="w-5 h-5 text-gray-800" />
+                    <Pause className="w-5 h-5 text-white" />
                   ) : (
-                    <Play className="w-5 h-5 text-gray-800 ml-0.5" />
+                    <Play className="w-5 h-5 text-white ml-0.5" />
                   )}
                 </motion.button>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-4">
-              <h3 className="font-semibold text-gray-800 truncate mb-1">{sample.name}</h3>
-              <p className="text-sm text-gray-600 truncate mb-3">{sample.artist}</p>
+            {/* Glass Content Card */}
+            <div className="p-5">
+              <h3 className="font-bold text-white truncate mb-1.5 text-lg group-hover:text-emerald-400 transition-colors">{sample.name}</h3>
+              <p className="text-sm text-white/60 truncate mb-4">{sample.artist}</p>
 
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                <span className="capitalize">{sample.category?.replace(' & ', '&') || 'Drums'}</span>
-                <span>{sample.bpm} BPM</span>
-                <span>{sample.duration}</span>
+              {/* Stats Pills */}
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <span className="px-3 py-1.5 bg-white/10 backdrop-blur-xl border border-white/10 text-white/80 text-xs rounded-full font-medium">
+                  {sample.bpm} BPM
+                </span>
+                <span className="px-3 py-1.5 bg-white/10 backdrop-blur-xl border border-white/10 text-white/80 text-xs rounded-full font-medium capitalize">
+                  {sample.category?.replace(' & ', '&') || 'Drums'}
+                </span>
+                <span className="px-3 py-1.5 bg-white/10 backdrop-blur-xl border border-white/10 text-white/80 text-xs rounded-full font-medium">
+                  {sample.duration}
+                </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <motion.button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleLike(sample.id)
-                    }}
-                    className={`p-1.5 rounded-full transition-colors ${
-                      likedSamples.has(sample.id)
-                        ? "text-red-500 bg-red-50"
-                        : "text-gray-400 hover:text-red-500 hover:bg-red-50"
-                    }`}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Heart className={`w-4 h-4 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
-                  </motion.button>
-                </div>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleLike(sample.id)
+                  }}
+                  className={`p-2 rounded-lg transition-all duration-300 ${
+                    likedSamples.has(sample.id)
+                      ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
+                      : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
+                  }`}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <Heart className={`w-5 h-5 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
+                </motion.button>
 
                 <motion.button
                   onClick={(e) => {
                     e.stopPropagation()
                     // Handle download
                   }}
-                  className="p-1.5 rounded-full text-gray-400 hover:text-green-500 hover:bg-green-50 transition-colors"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <Download className="w-4 h-4" />
                 </motion.button>
               </div>
             </div>
+
+            {/* Active Indicator */}
+            {currentlyPlaying === sample.id && (
+              <motion.div
+                className="absolute inset-0 border-2 border-emerald-500 rounded-2xl pointer-events-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              />
+            )}
           </motion.div>
         ))}
       </div>
     )
   }
 
-  // List view
+  // List view - Glassmorphism design
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {samples.map((sample, index) => (
         <motion.div
           key={sample.id}
-          className="bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer"
+          className="bg-white/5 backdrop-blur-2xl rounded-2xl border border-white/10 hover:border-emerald-500/50 overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 group cursor-pointer relative"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: index * 0.05 }}
-          whileHover={{ scale: 1.01, y: -1 }}
+          transition={{ delay: index * 0.03 }}
+          whileHover={{ scale: 1.01, x: 4 }}
           onClick={() => handleSampleClick(sample.id)}
         >
-          <div className="flex items-center p-4 space-x-4">
-            {/* Drum Image with Integrated Waveform */}
-            <div className="flex-shrink-0 w-20 h-12 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg relative overflow-hidden border border-gray-200">
+          <div className="flex items-center p-5 space-x-6">
+            {/* Premium Drum Image with Waveform */}
+            <div className="flex-shrink-0 w-28 h-20 bg-gradient-to-br from-emerald-600/20 via-teal-500/20 to-green-600/20 rounded-xl relative overflow-hidden border border-white/10">
               <Image
                 src={getDrumImage(sample.category)}
                 alt={sample.category || "Drum"}
                 fill
-                className="object-cover"
+                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
               />
-              <div className="absolute inset-0 bg-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-transparent to-transparent" />
               
-              {/* Compact Waveform Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 h-3 bg-black/40 backdrop-blur-sm">
-                <div className="flex items-end justify-center px-1 h-full">
-                  <div className="flex items-end space-x-0.5 h-2 w-full">
-                    {sample.waveform.slice(0, 12).map((height: number, i: number) => (
-                      <motion.div
-                        key={i}
-                        className="w-0.5 bg-white/70 rounded-full relative"
-                        style={{ height: `${height * 0.3}%` }}
-                        animate={
-                          currentlyPlaying === sample.id
-                            ? {
-                                scaleY: [1, 1.4, 1],
-                                opacity: [0.7, 1, 0.7],
-                                backgroundColor: ["#10b981", "#ffffff", "#10b981"],
-                              }
-                            : {}
-                        }
-                        transition={{
-                          duration: 0.6,
-                          repeat: currentlyPlaying === sample.id ? Number.POSITIVE_INFINITY : 0,
-                          delay: i * 0.05,
-                        }}
-                      >
-                        {/* Progress overlay for played portion */}
-                        {currentlyPlaying === sample.id && (
-                          <motion.div
-                            className="absolute bottom-0 left-0 w-full bg-green-400 rounded-full"
-                            initial={{ height: "0%" }}
-                            animate={{ height: `${height * 0.3}%` }}
-                            transition={{
-                              duration: 8,
-                              ease: "linear",
-                              repeat: Number.POSITIVE_INFINITY,
-                            }}
-                          />
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
+              {/* Compact Waveform */}
+              <div className="absolute bottom-1 left-1 right-1 h-4 bg-black/50 backdrop-blur-md rounded-lg border border-white/10 flex items-center px-1">
+                <div className="flex items-end space-x-0.5 h-2.5 w-full">
+                  {sample.waveform.slice(0, 12).map((height: number, i: number) => (
+                    <motion.div
+                      key={i}
+                      className="flex-1 bg-emerald-400/70 rounded-full"
+                      style={{ height: `${height * 0.4}%` }}
+                      animate={
+                        currentlyPlaying === sample.id
+                          ? {
+                              scaleY: [1, 1.5, 1],
+                              backgroundColor: ["#34d399", "#ffffff", "#34d399"],
+                            }
+                          : {}
+                      }
+                      transition={{
+                        duration: 0.5,
+                        repeat: currentlyPlaying === sample.id ? Number.POSITIVE_INFINITY : 0,
+                        delay: i * 0.03,
+                      }}
+                    />
+                  ))}
                 </div>
-                
-                {/* Progress bar overlay */}
-                {currentlyPlaying === sample.id && (
-                  <motion.div
-                    className="absolute bottom-0 left-0 h-0.5 bg-green-400"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{
-                      duration: 8,
-                      ease: "linear",
-                      repeat: Number.POSITIVE_INFINITY,
-                    }}
-                  />
-                )}
               </div>
             </div>
 
             {/* Sample Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-800 truncate text-sm mb-1">{sample.name}</h3>
-              <p className="text-xs text-gray-600 truncate mb-2">{sample.artist}</p>
+              <h3 className="font-bold text-white truncate text-base mb-1 group-hover:text-emerald-400 transition-colors">{sample.name}</h3>
+              <p className="text-sm text-white/60 truncate mb-3">{sample.artist}</p>
 
               {/* Tags */}
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                  Afrobeat
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs rounded-full border border-emerald-500/30 font-medium">
+                  {sample.bpm} BPM
                 </span>
-                <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
-                  Drums
+                <span className="px-3 py-1 bg-white/10 text-white/70 text-xs rounded-full border border-white/10 font-medium capitalize">
+                  {sample.category?.replace(' & ', '&') || 'Drums'}
                 </span>
-              </div>
-            </div>
-
-            {/* Parameters */}
-            <div className="flex-shrink-0 grid grid-cols-3 gap-3 text-xs">
-              <div className="bg-gray-100 rounded px-3 py-2 text-center border border-gray-200 min-w-[50px]">
-                <div className="text-gray-600 text-xs">TYPE</div>
-                <div className="text-green-600 font-mono font-semibold text-[10px] capitalize">{sample.category?.replace(' & ', '&') || 'Drums'}</div>
-              </div>
-              <div className="bg-gray-100 rounded px-3 py-2 text-center border border-gray-200 min-w-[50px]">
-                <div className="text-gray-600 text-xs">BPM</div>
-                <div className="text-green-600 font-mono font-semibold">{sample.bpm}</div>
-              </div>
-              <div className="bg-gray-100 rounded px-3 py-2 text-center border border-gray-200 min-w-[50px]">
-                <div className="text-gray-600 text-xs">TIME</div>
-                <div className="text-green-600 font-mono font-semibold">{sample.duration}</div>
+                <span className="px-3 py-1 bg-white/10 text-white/70 text-xs rounded-full border border-white/10 font-medium">
+                  {sample.duration}
+                </span>
               </div>
             </div>
 
             {/* Controls */}
-            <div className="flex-shrink-0 flex items-center space-x-2">
+            <div className="flex-shrink-0 flex items-center gap-3">
               <motion.button
                 onClick={(e) => {
                   e.stopPropagation()
                   handlePlayPause(sample.id, sample.audioUrl)
                 }}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${
                   currentlyPlaying === sample.id
-                    ? "bg-green-500 text-white shadow-lg"
-                    : "bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600"
+                    ? "bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/50"
+                    : "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40"
                 }`}
-                whileHover={{ scale: 1.1 }}
+                whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.9 }}
               >
-                {currentlyPlaying === sample.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                {currentlyPlaying === sample.id ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </motion.button>
 
               <motion.button
@@ -400,15 +362,15 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                   e.stopPropagation()
                   toggleLike(sample.id)
                 }}
-                className={`p-2 rounded-full transition-colors ${
+                className={`p-2.5 rounded-lg transition-all duration-300 ${
                   likedSamples.has(sample.id)
-                    ? "text-red-500 bg-red-50"
-                    : "text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
+                    : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
                 }`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
-                <Heart className={`w-4 h-4 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
+                <Heart className={`w-5 h-5 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
               </motion.button>
 
               <motion.button
@@ -416,26 +378,20 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                   e.stopPropagation()
                   // Handle download
                 }}
-                className="p-2 rounded-full text-gray-400 hover:text-green-500 hover:bg-green-50 transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30 flex items-center gap-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <Download className="w-4 h-4" />
+                <span className="text-sm">Download</span>
               </motion.button>
-            </div>
-
-            {/* Drag Instruction */}
-            <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                Drag to DAW
-              </div>
             </div>
           </div>
 
           {/* Active playing indicator */}
           {currentlyPlaying === sample.id && (
             <motion.div
-              className="absolute inset-0 border-2 border-green-500 rounded-xl pointer-events-none"
+              className="absolute inset-0 border-2 border-emerald-500 rounded-2xl pointer-events-none"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

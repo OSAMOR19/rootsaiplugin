@@ -45,6 +45,7 @@ function ResultsContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [syncPlayingSampleId, setSyncPlayingSampleId] = useState<string | null>(null) // Track which sample is sync playing
+  const [currentSyncSample, setCurrentSyncSample] = useState<{ id: string; bpm: number; url: string } | null>(null) // Store current sync sample info for re-syncing
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
@@ -228,7 +229,15 @@ function ResultsContent() {
       
       // Also update recordedBPM so playback uses the new BPM
       setRecordedBPM(editedBPM)
+      
+      // ✅ NEW: If a sample is currently syncing, restart it with the new BPM
+      if (currentSyncSample && recordedAudioBuffer) {
+        console.log(`🔄 Re-syncing with new BPM: ${editedBPM}`)
+        // Restart the sync with updated BPM
+        restartSyncWithNewBPM(currentSyncSample.id, currentSyncSample.url)
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedBPM])
 
   // Helper function to apply BPM change (used when user types/edits)
@@ -244,12 +253,45 @@ function ResultsContent() {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
   }
 
+  // ✅ Helper function to restart sync with new BPM
+  const restartSyncWithNewBPM = async (sampleId: string, sampleUrl: string) => {
+    if (!recordedAudioBuffer || !editedBPM) return
+    
+    try {
+      // Stop current playback
+      syncEngine.stopAll()
+      
+      // Get the updated sample BPM (which is now the edited BPM)
+      const updatedSampleBPM = editedBPM
+      
+      // Load sample audio
+      const sampleBuffer = await loadAudioBuffer(sampleUrl)
+      
+      // Restart sync playback with new BPM
+      await syncEngine.syncPlay(
+        recordedAudioBuffer,
+        sampleBuffer,
+        updatedSampleBPM,
+        {
+          recordedBPM: editedBPM,
+          recordedVolume: recordedVolume / 100,
+          sampleVolume: sampleVolume / 100
+        }
+      )
+      
+      console.log(`✅ Re-synced with new BPM: ${editedBPM}`)
+    } catch (error) {
+      console.error('Error re-syncing with new BPM:', error)
+    }
+  }
+
   // ✅ NEW: Handle sync play (play captured audio + sample together)
   const handleSyncPlay = async (sampleId: string, sampleBPM: number, sampleUrl: string) => {
     if (syncPlayingSampleId === sampleId) {
       // Stop sync playback
       syncEngine.stopAll()
       setSyncPlayingSampleId(null)
+      setCurrentSyncSample(null) // Clear the sync sample info
       setCurrentlyPlaying(null)
       
       toast({
@@ -302,6 +344,8 @@ function ResultsContent() {
         )
         
         setSyncPlayingSampleId(sampleId)
+        // Store current sync sample info for re-syncing when BPM changes
+        setCurrentSyncSample({ id: sampleId, bpm: sampleBPM, url: sampleUrl })
         console.log(`✅ Sync playing: Your audio + ${sampleId}`)
         
         toast({

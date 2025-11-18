@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon } from "lucide-react"
+import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon, Shield } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function SettingsPage() {
@@ -235,12 +235,37 @@ export default function SettingsPage() {
             </div>
           </motion.div>
 
+          {/* Admin Access */}
+          <motion.div
+            className="bg-gradient-to-br from-emerald-500/10 to-teal-600/10 backdrop-blur-xl rounded-2xl p-6 border border-emerald-200/50 dark:border-emerald-700/50"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+              <Shield className="w-5 h-5 mr-2 text-emerald-600 dark:text-emerald-400" />
+              Admin Panel
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Upload and manage drum samples in your library. Requires admin password.
+            </p>
+            <motion.button
+              onClick={() => router.push('/admin')}
+              className="w-full px-4 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium flex items-center justify-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Shield className="w-5 h-5" />
+              Access Admin Panel
+            </motion.button>
+          </motion.div>
+
           {/* About */}
           <motion.div
             className="bg-gradient-to-br from-green-500/10 to-green-600/10 backdrop-blur-xl rounded-2xl p-6 border border-green-200/50 dark:border-green-700/50"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.5 }}
           >
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">About ROOTS</h2>
             <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
