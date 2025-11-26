@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
+    const imageFile = formData.get('image') as File
     const name = formData.get('name') as string
     const category = formData.get('category') as string
     const bpmStr = formData.get('bpm') as string
-    const key = formData.get('key') as string
+    const timeSignature = formData.get('timeSignature') as string
 
     if (!audioFile) {
       return NextResponse.json(
@@ -25,37 +26,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate a safe filename
-    const ext = audioFile.name.split('.').pop()
-    const safeFilename = `${name.replace(/[^a-z0-9]/gi, '_')}.${ext}`
+    // Generate a safe filename base
+    const safeNameBase = name.replace(/[^a-z0-9]/gi, '_')
+
+    // --- Audio Processing ---
+    const audioExt = audioFile.name.split('.').pop()
+    const safeAudioFilename = `${safeNameBase}.${audioExt}`
 
     // Determine the category folder
     const categoryFolder = category || 'Full Drums'
     const audioDir = path.join(process.cwd(), 'public', 'audio', categoryFolder)
 
-    // Create directory if it doesn't exist
+    // Create audio directory if it doesn't exist
     if (!existsSync(audioDir)) {
       await mkdir(audioDir, { recursive: true })
     }
 
     // Save the audio file
-    const filePath = path.join(audioDir, safeFilename)
-    const bytes = await audioFile.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    const audioFilePath = path.join(audioDir, safeAudioFilename)
+    const audioBytes = await audioFile.arrayBuffer()
+    await writeFile(audioFilePath, Buffer.from(audioBytes))
 
-    // Auto-detect BPM and key if not provided (you can integrate Essentia.js here)
-    let detectedBPM = bpmStr ? parseInt(bpmStr) : undefined
-    let detectedKey = key || undefined
+    // --- Image Processing ---
+    let imageUrl = '/placeholder.jpg' // Default
+    if (imageFile) {
+      const imageExt = imageFile.name.split('.').pop()
+      const safeImageFilename = `${safeNameBase}_art.${imageExt}`
+      const imageDir = path.join(process.cwd(), 'public', 'images', 'uploads')
 
-    // TODO: If BPM or key not provided, analyze the audio file
-    // For now, we'll use defaults or user input
-    if (!detectedBPM) {
-      detectedBPM = 120 // Default, or analyze with Essentia.js
+      // Create image directory if it doesn't exist
+      if (!existsSync(imageDir)) {
+        await mkdir(imageDir, { recursive: true })
+      }
+
+      // Save the image file
+      const imageFilePath = path.join(imageDir, safeImageFilename)
+      const imageBytes = await imageFile.arrayBuffer()
+      await writeFile(imageFilePath, Buffer.from(imageBytes))
+
+      imageUrl = `/images/uploads/${safeImageFilename}`
     }
-    if (!detectedKey) {
-      detectedKey = 'C' // Default, or analyze with Essentia.js
-    }
+
+    // Auto-detect BPM if not provided
+    let detectedBPM = bpmStr ? parseInt(bpmStr) : 120
+    let selectedTimeSignature = timeSignature || '4/4'
 
     // Update metadata.json
     const metadataPath = path.join(process.cwd(), 'public', 'audio', 'metadata.json')
@@ -68,11 +82,15 @@ export async function POST(request: NextRequest) {
 
     // Add new entry
     const newEntry = {
-      filename: safeFilename,
+      id: Math.random().toString(36).substr(2, 9),
+      name: name,
+      filename: safeAudioFilename,
       bpm: detectedBPM,
-      key: detectedKey,
+      timeSignature: selectedTimeSignature,
       category: categoryFolder,
-      url: `/audio/${categoryFolder}/${safeFilename}`
+      audioUrl: `/audio/${categoryFolder}/${safeAudioFilename}`,
+      imageUrl: imageUrl,
+      duration: "0:00" // Placeholder, would need analysis to get real duration
     }
 
     metadata.push(newEntry)
@@ -80,17 +98,10 @@ export async function POST(request: NextRequest) {
     // Save updated metadata
     await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
 
-    // Also update mockData.ts (optional - for development)
-    // You would need to regenerate the mockData array or make it read from metadata.json
-
     return NextResponse.json({
       success: true,
       message: 'Beat uploaded successfully',
-      filename: safeFilename,
-      bpm: detectedBPM,
-      key: detectedKey,
-      category: categoryFolder,
-      url: `/audio/${categoryFolder}/${safeFilename}`
+      ...newEntry
     })
 
   } catch (error: any) {

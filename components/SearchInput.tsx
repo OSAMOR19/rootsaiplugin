@@ -34,7 +34,7 @@ export default function SearchInput({ value, onChange, placeholder, disabled, on
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-12 pr-4 py-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 resize-none h-32 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 dark:text-gray-100"
+          className="w-full pl-12 pr-4 py-4 bg-white dark:bg-white border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 resize-none h-32 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900"
           whileFocus={{ scale: 1.02 }}
         />
       </div>
@@ -45,7 +45,7 @@ export default function SearchInput({ value, onChange, placeholder, disabled, on
         animate={value ? { opacity: 1 } : { opacity: 0 }}
         transition={{ duration: 0.3 }}
       />
-      
+
       {/* Keyboard shortcut hint */}
       {value && (
         <motion.div

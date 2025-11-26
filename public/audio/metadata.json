@@ -327,5 +327,16 @@
     "key": "C",
     "category": "Kick Loops",
     "url": "/audio/Kick Loops/Manifxtsounds___Scata_Kick_120BPM.wav"
+  },
+  {
+    "id": "yhx0rhtn7",
+    "name": "Greatman_Takit_Korale_-_Commando_CeeNaija.com_",
+    "filename": "Greatman_Takit_Korale___Commando_CeeNaija_com_.mp3",
+    "bpm": 120,
+    "timeSignature": "4/4",
+    "category": "Full Drums",
+    "audioUrl": "/audio/Full Drums/Greatman_Takit_Korale___Commando_CeeNaija_com_.mp3",
+    "imageUrl": "/images/uploads/Greatman_Takit_Korale___Commando_CeeNaija_com__art.jpg",
+    "duration": "0:00"
   }
 ]

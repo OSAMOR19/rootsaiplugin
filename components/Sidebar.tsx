@@ -1,114 +1,66 @@
 "use client"
 
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Music, Filter } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Home, Search, Library, User, Settings, GraduationCap } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-interface SidebarProps {
-  selectedCategory: string
-  onCategoryChange: (category: string) => void
-}
+export default function Sidebar() {
+  const pathname = usePathname()
 
-const categories = [
-  { id: 'all', name: 'All Drums & Loops', icon: Music },
-  { id: 'full-drums', name: 'Full Drum Loops', icon: Music },
-  { id: 'top-loops', name: 'Top Loops', icon: Music },
-  { id: 'kick-loops', name: 'Kick Loops', icon: Music },
-  { id: 'shaker-loops', name: 'Shaker Loops', icon: Music },
-  { id: 'fills-rolls', name: 'Fills & Rolls', icon: Music },
-  { id: 'percussions', name: 'Percussions', icon: Music }
-]
+  const navItems = [
+    { icon: Home, href: "/", label: "Home" },
+    { icon: Search, href: "/browse", label: "Browse" },
+    { icon: Library, href: "/library", label: "Library" },
+    { icon: User, href: "/profile", label: "Profile" },
+  ]
 
-export default function Sidebar({ selectedCategory, onCategoryChange }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const bottomItems = [
+    { icon: GraduationCap, href: "/learn", label: "Learn" },
+    { icon: Settings, href: "/settings", label: "Settings" },
+  ]
 
   return (
-    <div className="relative">
-             {/* Toggle Button */}
-       <button
-         onClick={() => setIsCollapsed(!isCollapsed)}
-         className="absolute -right-3 top-4 z-20 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
-       >
-         {isCollapsed ? (
-           <ChevronRight className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-         ) : (
-           <ChevronLeft className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-         )}
-       </button>
+    <div className="w-16 flex flex-col items-center py-6 bg-black border-r border-white/10 h-screen sticky top-0 z-50">
+      {/* Logo Placeholder */}
+      <div className="w-1 bg-yellow-500 h-6 absolute left-0 top-8 rounded-r-full" />
 
-       {/* Sidebar */}
-       <AnimatePresence>
-         {!isCollapsed && (
-           <motion.div
-             initial={{ width: 0, opacity: 0 }}
-             animate={{ width: 280, opacity: 1 }}
-             exit={{ width: 0, opacity: 0 }}
-             transition={{ duration: 0.3, ease: "easeInOut" }}
-             className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden"
-           >
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                  <Filter className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Categories
-                </h2>
-              </div>
+      <nav className="flex-1 flex flex-col gap-8 mt-4">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center",
+                isActive
+                  ? "text-white"
+                  : "text-white/40 hover:text-white"
+              )}
+              title={item.label}
+            >
+              <item.icon className={cn("w-6 h-6", isActive && "fill-current")} />
+              {isActive && (
+                <div className="absolute inset-0 bg-white/10 blur-xl rounded-full -z-10" />
+              )}
+            </Link>
+          )
+        })}
+      </nav>
 
-              {/* Categories List */}
-              <div className="space-y-2">
-                {categories.map((category) => {
-                  const Icon = category.icon
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => onCategoryChange(category.id)}
-                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-left ${
-                        selectedCategory === category.id
-                          ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 ${
-                        selectedCategory === category.id 
-                          ? 'text-green-600 dark:text-green-400' 
-                          : 'text-gray-500 dark:text-gray-400'
-                      }`} />
-                      <span className="text-sm font-medium">{category.name}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Footer */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                  {categories.length} categories available
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-             {/* Collapsed State */}
-       {isCollapsed && (
-         <motion.div
-           initial={{ width: 0 }}
-           animate={{ width: 60 }}
-           exit={{ width: 0 }}
-           transition={{ duration: 0.3, ease: "easeInOut" }}
-           className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-r border-gray-200 dark:border-gray-700 shadow-lg"
-         >
-           <div className="p-4">
-             <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mx-auto">
-               <Filter className="w-4 h-4 text-white" />
-             </div>
-           </div>
-         </motion.div>
-       )}
+      <div className="flex flex-col gap-6 mb-24 mt-auto">
+        {bottomItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="p-2 text-white/40 hover:text-white transition-colors flex items-center justify-center"
+            title={item.label}
+          >
+            <item.icon className="w-6 h-6" />
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }

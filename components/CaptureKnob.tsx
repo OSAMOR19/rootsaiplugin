@@ -2,11 +2,12 @@
 
 import { motion } from "framer-motion"
 import { Play, Square, Mic, MicOff, Upload, FileAudio } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useLayoutEffect } from "react"
 import { syncEngine, blobToAudioBuffer, fileToAudioBuffer, extractBest4Bars } from "@/lib/syncEngine"
 import { toast } from "sonner"
 import { useBPMDetection } from "@/hooks/useBPMDetection"
 import BreathingOrb from "./BreathingOrb"
+import gsap from "gsap"
 
 interface CaptureKnobProps {
   isListening: boolean
@@ -27,7 +28,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
   const [mode, setMode] = useState<'capture' | 'upload'>('capture')
   const [uploadedFileName, setUploadedFileName] = useState<string>('')
   const [isExtracting, setIsExtracting] = useState(false)
-  
+
   // Real BPM Detection Hook
   const {
     analyzeAudioBuffer,
@@ -42,29 +43,30 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     minBPM: 60,
     maxBPM: 200,
   })
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const circleRef = useRef<SVGCircleElement>(null)
 
   // Convert AudioBuffer to Blob for API upload
   const audioBufferToBlob = (audioBuffer: AudioBuffer): Blob => {
     const length = audioBuffer.length
     const sampleRate = audioBuffer.sampleRate
     const numberOfChannels = audioBuffer.numberOfChannels
-    
+
     // Create a WAV file header
     const header = new ArrayBuffer(44)
     const view = new DataView(header)
-    
+
     // WAV file header
     const writeString = (offset: number, string: string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i))
       }
     }
-    
+
     writeString(0, 'RIFF')
     view.setUint32(4, 36 + length * 2, true)
     writeString(8, 'WAVE')
@@ -78,11 +80,11 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     view.setUint16(34, 16, true)
     writeString(36, 'data')
     view.setUint32(40, length * 2, true)
-    
+
     // Convert channels to interleaved audio
     const audioData = new ArrayBuffer(length * numberOfChannels * 2)
     const audioView = new Int16Array(audioData)
-    
+
     for (let channel = 0; channel < numberOfChannels; channel++) {
       const channelData = audioBuffer.getChannelData(channel)
       for (let i = 0; i < length; i++) {
@@ -90,9 +92,39 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         audioView[i * numberOfChannels + channel] = sample * 32767
       }
     }
-    
+
     return new Blob([header, audioData], { type: 'audio/wav' })
   }
+
+
+  // GSAP Circular Progress Animation
+  useLayoutEffect(() => {
+    if (!circleRef.current) return
+
+    const circle = circleRef.current
+    const radius = 126 // Radius of the circle
+    const circumference = 2 * Math.PI * radius
+
+    // Set initial values
+    circle.style.strokeDasharray = `${circumference}`
+    circle.style.strokeDashoffset = `${circumference}`
+
+    // Animate based on recording progress
+    if (isRecording || isExtracting || isBPMAnalyzing) {
+      gsap.to(circle, {
+        strokeDashoffset: circumference * (1 - recordingProgress / 100),
+        duration: 0.3,
+        ease: "power2.out"
+      })
+    } else {
+      // Reset when not recording
+      gsap.to(circle, {
+        strokeDashoffset: circumference,
+        duration: 0.5,
+        ease: "power2.inOut"
+      })
+    }
+  }, [recordingProgress, isRecording, isExtracting, isBPMAnalyzing])
 
   // Cleanup effect
   useEffect(() => {
@@ -108,12 +140,12 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     try {
       setIsRecording(true)
       setRecordingProgress(0)
-      
+
       // Check if getDisplayMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
         throw new Error('Screen sharing not supported in this browser')
       }
-      
+
       // ONLY capture internal audio - NO external sounds allowed
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: false, // We only want audio
@@ -126,31 +158,31 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           sampleSize: 16 // 16-bit depth
         }
       })
-      
+
       console.log('Using INTERNAL audio capture only - No external sounds')
-      
+
       // Verify this is internal audio (not microphone)
       const audioTracks = stream.getAudioTracks()
       if (audioTracks.length === 0) {
         throw new Error('No audio track available')
       }
-      
+
       const audioTrack = audioTracks[0]
       console.log('Audio track details:', {
         label: audioTrack.label,
         kind: audioTrack.kind,
         enabled: audioTrack.enabled
       })
-      
+
       // If it's a microphone track, reject it
-      if (audioTrack.label.toLowerCase().includes('microphone') || 
-          audioTrack.label.toLowerCase().includes('mic') ||
-          audioTrack.label.toLowerCase().includes('default')) {
+      if (audioTrack.label.toLowerCase().includes('microphone') ||
+        audioTrack.label.toLowerCase().includes('mic') ||
+        audioTrack.label.toLowerCase().includes('default')) {
         throw new Error('Microphone detected - internal audio only')
       }
       // Try different codecs for maximum quality
       let mediaRecorder: MediaRecorder
-      
+
       try {
         // Try lossless WAV first (best quality)
         mediaRecorder = new MediaRecorder(stream, {
@@ -189,52 +221,52 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         const mimeType = mediaRecorder.mimeType || 'audio/wav'
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
         setRecordedAudioBlob(audioBlob) // Store the recorded audio for playback
-        
+
         console.log('Recording completed:', {
           mimeType: mimeType,
           size: audioBlob.size,
           duration: audioBlob.size / (48000 * 2 * 2) // Rough duration calculation
         })
-        
+
         // Convert to AudioBuffer and detect BPM with real detection
         let toastId: any = null
         try {
           const fullAudioBuffer = await blobToAudioBuffer(audioBlob)
-          
+
           // ⚡ OPTIMIZED: Skip extraction, send directly to API!
           console.log('⚡ Fast mode: Sending audio directly to SoundStat API (no pre-processing)...')
-          
+
           // Reset previous BPM analysis
           resetAnalysis()
-          
+
           // Show persistent toast that stays until BPM is detected
-          toastId = toast.loading('🎵 Analyzing BPM with SoundStat... Please wait', {
+          toastId = toast.loading('🎵 Analyzing BPM  wait', {
             duration: Infinity // Stays visible until we dismiss it
           })
-          
+
           // ⚡ Direct BPM detection - SoundStat API handles everything!
           const bpmResult = await analyzeAudioBuffer(fullAudioBuffer)
-          
+
           console.log('⚡ Fast BPM Detection Result:', {
             bpm: bpmResult.bpm,
             confidence: bpmResult.confidence,
             isStable: bpmResult.isStable,
             duration: fullAudioBuffer.duration.toFixed(2) + 's'
           })
-          
+
           setRecordedAudioBuffer(fullAudioBuffer) // Store full recording
           setRecordedBPM(bpmResult.bpm)
-          
+
           // Dismiss loading toast and show success
           toast.dismiss(toastId)
           toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
             duration: 5000
           })
-          
+
           // ⚡ SKIP processAudio - we already have the BPM!
           // Just store the data and mark as complete
           setRecordedAudioBlob(audioBlob)
-          
+
           // Call onAnalysisComplete directly with mock recommendations
           if (onAnalysisComplete) {
             onAnalysisComplete({
@@ -246,15 +278,15 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           }
         } catch (error) {
           console.error('Error processing recorded audio:', error)
-          
+
           // Dismiss loading toast
           if (toastId !== null) {
             toast.dismiss(toastId)
           }
-          
+
           // Show detailed error message
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          
+
           if (errorMessage.includes('Failed to fetch')) {
             toast.error('Cannot connect to BPM detection API. Please check your internet connection and try again.', {
               duration: 8000
@@ -267,7 +299,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             toast.error(`Failed to detect BPM: ${errorMessage}`)
           }
         }
-        
+
         // Stop all tracks to release audio capture
         stream.getTracks().forEach(track => track.stop())
       }
@@ -281,7 +313,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       progressIntervalRef.current = setInterval(() => {
         progress += 1
         setRecordingProgress(progress)
-        
+
         if (progress >= 100) {
           if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current)
@@ -302,7 +334,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
 
     } catch (error) {
       console.error('Error accessing internal audio:', error)
-      
+
       let errorMessage = ''
       if (error instanceof Error) {
         if (error.message.includes('Screen sharing not supported')) {
@@ -315,7 +347,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       } else {
         errorMessage = 'Could not access INTERNAL audio only. Please:\n\n1. Make sure you select "Share audio" (not microphone)\n2. Choose "Entire screen" or "Application window" with audio\n3. Do NOT select microphone or external audio\n4. Refresh the page and try again\n\nThis will ONLY capture sounds playing on your laptop (like Spotify), not external sounds.'
       }
-      
+
       alert(errorMessage)
       setIsRecording(false)
     }
@@ -333,10 +365,10 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
 
   const processAudio = async (audioBlob: Blob, audioBuffer: AudioBuffer, detectedBPM?: number | null) => {
     setIsProcessing(true)
-    
+
     // Use provided BPM or try to get from state, but never default to 120
     let bpmToUse = detectedBPM ?? recordedBPM
-    
+
     console.log('processAudio called:', {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
@@ -346,7 +378,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       detectedBPM,
       bpmToUse
     })
-    
+
     // If no BPM is available, try to detect it now
     if (!bpmToUse) {
       console.warn('No BPM provided, attempting to detect now...')
@@ -356,7 +388,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         const finalBPM = bpmResult.bpm
         setRecordedBPM(finalBPM)
         console.log('BPM detected during processAudio:', finalBPM)
-        
+
         // Continue with detected BPM
         bpmToUse = finalBPM
       } catch (bpmError) {
@@ -366,7 +398,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         return
       }
     }
-    
+
     // Now process with the detected BPM
     if (!bpmToUse) {
       console.error('No BPM available after detection attempts')
@@ -374,15 +406,15 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       setIsProcessing(false)
       return
     }
-    
+
     try {
       // For now, let's simulate the API response to avoid server issues
       // We'll use mock data that matches the expected format
       console.log('Simulating API call...')
-      
+
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       // Mock recommendation data
       const mockData = {
         detectedBPM: bpmToUse,
@@ -420,23 +452,23 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           }
         ]
       }
-      
+
       console.log('Mock data generated:', mockData)
-      
+
       if (onAnalysisComplete) {
         onAnalysisComplete({
           ...mockData,
           recordedAudioBuffer: audioBuffer
         })
       }
-      
+
       console.log('Analysis complete! Called onAnalysisComplete.')
-      
+
     } catch (error) {
       console.error('Error processing audio:', error)
-      
+
       toast.error('Analysis failed. Please try again.')
-      
+
       // Show detailed error for debugging
       console.error('Full error details:', {
         error: error,
@@ -449,7 +481,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           sampleRate: audioBuffer.sampleRate
         }
       })
-      
+
     } finally {
       setIsProcessing(false)
       console.log('Processing finished, isProcessing set to false')
@@ -501,52 +533,52 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     try {
       setIsExtracting(true)
       toast.info('Processing uploaded audio file...')
-      
+
       console.log('Upload file processing:', {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type
       })
-      
+
       // ⚡ OPTIMIZED: Skip all pre-processing, send directly!
       console.log('⚡ Fast mode: Processing uploaded file directly...')
-      
+
       // Show persistent loading toast
       toastId = toast.loading('🎵 Analyzing BPM with SoundStat... Please wait', {
         duration: Infinity // Stays visible
       })
-      
+
       // Convert file to AudioBuffer (needed for playback)
       const audioBuffer = await fileToAudioBuffer(file)
       console.log('Audio buffer created:', {
         duration: audioBuffer.duration,
         sampleRate: audioBuffer.sampleRate
       })
-      
+
       // Reset and detect BPM
       resetAnalysis()
       const bpmResult = await analyzeAudioBuffer(audioBuffer)
-      
+
       console.log('⚡ Fast BPM Detection:', {
         detectedBPM: bpmResult.bpm,
         confidence: bpmResult.confidence
       })
-      
+
       // Store results
-      setRecordedAudioBuffer(audioBuffer) 
+      setRecordedAudioBuffer(audioBuffer)
       setRecordedAudioBlob(new Blob([await file.arrayBuffer()], { type: file.type }))
       setRecordedBPM(bpmResult.bpm)
       setUploadedFileName(file.name)
-      
+
       // Dismiss loading and show success
       toast.dismiss(toastId)
       toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
         duration: 5000
       })
-      
+
       // Mark as listened
       onListen()
-      
+
       // ⚡ SKIP processAudio - we already have BPM!
       // Call onAnalysisComplete directly
       if (onAnalysisComplete) {
@@ -557,21 +589,21 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           recordedAudioBuffer: audioBuffer
         })
       }
-      
+
       toast.dismiss(toastId)
       toast.success('✅ Audio analyzed!', { duration: 3000 })
-      
+
     } catch (error) {
       console.error('Error processing uploaded file:', error)
-      
+
       // Dismiss loading toast
       if (toastId !== null) {
         toast.dismiss(toastId)
       }
-      
+
       // Show detailed error message
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
+
       if (errorMessage.includes('Failed to fetch')) {
         toast.error('Cannot connect to BPM detection API. Please check your internet connection and try again.', {
           duration: 8000
@@ -605,7 +637,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       isPlayingRecording,
       uploadedFileName
     })
-    
+
     if (mode === 'capture') {
       if (isRecording) {
         stopRecording()
@@ -658,7 +690,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       setIsProcessing(false)
     }
   }
-  
+
   // Status toast notifications
   useEffect(() => {
     if (isRecording) {
@@ -695,7 +727,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       }
     }
   }, [isRecording, isProcessing, isExtracting, isBPMAnalyzing, hasListened, recordedAudioBuffer, isPlayingRecording])
-  
+
   return (
     <div className="relative">
       {/* Hidden file input */}
@@ -748,9 +780,9 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         {/* Breathing Orb when recording/processing/extracting */}
         {(isRecording || isProcessing || isExtracting || isBPMAnalyzing) && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <BreathingOrb 
-              active={true} 
-              size="lg" 
+            <BreathingOrb
+              active={true}
+              size="lg"
               className="pointer-events-none"
             />
           </div>
@@ -763,22 +795,21 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             transition={{ duration: 0.3 }}
           >
             <motion.div
-              className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                hasListened && recordedAudioBuffer
-                  ? isPlayingRecording
-                    ? "bg-gradient-to-br from-blue-500 to-blue-700"
-                    : "bg-gradient-to-br from-green-400 to-green-600"
-                  : mode === 'upload'
-                    ? "bg-gradient-to-br from-blue-500 to-blue-700"
-                    : "bg-gradient-to-br from-green-500 to-green-700"
-              } shadow-2xl`}
+              className={`w-20 h-20 rounded-full flex items-center justify-center ${hasListened && recordedAudioBuffer
+                ? isPlayingRecording
+                  ? "bg-gradient-to-br from-blue-500 to-blue-700"
+                  : "bg-gradient-to-br from-green-400 to-green-600"
+                : mode === 'upload'
+                  ? "bg-gradient-to-br from-blue-500 to-blue-700"
+                  : "bg-gradient-to-br from-green-500 to-green-700"
+                } shadow-2xl`}
               whileHover={{ scale: 1.1 }}
             >
               {hasListened && recordedAudioBuffer ? (
                 isPlayingRecording ? (
                   <Square className="w-8 h-8 text-white" />
                 ) : (
-                <Play className="w-10 h-10 text-white ml-1" />
+                  <Play className="w-10 h-10 text-white ml-1" />
                 )
               ) : mode === 'upload' ? (
                 <Upload className="w-10 h-10 text-white" />
@@ -804,22 +835,49 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                     ? "PLAYING EXTRACTED AUDIO • LISTEN TO THE 4 BARS • "
                     : "CLICK TO PLAY • PREVIEW EXTRACTED 4 BARS • CLICK TO PLAY • "
                   : hasListened
-                  ? "AUDIO ANALYZED • SAMPLES READY • AUDIO ANALYZED • SAMPLES READY • "
+                    ? "AUDIO ANALYZED • SAMPLES READY • AUDIO ANALYZED • SAMPLES READY • "
                     : isRecording
                       ? "RECORDING • LISTENING TO INTERNAL AUDIO • RECORDING • "
                       : isProcessing
                         ? "ANALYZING AUDIO • PROCESSING • ANALYZING AUDIO • "
                         : isExtracting
                           ? "EXTRACTING BEST 4 BARS • PROCESSING UPLOAD • "
-                        : isBPMAnalyzing
-                          ? "BPM DETECTION • ANALYZING TEMPO • BPM DETECTION • "
-                          : mode === 'upload'
-                            ? "CLICK TO UPLOAD • CHOOSE AUDIO FILE • CLICK TO UPLOAD • "
-                            : "CLICK TO LISTEN • ANALYZE INTERNAL AUDIO • CLICK TO LISTEN • "}
+                          : isBPMAnalyzing
+                            ? "BPM DETECTION • ANALYZING TEMPO • BPM DETECTION • "
+                            : mode === 'upload'
+                              ? "CLICK TO UPLOAD • CHOOSE AUDIO FILE • CLICK TO UPLOAD • "
+                              : "CLICK TO LISTEN • ANALYZE INTERNAL AUDIO • CLICK TO LISTEN • "}
               </textPath>
             </text>
           </svg>
         </div>
+
+        {/* GSAP Circular Progress Indicator */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-30"
+          viewBox="0 0 256 256"
+          style={{ transform: 'rotate(-90deg)' }}
+        >
+          <circle
+            ref={circleRef}
+            cx="128"
+            cy="128"
+            r="126"
+            fill="none"
+            stroke="url(#progressGradient)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            style={{
+              filter: 'drop-shadow(0 0 8px rgba(34, 197, 94, 0.6))'
+            }}
+          />
+          <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#22c55e" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+          </defs>
+        </svg>
       </motion.button>
 
       {/* Progress bar when recording or extracting */}
@@ -830,7 +888,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 shadow-inner">
-          <motion.div
+            <motion.div
               className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full shadow-sm"
               initial={{ width: 0 }}
               animate={{ width: `${recordingProgress}%` }}

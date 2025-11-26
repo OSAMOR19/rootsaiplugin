@@ -11,12 +11,14 @@ import { extractBPMFromString, formatTimeSeconds } from "@/lib/utils"
 import { isFavorite, toggleFavorite } from "@/lib/favorites"
 import WaveSurfer from "wavesurfer.js"
 
+
 // Import drum images
-import kickDrumImage from "./images/kickdrum.jpg"
-import talkingDrumImage from "./images/talkingdrum.jpg"
-import tomImage from "./images/tomimage.jpg"
-import shekereImage from "./images/shekere.jpg"
-import hihatImage from "./images/hihat.png"
+import kickDrumImage from "@/public/images/kickdrum.jpg"
+import talkingDrumImage from "@/public/images/talkingdrum.jpg"
+import tomImage from "@/public/images/tomimage.jpg"
+import shekereImage from "@/public/images/shekere.jpg"
+import hihatImage from "@/public/images/hihat.png"
+
 
 interface DraggableSampleProps {
   sample: any
@@ -31,13 +33,13 @@ interface DraggableSampleProps {
   onSyncPlay?: () => void // NEW: Handler for sync play
 }
 
-export default function DraggableSample({ 
-  sample, 
-  isPlaying, 
-  onPlayPause, 
-  index, 
-  audioUrl, 
-  recordedAudioBuffer, 
+export default function DraggableSample({
+  sample,
+  isPlaying,
+  onPlayPause,
+  index,
+  audioUrl,
+  recordedAudioBuffer,
   recordedBPM,
   originalDetectedBPM,
   isSyncPlaying = false,
@@ -46,17 +48,17 @@ export default function DraggableSample({
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
-  
+
   // Load favorite status from localStorage on mount
   useEffect(() => {
     setIsLiked(isFavorite(sample.id))
-    
+
     // Listen for favorites updates from other components
     const handleFavoritesUpdate = () => {
       setIsLiked(isFavorite(sample.id))
     }
     window.addEventListener('favoritesUpdated', handleFavoritesUpdate)
-    
+
     return () => {
       window.removeEventListener('favoritesUpdated', handleFavoritesUpdate)
     }
@@ -68,7 +70,7 @@ export default function DraggableSample({
   const waveformRef = useRef<HTMLDivElement>(null)
   const isInitializingRef = useRef(false)
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
+
   // Load audio buffer when component mounts
   useEffect(() => {
     if (audioUrl) {
@@ -96,7 +98,7 @@ export default function DraggableSample({
         })
     }
   }, [audioUrl])
-  
+
   // Initialize WaveSurfer
   useEffect(() => {
     // Clear any existing timeout
@@ -108,190 +110,190 @@ export default function DraggableSample({
       // Small debounce to prevent rapid re-initialization
       initTimeoutRef.current = setTimeout(() => {
         isInitializingRef.current = true
-      
-      try {
-        if (!waveformRef.current) return
-        
-        const ws = WaveSurfer.create({
-          container: waveformRef.current,
-          waveColor: 'rgb(156, 163, 175)', // gray-400
-          progressColor: 'rgb(34, 197, 94)', // green-500
-          cursorColor: 'transparent',
-          barWidth: 2,
-          barGap: 1,
-          barRadius: 2,
-          height: 32, // Keep consistent height, CSS will handle responsive sizing
-          normalize: true,
-          backend: 'MediaElement', // ✅ CRITICAL FIX: Use MediaElement (HTML5 audio) for pitch preservation
-          mediaControls: false,
-          interact: true,
-          hideScrollbar: true,
-          fillParent: true,
-          minPxPerSec: 1,
-        })
-        
-        // ✅ FIX: Enable pitch-preserving time stretching (tempo changes without pitch changes)
-        // This ensures that when BPM changes, only the tempo changes, NOT the key/pitch
-        // Wait a tiny bit for the media element to be created
-        setTimeout(() => {
-          const mediaElement = ws.getMediaElement() as any
-          if (mediaElement) {
-            mediaElement.preservesPitch = true
-            mediaElement.mozPreservesPitch = true // Firefox
-            mediaElement.webkitPreservesPitch = true // Safari
-            console.log('✅ Pitch-preserving time stretch ENABLED - tempo changes won\'t affect key/pitch!')
-          } else {
-            console.warn('⚠️ Could not enable pitch preservation - media element not found')
-          }
-        }, 100)
 
-        // Set dark mode colors if needed
-        if (document.documentElement.classList.contains('dark')) {
-          ws.setOptions({
-            waveColor: 'rgb(107, 114, 128)', // gray-500 for better contrast in dark mode
-            progressColor: 'rgb(34, 197, 94)', // green-500 stays same
-          })
-        }
+        try {
+          if (!waveformRef.current) return
 
-        // Load audio if URL is available or if it's the recent song with recorded buffer
-        if (audioUrl) {
-          ws.load(audioUrl).catch((error) => {
-            console.error('Error loading audio:', error)
+          const ws = WaveSurfer.create({
+            container: waveformRef.current,
+            waveColor: 'rgb(156, 163, 175)', // gray-400
+            progressColor: 'rgb(34, 197, 94)', // green-500
+            cursorColor: 'transparent',
+            barWidth: 2,
+            barGap: 1,
+            barRadius: 2,
+            height: 32, // Keep consistent height, CSS will handle responsive sizing
+            normalize: true,
+            backend: 'MediaElement', // ✅ CRITICAL FIX: Use MediaElement (HTML5 audio) for pitch preservation
+            mediaControls: false,
+            interact: true,
+            hideScrollbar: true,
+            fillParent: true,
+            minPxPerSec: 1,
           })
-        } else if (sample.isRecentSong && recordedAudioBuffer) {
-          // For the recent song, use the recorded audio buffer
-          try {
-            // Convert AudioBuffer to blob for WaveSurfer
-            const numberOfChannels = recordedAudioBuffer.numberOfChannels
-            const sampleRate = recordedAudioBuffer.sampleRate
-            const length = recordedAudioBuffer.length
-            
-            // Create WAV file from AudioBuffer
-            const buffer = new ArrayBuffer(44 + length * numberOfChannels * 2)
-            const view = new DataView(buffer)
-            
-            // WAV header
-            const writeString = (offset: number, string: string) => {
-              for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i))
-              }
+
+          // ✅ FIX: Enable pitch-preserving time stretching (tempo changes without pitch changes)
+          // This ensures that when BPM changes, only the tempo changes, NOT the key/pitch
+          // Wait a tiny bit for the media element to be created
+          setTimeout(() => {
+            const mediaElement = ws.getMediaElement() as any
+            if (mediaElement) {
+              mediaElement.preservesPitch = true
+              mediaElement.mozPreservesPitch = true // Firefox
+              mediaElement.webkitPreservesPitch = true // Safari
+              console.log('✅ Pitch-preserving time stretch ENABLED - tempo changes won\'t affect key/pitch!')
+            } else {
+              console.warn('⚠️ Could not enable pitch preservation - media element not found')
             }
-            
-            writeString(0, 'RIFF')
-            view.setUint32(4, 36 + length * numberOfChannels * 2, true)
-            writeString(8, 'WAVE')
-            writeString(12, 'fmt ')
-            view.setUint32(16, 16, true)
-            view.setUint16(20, 1, true)
-            view.setUint16(22, numberOfChannels, true)
-            view.setUint32(24, sampleRate, true)
-            view.setUint32(28, sampleRate * numberOfChannels * 2, true)
-            view.setUint16(32, numberOfChannels * 2, true)
-            view.setUint16(34, 16, true)
-            writeString(36, 'data')
-            view.setUint32(40, length * numberOfChannels * 2, true)
-            
-            // Convert audio data
-            let offset = 44
-            for (let i = 0; i < length; i++) {
-              for (let channel = 0; channel < numberOfChannels; channel++) {
-                const sample = Math.max(-1, Math.min(1, recordedAudioBuffer.getChannelData(channel)[i]))
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
-                offset += 2
-              }
-            }
-            
-            const blob = new Blob([buffer], { type: 'audio/wav' })
-            ws.loadBlob(blob).catch((error) => {
-              console.error('Error loading recorded audio:', error)
+          }, 100)
+
+          // Set dark mode colors if needed
+          if (document.documentElement.classList.contains('dark')) {
+            ws.setOptions({
+              waveColor: 'rgb(107, 114, 128)', // gray-500 for better contrast in dark mode
+              progressColor: 'rgb(34, 197, 94)', // green-500 stays same
             })
-          } catch (error) {
-            console.error('Error converting recorded audio buffer:', error)
-            // Fallback to mock waveform
+          }
+
+          // Load audio if URL is available or if it's the recent song with recorded buffer
+          if (audioUrl) {
+            ws.load(audioUrl).catch((error) => {
+              console.error('Error loading audio:', error)
+            })
+          } else if (sample.isRecentSong && recordedAudioBuffer) {
+            // For the recent song, use the recorded audio buffer
+            try {
+              // Convert AudioBuffer to blob for WaveSurfer
+              const numberOfChannels = recordedAudioBuffer.numberOfChannels
+              const sampleRate = recordedAudioBuffer.sampleRate
+              const length = recordedAudioBuffer.length
+
+              // Create WAV file from AudioBuffer
+              const buffer = new ArrayBuffer(44 + length * numberOfChannels * 2)
+              const view = new DataView(buffer)
+
+              // WAV header
+              const writeString = (offset: number, string: string) => {
+                for (let i = 0; i < string.length; i++) {
+                  view.setUint8(offset + i, string.charCodeAt(i))
+                }
+              }
+
+              writeString(0, 'RIFF')
+              view.setUint32(4, 36 + length * numberOfChannels * 2, true)
+              writeString(8, 'WAVE')
+              writeString(12, 'fmt ')
+              view.setUint32(16, 16, true)
+              view.setUint16(20, 1, true)
+              view.setUint16(22, numberOfChannels, true)
+              view.setUint32(24, sampleRate, true)
+              view.setUint32(28, sampleRate * numberOfChannels * 2, true)
+              view.setUint16(32, numberOfChannels * 2, true)
+              view.setUint16(34, 16, true)
+              writeString(36, 'data')
+              view.setUint32(40, length * numberOfChannels * 2, true)
+
+              // Convert audio data
+              let offset = 44
+              for (let i = 0; i < length; i++) {
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                  const sample = Math.max(-1, Math.min(1, recordedAudioBuffer.getChannelData(channel)[i]))
+                  view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+                  offset += 2
+                }
+              }
+
+              const blob = new Blob([buffer], { type: 'audio/wav' })
+              ws.loadBlob(blob).catch((error) => {
+                console.error('Error loading recorded audio:', error)
+              })
+            } catch (error) {
+              console.error('Error converting recorded audio buffer:', error)
+              // Fallback to mock waveform
+              const mockAudioData = new Float32Array(sample.waveform.length)
+              sample.waveform.forEach((val: number, i: number) => {
+                mockAudioData[i] = (val / 100 - 0.5) * 2
+              })
+              const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
+              ws.loadBlob(blob).catch((error) => {
+                console.error('Error loading mock audio:', error)
+              })
+            }
+          } else {
+            // Generate mock waveform for samples without real audio
             const mockAudioData = new Float32Array(sample.waveform.length)
             sample.waveform.forEach((val: number, i: number) => {
-              mockAudioData[i] = (val / 100 - 0.5) * 2
+              mockAudioData[i] = (val / 100 - 0.5) * 2 // Convert to -1 to 1 range
             })
-            const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
-            ws.loadBlob(blob).catch((error) => {
-              console.error('Error loading mock audio:', error)
-            })
-          }
-        } else {
-          // Generate mock waveform for samples without real audio
-          const mockAudioData = new Float32Array(sample.waveform.length)
-          sample.waveform.forEach((val: number, i: number) => {
-            mockAudioData[i] = (val / 100 - 0.5) * 2 // Convert to -1 to 1 range
-          })
-          
-          try {
-            const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
-            ws.loadBlob(blob).catch((error) => {
-              console.error('Error loading mock audio:', error)
-            })
-          } catch (error) {
-            console.error('Error creating mock audio blob:', error)
-          }
-        }
 
-        ws.on('ready', () => {
-          setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
-          
-          // ✅ ENSURE pitch preservation is enabled for the media element (all browser variants)
-          const mediaElement = ws.getMediaElement() as any
-          if (mediaElement) {
-            mediaElement.preservesPitch = true
-            mediaElement.mozPreservesPitch = true // Firefox
-            mediaElement.webkitPreservesPitch = true // Safari/older Chrome
-            console.log('✅ Pitch preservation confirmed on ready')
-          }
-          
-          // Special handling for user's recorded audio
-          if (sample.isRecentSong && originalDetectedBPM && recordedBPM) {
-            // For user's own audio, calculate rate based on BPM change from original detected BPM
-            const rate = recordedBPM / originalDetectedBPM
-            ws.setPlaybackRate(rate)
-            console.log(`✅ Tempo-adjusted user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
-          } else {
-            // Apply tempo matching for library samples: adjust playback rate to match detected BPM
-            // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
-            const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
-            if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
-              const rate = recordedBPM / actualBPM
-              ws.setPlaybackRate(rate)
-              console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
-            } else if (recordedBPM && actualBPM) {
-              console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
-              ws.setPlaybackRate(1.0)
-            } else {
-              ws.setPlaybackRate(1.0) // Reset to normal speed if no tempo match needed
+            try {
+              const blob = new Blob([mockAudioData.buffer], { type: 'audio/wav' })
+              ws.loadBlob(blob).catch((error) => {
+                console.error('Error loading mock audio:', error)
+              })
+            } catch (error) {
+              console.error('Error creating mock audio blob:', error)
             }
           }
-        })
 
-        ws.on('audioprocess', () => {
-          if (ws.getDuration() > 0) {
-            const progress = (ws.getCurrentTime() / ws.getDuration()) * 100
-            setAudioProgress(progress)
-          }
-        })
+          ws.on('ready', () => {
+            setAudioDuration(ws.getDuration() || 8) // Default to 8 seconds if no duration
 
-        ws.on('finish', () => {
-          setAudioProgress(0)
-          setHasStarted(false)
-        })
+            // ✅ ENSURE pitch preservation is enabled for the media element (all browser variants)
+            const mediaElement = ws.getMediaElement() as any
+            if (mediaElement) {
+              mediaElement.preservesPitch = true
+              mediaElement.mozPreservesPitch = true // Firefox
+              mediaElement.webkitPreservesPitch = true // Safari/older Chrome
+              console.log('✅ Pitch preservation confirmed on ready')
+            }
 
-        ws.on('error', (error) => {
-          console.error('WaveSurfer error:', error)
-        })
+            // Special handling for user's recorded audio
+            if (sample.isRecentSong && originalDetectedBPM && recordedBPM) {
+              // For user's own audio, calculate rate based on BPM change from original detected BPM
+              const rate = recordedBPM / originalDetectedBPM
+              ws.setPlaybackRate(rate)
+              console.log(`✅ Tempo-adjusted user's audio: ${originalDetectedBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
+            } else {
+              // Apply tempo matching for library samples: adjust playback rate to match detected BPM
+              // Only apply if we have both recordedBPM and sampleActualBPM, and they differ
+              const actualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
+              if (recordedBPM && actualBPM && actualBPM > 0 && actualBPM !== recordedBPM) {
+                const rate = recordedBPM / actualBPM
+                ws.setPlaybackRate(rate)
+                console.log(`✅ Tempo-matched "${sample?.name}": ${actualBPM} BPM → ${recordedBPM} BPM (rate: ${rate.toFixed(3)}x) [PITCH PRESERVED]`)
+              } else if (recordedBPM && actualBPM) {
+                console.log(`✓ "${sample?.name}" already matches: ${actualBPM} BPM = ${recordedBPM} BPM`)
+                ws.setPlaybackRate(1.0)
+              } else {
+                ws.setPlaybackRate(1.0) // Reset to normal speed if no tempo match needed
+              }
+            }
+          })
 
-        setWaveSurfer(ws)
-        isInitializingRef.current = false
-        
-      } catch (error) {
-        console.error('Error initializing WaveSurfer:', error)
-        isInitializingRef.current = false
-      }
+          ws.on('audioprocess', () => {
+            if (ws.getDuration() > 0) {
+              const progress = (ws.getCurrentTime() / ws.getDuration()) * 100
+              setAudioProgress(progress)
+            }
+          })
+
+          ws.on('finish', () => {
+            setAudioProgress(0)
+            setHasStarted(false)
+          })
+
+          ws.on('error', (error) => {
+            console.error('WaveSurfer error:', error)
+          })
+
+          setWaveSurfer(ws)
+          isInitializingRef.current = false
+
+        } catch (error) {
+          console.error('Error initializing WaveSurfer:', error)
+          isInitializingRef.current = false
+        }
       }, 50) // 50ms debounce
     }
 
@@ -314,7 +316,7 @@ export default function DraggableSample({
         mediaElement.mozPreservesPitch = true // Firefox
         mediaElement.webkitPreservesPitch = true // Safari/older Chrome
       }
-      
+
       // Special handling for user's recorded audio
       if (sample.isRecentSong && originalDetectedBPM) {
         // For user's own audio, calculate rate based on BPM change from original detected BPM
@@ -362,13 +364,13 @@ export default function DraggableSample({
   // Component unmount cleanup
   useEffect(() => {
     const currentWaveSurfer = waveSurfer
-    
+
     return () => {
       // Clear any pending initialization
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current)
       }
-      
+
       if (currentWaveSurfer) {
         try {
           // Try to pause first if possible
@@ -377,7 +379,7 @@ export default function DraggableSample({
           } catch (pauseError) {
             // Ignore pause errors
           }
-          
+
           // Then destroy
           currentWaveSurfer.destroy()
         } catch (error) {
@@ -388,7 +390,7 @@ export default function DraggableSample({
       isInitializingRef.current = false
     }
   }, [waveSurfer])
-  
+
   // Use real audio progress
   const currentProgress = audioProgress
 
@@ -397,17 +399,17 @@ export default function DraggableSample({
   const inferredBpmFromName = extractBPMFromString(sample?.name || sample?.filename)
   // Prioritize recordedBPM when available (this is the detected BPM that should be shown on all recommendation cards)
   const displayBpm = recordedBPM ?? sample?.bpm ?? inferredBpmFromName ?? null
-  
+
   // Get the actual BPM of this sample file (for tempo matching calculation)
   // This is the sample's natural BPM before tempo adjustment
   // Use originalBpm if available (stored from metadata), otherwise parse from filename/URL
   const sampleActualBPM = (sample as any)?.originalBpm ?? inferredBpmFromName ?? extractBPMFromString(audioUrl || '') ?? null
-  
+
   // Calculate playback rate to tempo-match this sample to the detected BPM
   // Formula: playbackRate = detectedBPM / sampleActualBPM
   // If detected is 104 and sample is 113, rate = 104/113 = 0.92 (plays slower)
   const playbackRate = recordedBPM && sampleActualBPM && sampleActualBPM > 0
-    ? recordedBPM / sampleActualBPM 
+    ? recordedBPM / sampleActualBPM
     : 1.0 // Default to 1.0 if we can't calculate
 
   // Function to get the appropriate image for each drum type
@@ -440,7 +442,7 @@ export default function DraggableSample({
 
     // Get the real audio URL from the sample
     const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
-    
+
     // Create drag data for DAW integration
     const dragData = {
       type: "audio/sample",
@@ -462,25 +464,25 @@ export default function DraggableSample({
     e.dataTransfer.setData("text/plain", sample.name || sample.filename)
     e.dataTransfer.setData("application/json", JSON.stringify(dragData))
     e.dataTransfer.setData("audio/wav", realAudioUrl)
-    
+
     // Add file data for both DAW and desktop/folder dropping
     try {
       // Fetch the actual audio file
       const response = await fetch(realAudioUrl)
       const audioBlob = await response.blob()
-      
+
       // Create a File object for proper drag and drop
       const audioFile = new File([audioBlob], sample.name || sample.filename, {
         type: audioBlob.type || 'audio/wav'
       })
-      
+
       // Use DataTransferItemList for file dragging
       const dataTransferItemList = e.dataTransfer.items
       dataTransferItemList.add(audioFile)
-      
+
       // Also set as download URL for desktop dropping
       e.dataTransfer.setData("DownloadURL", `audio/wav:${sample.name || sample.filename}:${realAudioUrl}`)
-      
+
     } catch (error) {
       console.warn('Could not fetch audio file for drag:', error)
       // Fallback to URL-based dragging
@@ -528,29 +530,29 @@ export default function DraggableSample({
     try {
       // Get the real audio URL
       const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
-      
+
       // Fetch the audio file
       const response = await fetch(realAudioUrl)
       if (!response.ok) {
         throw new Error('Failed to fetch audio file')
       }
-      
+
       const audioBlob = await response.blob()
-      
+
       // Create download link
       const url = window.URL.createObjectURL(audioBlob)
       const link = document.createElement('a')
       link.href = url
       link.download = sample.name || sample.filename || 'sample.wav'
-      
+
       // Trigger download
       document.body.appendChild(link)
       link.click()
-      
+
       // Cleanup
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      
+
     } catch (error) {
       console.error('Download failed:', error)
       // Fallback: open in new tab
@@ -561,13 +563,11 @@ export default function DraggableSample({
 
   return (
     <motion.div
-      className={`backdrop-blur-sm rounded-xl border overflow-hidden transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${
-        sample.isRecentSong 
-          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400" 
+      className={`backdrop-blur-sm rounded-xl border overflow-hidden transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${sample.isRecentSong
+          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400"
           : "bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-green-500/50"
-      } ${
-        isDragging ? "opacity-50 scale-95" : ""
-      }`}
+        } ${isDragging ? "opacity-50 scale-95" : ""
+        }`}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
@@ -587,16 +587,15 @@ export default function DraggableSample({
         </div>
 
         {/* Artwork (square) - Responsive sizing */}
-        <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 relative overflow-hidden border ${
-          sample.isRecentSong 
-            ? "bg-gradient-to-br from-blue-500/30 to-purple-500/30 border-blue-400/50 dark:border-blue-500/50" 
+        <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 relative overflow-hidden border ${sample.isRecentSong
+            ? "bg-gradient-to-br from-blue-500/30 to-purple-500/30 border-blue-400/50 dark:border-blue-500/50"
             : "bg-gradient-to-br from-green-500/20 to-green-600/20 border-gray-200 dark:border-gray-700"
-        }`}>
+          }`}>
           {sample.isRecentSong ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                 </svg>
               </div>
             </div>
@@ -617,26 +616,24 @@ export default function DraggableSample({
         <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2">
           <motion.button
             onClick={onPlayPause}
-            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-              isPlaying
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${isPlaying
                 ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
                 : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 hover:shadow-md"
-            }`}
+              }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             {isPlaying ? <Pause className="w-3 h-3 sm:w-4 sm:h-4" /> : <Play className="w-3 h-3 sm:w-4 sm:h-4 ml-0.5" />}
           </motion.button>
-          
+
           {/* ✅ NEW: Sync Play button - Only show if not the "YOUR AUDIO" card and has onSyncPlay handler */}
           {!sample.isRecentSong && onSyncPlay && recordedAudioBuffer && (
             <motion.button
               onClick={onSyncPlay}
-              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isSyncPlaying
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${isSyncPlaying
                   ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
                   : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-md"
-              }`}
+                }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               title="Sync play with your audio"
@@ -648,11 +645,10 @@ export default function DraggableSample({
 
         {/* Filename and Tags - Responsive */}
         <div className="flex-shrink-0 min-w-0 hidden sm:block" style={{ width: '150px' }}>
-          <h3 className={`font-semibold truncate text-xs sm:text-sm mb-1 ${
-            sample.isRecentSong 
-              ? "text-blue-700 dark:text-blue-300" 
+          <h3 className={`font-semibold truncate text-xs sm:text-sm mb-1 ${sample.isRecentSong
+              ? "text-blue-700 dark:text-blue-300"
               : "text-gray-800 dark:text-gray-200"
-          }`}>
+            }`}>
             {sample.name}
           </h3>
           <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
@@ -672,18 +668,17 @@ export default function DraggableSample({
 
         {/* Mobile filename - shown only on mobile */}
         <div className="flex-shrink-0 min-w-0 sm:hidden">
-          <h3 className={`font-semibold truncate text-xs ${
-            sample.isRecentSong 
-              ? "text-blue-700 dark:text-blue-300" 
+          <h3 className={`font-semibold truncate text-xs ${sample.isRecentSong
+              ? "text-blue-700 dark:text-blue-300"
               : "text-gray-800 dark:text-gray-200"
-          }`}>
+            }`}>
             {sample.name}
           </h3>
         </div>
 
         {/* Waveform visualization stretched horizontally to occupy most of the row width - Responsive */}
         <div className="flex-1 min-w-0 mx-2 sm:mx-3 lg:mx-4">
-          <div 
+          <div
             ref={waveformRef}
             className="w-full h-6 sm:h-7 lg:h-8 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
             style={{
@@ -717,11 +712,10 @@ export default function DraggableSample({
               const newLikedState = toggleFavorite(sample)
               setIsLiked(newLikedState)
             }}
-            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-              isLiked
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isLiked
                 ? "text-red-500 bg-red-50 dark:bg-red-900/20"
                 : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-            }`}
+              }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title={isLiked ? "Remove from favorites" : "Add to favorites"}
