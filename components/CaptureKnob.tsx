@@ -240,7 +240,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           resetAnalysis()
 
           // Show persistent toast that stays until BPM is detected
-          toastId = toast.loading('🎵 Analyzing BPM  wait', {
+          toastId = toast.loading('🎵 Analyzing BPM...', {
             duration: Infinity // Stays visible until we dismiss it
           })
 
@@ -544,7 +544,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       console.log('⚡ Fast mode: Processing uploaded file directly...')
 
       // Show persistent loading toast
-      toastId = toast.loading('🎵 Analyzing BPM with SoundStat... Please wait', {
+      toastId = toast.loading('🎵 Analyzing BPM...', {
         duration: Infinity // Stays visible
       })
 
@@ -691,6 +691,32 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     }
   }
 
+  const handleReset = () => {
+    // Stop any playing audio
+    syncEngine.stopAll()
+
+    // Clear all state
+    setRecordedAudioBlob(null)
+    setRecordedAudioBuffer(null)
+    setRecordedBPM(null)
+    setIsPlayingRecording(false)
+    setUploadedFileName('')
+    setRecordingProgress(0)
+    setIsRecording(false)
+    setIsProcessing(false)
+    setIsExtracting(false)
+
+    // Clear any timers
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current)
+    }
+
+    // Reset analysis
+    resetAnalysis()
+
+    toast.success('Ready for new sample!')
+  }
+
   // Status toast notifications
   useEffect(() => {
     if (isRecording) {
@@ -746,6 +772,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         disabled={isRecording || isProcessing || isExtracting || isBPMAnalyzing}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        title={mode === 'capture' ? 'Switch to upload mode' : 'Switch to capture mode'}
       >
         {mode === 'capture' ? (
           <Upload className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -899,6 +926,24 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
             {Math.round(recordingProgress / 10)}s / 10s
           </p>
         </motion.div>
+      )}
+
+      {/* Reset button - shown when analysis is complete */}
+      {hasListened && recordedAudioBuffer && !isRecording && !isProcessing && !isExtracting && !isBPMAnalyzing && (
+        <motion.button
+          className="absolute -top-8 -left-8 w-10 h-10 rounded-full bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center z-30"
+          onClick={handleReset}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          title="Try another sample"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+        >
+          <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </motion.button>
       )}
     </div>
   )
