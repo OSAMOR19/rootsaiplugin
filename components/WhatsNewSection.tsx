@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
 import { motion } from "framer-motion"
-import { mockSamples } from "@/lib/mockData"
+import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
 // Reusing images for consistency, or we could have a separate set
@@ -20,9 +20,25 @@ export default function WhatsNewSection() {
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(true)
     const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+    const { samples, loading } = useSamples({ autoFetch: true })
 
-    // Using a different slice of mock data to simulate "new" content
-    const newSamples = mockSamples.slice(10, 20)
+    // Get recently uploaded samples
+    // First try to get samples with uploadedAt field (new uploads)
+    // If none exist, show the last 10 samples from the array
+    const samplesWithDate = samples.filter(s => s.uploadedAt)
+    const newSamples = samplesWithDate.length > 0
+        ? samplesWithDate
+            .sort((a, b) => new Date(b.uploadedAt!).getTime() - new Date(a.uploadedAt!).getTime())
+            .slice(0, 10)
+        : samples.slice(-10).reverse() // Get last 10 samples (most recent)
+    
+    // Helper to get sample image with fallback
+    const getSampleImage = (sample: any, index: number) => {
+        if (sample.imageUrl && sample.imageUrl !== '/placeholder.jpg') {
+            return sample.imageUrl
+        }
+        return sampleImages[index % sampleImages.length]
+    }
 
     const checkScroll = () => {
         if (scrollContainerRef.current) {
@@ -49,10 +65,10 @@ export default function WhatsNewSection() {
             playTrack({
                 id: sample.id,
                 title: sample.name,
-                artist: sample.artist,
-                audioUrl: sample.audioUrl,
-                imageUrl: imageUrl,
-                duration: sample.duration
+                artist: sample.artist || sample.category,
+                audioUrl: sample.audioUrl || sample.url, // Support both R2 and local URLs
+                imageUrl: sample.imageUrl || imageUrl, // Use uploaded image or fallback
+                duration: sample.duration || '0:00'
             })
         }
     }
@@ -88,10 +104,20 @@ export default function WhatsNewSection() {
                 className="flex gap-4 overflow-x-auto scrollbar-hide pb-4"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-                {newSamples.map((sample, index) => {
+                {loading ? (
+                    <div className="flex gap-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="flex-shrink-0 w-64 h-48 bg-white/5 rounded-lg animate-pulse" />
+                        ))}
+                    </div>
+                ) : newSamples.length === 0 ? (
+                    <div className="text-white/40 text-center py-12 w-full">
+                        No samples yet. Upload some samples to see them here!
+                    </div>
+                ) : newSamples.map((sample, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
-                    const imageUrl = sampleImages[index % sampleImages.length]
+                    const imageUrl = getSampleImage(sample, index)
 
                     return (
                         <motion.div
@@ -100,13 +126,17 @@ export default function WhatsNewSection() {
                             whileHover={{ y: -4 }}
                             onClick={() => handlePlayClick(sample, imageUrl)}
                         >
-                            <div className={`w-full aspect-video rounded-lg mb-3 bg-gray-900 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
+                            <div className={`w-full aspect-video rounded-lg mb-3 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
                                 {/* Image */}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={imageUrl}
                                     alt={sample.name}
                                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-80 group-hover:opacity-100"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.src = sampleImages[index % sampleImages.length]
+                                    }}
                                 />
 
                                 {/* Gradient Overlay */}

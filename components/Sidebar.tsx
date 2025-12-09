@@ -1,16 +1,18 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Search, Library, User, Settings, GraduationCap } from "lucide-react"
 import { cn } from "@/lib/utils"
+import SearchModal from "./SearchModal"
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   const navItems = [
     { icon: Home, href: "/", label: "Home" },
-    { icon: Search, href: "/browse", label: "Browse" },
     { icon: Library, href: "/library", label: "Library" },
     { icon: User, href: "/profile", label: "Profile" },
   ]
@@ -47,7 +49,19 @@ export default function Sidebar() {
             </Link>
           )
         })}
+        
+        {/* Search Button (Opens Modal) */}
+        <button
+          onClick={() => setIsSearchOpen(true)}
+          className="p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center text-white/40 hover:text-white"
+          title="Search"
+        >
+          <Search className="w-6 h-6" />
+        </button>
       </nav>
+      
+      {/* Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
       <div className="flex flex-col gap-6 mb-24 mt-auto">
         {bottomItems.map((item) => (

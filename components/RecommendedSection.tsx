@@ -1,9 +1,10 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
 import { motion } from "framer-motion"
-import { mockSamples } from "@/lib/mockData"
+import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
 const sampleImages = [
@@ -29,10 +30,21 @@ const sampleImages = [
 ]
 
 export default function RecommendedSection() {
+    const router = useRouter()
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(true)
     const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+    const { samples, loading } = useSamples({ autoFetch: true })
+    
+    // Group samples by category and get first from each
+    const categoryMap = new Map<string, any>()
+    samples.forEach(sample => {
+        if (sample.category && !categoryMap.has(sample.category)) {
+            categoryMap.set(sample.category, sample)
+        }
+    })
+    const recommendedSamples = Array.from(categoryMap.values()).slice(0, 10)
 
     const checkScroll = () => {
         if (scrollContainerRef.current) {
@@ -52,19 +64,24 @@ export default function RecommendedSection() {
         }
     }
 
-    const handlePlayClick = (sample: any, imageUrl: string) => {
+    const handlePlayClick = (e: React.MouseEvent, sample: any, imageUrl: string) => {
+        e.stopPropagation() // Prevent card click
         if (currentTrack?.id === sample.id && isPlaying) {
             pauseTrack()
         } else {
             playTrack({
                 id: sample.id,
                 title: sample.name,
-                artist: sample.artist,
-                audioUrl: sample.audioUrl,
-                imageUrl: imageUrl,
-                duration: sample.duration
+                artist: sample.artist || sample.category,
+                audioUrl: sample.audioUrl || sample.url, // Support both R2 and local URLs
+                imageUrl: sample.imageUrl || imageUrl, // Use uploaded image or fallback
+                duration: sample.duration || '0:00'
             })
         }
+    }
+
+    const handleCardClick = (category: string) => {
+        router.push(`/pack/${encodeURIComponent(category)}`)
     }
 
     return (
@@ -98,7 +115,11 @@ export default function RecommendedSection() {
                 className="flex gap-4 overflow-x-auto scrollbar-hide pb-4"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-                {mockSamples.slice(0, 10).map((sample, index) => {
+                {loading ? (
+                    <div className="text-white/40">Loading samples...</div>
+                ) : recommendedSamples.length === 0 ? (
+                    <div className="text-white/40">No samples available</div>
+                ) : recommendedSamples.map((sample, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
                     const imageUrl = sampleImages[index % sampleImages.length]
@@ -108,7 +129,7 @@ export default function RecommendedSection() {
                             key={sample.id}
                             className="flex-shrink-0 w-48 group cursor-pointer"
                             whileHover={{ y: -4 }}
-                            onClick={() => handlePlayClick(sample, imageUrl)}
+                            onClick={() => handleCardClick(sample.category)}
                         >
                             <div className={`w-full aspect-square rounded-lg mb-3 bg-gray-900 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
                                 {/* Image */}
@@ -122,12 +143,11 @@ export default function RecommendedSection() {
                                 {/* Gradient Overlay */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
 
-                                <div className="absolute bottom-0 left-0 right-0 p-3 z-10">
-                                    <span className="font-bold text-white text-shadow-sm line-clamp-1 text-sm">{sample.name}</span>
-                                </div>
-
                                 {/* Hover overlay / Play Button */}
-                                <div className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center z-20 ${isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                <div 
+                                    className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center z-20 ${isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                    onClick={(e) => handlePlayClick(e, sample, imageUrl)}
+                                >
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md border border-white/20 ${isCurrentPlaying ? 'bg-green-500 text-white' : 'bg-white/20 text-white hover:scale-110 transition-transform'}`}>
                                         {isCurrentPlaying ? (
                                             <Pause className="w-5 h-5 fill-current" />
@@ -138,9 +158,10 @@ export default function RecommendedSection() {
                                 </div>
                             </div>
 
-                            <h3 className={`text-sm font-medium truncate transition-colors ${isCurrentPlaying ? 'text-green-400' : 'text-white group-hover:text-white'}`}>{sample.name}</h3>
-                            <p className="text-xs text-white/60 truncate">{sample.category}</p>
-                            <p className="text-xs text-white/40 mt-1 truncate">{sample.artist}</p>
+                            <h3 className={`text-sm font-medium truncate transition-colors ${isCurrentPlaying ? 'text-green-400' : 'text-white group-hover:text-white'}`}>{sample.category}</h3>
+                            <p className="text-xs text-white/60 truncate">
+                                {samples.filter(s => s.category === sample.category).length} Samples
+                            </p>
                         </motion.div>
                     )
                 })}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir, readFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import { uploadFile } from '@/lib/r2'
+import { analyzeAudioBuffer } from '@/lib/audioAnalysis'
 
 export const config = {
   api: {
@@ -26,50 +28,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate a safe filename base
+    // Generate a safe filename base with timestamp to prevent conflicts
+    const timestamp = Date.now()
     const safeNameBase = name.replace(/[^a-z0-9]/gi, '_')
-
-    // --- Audio Processing ---
     const audioExt = audioFile.name.split('.').pop()
-    const safeAudioFilename = `${safeNameBase}.${audioExt}`
-
+    
     // Determine the category folder
     const categoryFolder = category || 'Full Drums'
-    const audioDir = path.join(process.cwd(), 'public', 'audio', categoryFolder)
+    const safeAudioFilename = `${categoryFolder}/${timestamp}_${safeNameBase}.${audioExt}`
 
-    // Create audio directory if it doesn't exist
-    if (!existsSync(audioDir)) {
-      await mkdir(audioDir, { recursive: true })
-    }
-
-    // Save the audio file
-    const audioFilePath = path.join(audioDir, safeAudioFilename)
+    // Upload audio to Cloudflare R2
     const audioBytes = await audioFile.arrayBuffer()
-    await writeFile(audioFilePath, Buffer.from(audioBytes))
+    const audioBuffer = Buffer.from(audioBytes)
+    
+    console.log(`Uploading audio to R2: ${safeAudioFilename}`)
+    const audioUploadResult = await uploadFile(
+      audioBuffer,
+      safeAudioFilename,
+      audioFile.type || 'audio/wav'
+    )
 
     // --- Image Processing ---
     let imageUrl = '/placeholder.jpg' // Default
     if (imageFile) {
       const imageExt = imageFile.name.split('.').pop()
-      const safeImageFilename = `${safeNameBase}_art.${imageExt}`
-      const imageDir = path.join(process.cwd(), 'public', 'images', 'uploads')
+      const safeImageFilename = `artwork/${timestamp}_${safeNameBase}_art.${imageExt}`
 
-      // Create image directory if it doesn't exist
-      if (!existsSync(imageDir)) {
-        await mkdir(imageDir, { recursive: true })
-      }
-
-      // Save the image file
-      const imageFilePath = path.join(imageDir, safeImageFilename)
+      // Upload image to Cloudflare R2
       const imageBytes = await imageFile.arrayBuffer()
-      await writeFile(imageFilePath, Buffer.from(imageBytes))
+      const imageBuffer = Buffer.from(imageBytes)
+      
+      console.log(`Uploading image to R2: ${safeImageFilename}`)
+      const imageUploadResult = await uploadFile(
+        imageBuffer,
+        safeImageFilename,
+        imageFile.type || 'image/jpeg'
+      )
 
-      imageUrl = `/images/uploads/${safeImageFilename}`
+      imageUrl = imageUploadResult.url
     }
 
-    // Auto-detect BPM if not provided
-    let detectedBPM = bpmStr ? parseInt(bpmStr) : 120
+    // Analyze audio with Essentia.js
+    console.log('🎵 Analyzing audio with Essentia.js...')
+    const analysis = await analyzeAudioBuffer(audioBuffer, audioFile.name)
+    
+    // Use analyzed BPM if not manually provided
+    let detectedBPM = bpmStr ? parseInt(bpmStr) : (analysis.bpm || 120)
     let selectedTimeSignature = timeSignature || '4/4'
+    
+    console.log(`✅ Analysis: BPM=${detectedBPM}, Key=${analysis.key}, Mood=${analysis.moodTag}`)
 
     // Update metadata.json
     const metadataPath = path.join(process.cwd(), 'public', 'audio', 'metadata.json')
@@ -80,17 +87,29 @@ export async function POST(request: NextRequest) {
       metadata = JSON.parse(metadataContent)
     }
 
-    // Add new entry
+    // Add new entry with AI analysis
     const newEntry = {
       id: Math.random().toString(36).substr(2, 9),
       name: name,
-      filename: safeAudioFilename,
+      filename: safeAudioFilename.split('/').pop(), // Just the filename part
       bpm: detectedBPM,
+      key: analysis.key || 'C',
       timeSignature: selectedTimeSignature,
       category: categoryFolder,
-      audioUrl: `/audio/${categoryFolder}/${safeAudioFilename}`,
-      imageUrl: imageUrl,
-      duration: "0:00" // Placeholder, would need analysis to get real duration
+      audioUrl: audioUploadResult.url, // R2 URL!
+      imageUrl: imageUrl, // R2 URL or placeholder
+      duration: "0:00", // Placeholder, would need analysis to get real duration
+      uploadedAt: new Date().toISOString(),
+      storage: 'r2', // Mark as R2 storage
+      // AI Analysis features
+      energy: analysis.energy,
+      danceability: analysis.danceability,
+      valence: analysis.valence,
+      moodTag: analysis.moodTag,
+      // Metadata tags (can be edited later via bulk edit)
+      genres: [],
+      instruments: [],
+      keywords: [],
     }
 
     metadata.push(newEntry)
@@ -98,9 +117,11 @@ export async function POST(request: NextRequest) {
     // Save updated metadata
     await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
 
+    console.log(`✅ Successfully uploaded to R2: ${name}`)
+
     return NextResponse.json({
       success: true,
-      message: 'Beat uploaded successfully',
+      message: 'Beat uploaded successfully to Cloudflare R2',
       ...newEntry
     })
 

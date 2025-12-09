@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, Music, Lock, CheckCircle, XCircle, Trash2, Play, Pause, Image as ImageIcon, Plus, ArrowLeft } from "lucide-react"
+import { Upload, Music, Lock, CheckCircle, XCircle, Trash2, Play, Pause, Image as ImageIcon, Plus, ArrowLeft, Edit } from "lucide-react"
 import { useRouter } from "next/navigation"
 import CustomDropdown from "@/components/CustomDropdown"
+import BulkEditModal, { BulkEditData } from "@/components/BulkEditModal"
 
 interface UploadedBeat {
   id: string
-  file: File
+  file?: File
   imageFile?: File
   imagePreview?: string
   name: string
@@ -17,6 +18,12 @@ interface UploadedBeat {
   category?: string
   status: 'pending' | 'analyzing' | 'complete' | 'error'
   error?: string
+  audioUrl?: string
+  imageUrl?: string
+  filename?: string
+  genres?: string[]
+  instruments?: string[]
+  keywords?: string[]
 }
 
 const categories = [
@@ -39,9 +46,106 @@ export default function AdminPage() {
   const [uploads, setUploads] = useState<UploadedBeat[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
+  const [selectedSamples, setSelectedSamples] = useState<string[]>([])
+  const [showBulkEdit, setShowBulkEdit] = useState(false)
 
   // Simple password check (In production, use proper authentication!)
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "rootsai2024"
+
+  // Load existing uploads from metadata.json
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadExistingUploads()
+    }
+  }, [isAuthenticated])
+
+  const loadExistingUploads = async () => {
+    setIsLoadingMetadata(true)
+    try {
+      const response = await fetch('/audio/metadata.json')
+      if (response.ok) {
+        const metadata = await response.json()
+        
+        // Convert metadata entries to UploadedBeat format
+        const existingBeats: UploadedBeat[] = metadata
+          .filter((item: any) => item.id) // Only show items with IDs (recently uploaded ones)
+          .map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            bpm: item.bpm,
+            timeSignature: item.timeSignature,
+            category: item.category,
+            status: 'complete' as const,
+            audioUrl: item.audioUrl,
+            imageUrl: item.imageUrl,
+            imagePreview: item.imageUrl,
+            filename: item.filename,
+            genres: item.genres || [],
+            instruments: item.instruments || [],
+            keywords: item.keywords || [],
+          }))
+        
+        setUploads(existingBeats)
+      }
+    } catch (error) {
+      console.error('Failed to load metadata:', error)
+    } finally {
+      setIsLoadingMetadata(false)
+    }
+  }
+
+  const toggleSampleSelection = (id: string) => {
+    setSelectedSamples(prev => 
+      prev.includes(id) 
+        ? prev.filter(sId => sId !== id)
+        : [...prev, id]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedSamples.length === uploads.length) {
+      setSelectedSamples([])
+    } else {
+      setSelectedSamples(uploads.map(u => u.id))
+    }
+  }
+
+  const handleBulkEdit = async (edits: BulkEditData) => {
+    // Apply edits to selected samples
+    setUploads(prev => prev.map(beat => {
+      if (selectedSamples.includes(beat.id)) {
+        return {
+          ...beat,
+          genres: edits.genres || beat.genres,
+          instruments: edits.instruments || beat.instruments,
+          keywords: edits.keywords || beat.keywords,
+        }
+      }
+      return beat
+    }))
+
+    // Save to metadata.json
+    try {
+      const response = await fetch('/api/admin/bulk-edit', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sampleIds: selectedSamples,
+          edits
+        })
+      })
+
+      if (response.ok) {
+        console.log('✅ Bulk edit applied successfully')
+        await loadExistingUploads() // Reload to ensure sync
+        setSelectedSamples([]) // Clear selection
+      }
+    } catch (error) {
+      console.error('Bulk edit failed:', error)
+      alert('Failed to apply changes. Please try again.')
+    }
+  }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -107,15 +211,48 @@ export default function AdminPage() {
     ))
   }
 
-  const removeBeat = (id: string) => {
-    setUploads(prev => prev.filter(beat => beat.id !== id))
+  const removeBeat = async (id: string) => {
+    const beat = uploads.find(b => b.id === id)
+    
+    // If it's a completed upload (no file object), delete from server
+    if (beat && beat.status === 'complete' && !beat.file) {
+      const confirmed = confirm(`Are you sure you want to permanently delete "${beat.name}"? This cannot be undone.`)
+      if (!confirmed) return
+
+      try {
+        const response = await fetch('/api/admin/delete-beat', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id })
+        })
+
+        if (!response.ok) {
+          throw new Error('Delete failed')
+        }
+
+        // Remove from state
+        setUploads(prev => prev.filter(beat => beat.id !== id))
+        
+        // Reload metadata to ensure sync
+        await loadExistingUploads()
+      } catch (error) {
+        alert('Failed to delete file. Please try again.')
+        console.error('Delete error:', error)
+      }
+    } else {
+      // Just remove from state (pending upload)
+      setUploads(prev => prev.filter(beat => beat.id !== id))
+    }
   }
 
   const handleUploadAll = async () => {
     setIsUploading(true)
 
     for (const beat of uploads) {
-      if (beat.status === 'complete') continue
+      // Skip if already complete or if there's no file to upload
+      if (beat.status === 'complete' || !beat.file) continue
 
       try {
         updateBeat(beat.id, { status: 'analyzing' })
@@ -143,7 +280,10 @@ export default function AdminPage() {
         updateBeat(beat.id, {
           status: 'complete',
           bpm: result.bpm || beat.bpm,
-          timeSignature: result.timeSignature || beat.timeSignature
+          timeSignature: result.timeSignature || beat.timeSignature,
+          audioUrl: result.audioUrl,
+          imageUrl: result.imageUrl,
+          filename: result.filename
         })
 
       } catch (error) {
@@ -155,6 +295,9 @@ export default function AdminPage() {
     }
 
     setIsUploading(false)
+    
+    // Reload metadata to refresh the list
+    await loadExistingUploads()
   }
 
   // Login Screen
@@ -250,10 +393,10 @@ export default function AdminPage() {
             </button>
             <button
               onClick={handleUploadAll}
-              disabled={isUploading || uploads.length === 0 || uploads.every(b => b.status === 'complete')}
+              disabled={isUploading || uploads.filter(b => b.status !== 'complete' && b.file).length === 0}
               className="px-8 py-3 bg-white text-black hover:bg-green-400 disabled:bg-white/10 disabled:text-white/40 rounded-xl font-bold transition-all shadow-lg shadow-white/5"
             >
-              {isUploading ? 'Uploading...' : `Publish ${uploads.length > 0 ? `(${uploads.length})` : ''}`}
+              {isUploading ? 'Uploading...' : `Publish ${uploads.filter(b => b.status !== 'complete' && b.file).length > 0 ? `(${uploads.filter(b => b.status !== 'complete' && b.file).length})` : ''}`}
             </button>
           </div>
         </header>
@@ -299,10 +442,63 @@ export default function AdminPage() {
           </div>
         </motion.div>
 
+        {/* Loading State */}
+        {isLoadingMetadata && (
+          <div className="text-center py-12">
+            <div className="w-12 h-12 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-white/40">Loading your uploads...</p>
+          </div>
+        )}
+
         {/* Uploads List */}
         <AnimatePresence>
-          {uploads.length > 0 && (
-            <div className="grid gap-4">
+          {uploads.length > 0 && !isLoadingMetadata && (
+            <div className="space-y-6">
+              {/* Stats Header */}
+              <div className="flex items-center justify-between px-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Your Uploads</h2>
+                  <p className="text-white/40 text-sm mt-1">
+                    {uploads.filter(b => b.status === 'complete').length} samples
+                    {selectedSamples.length > 0 && (
+                      <span className="ml-2 text-green-400">• {selectedSamples.length} selected</span>
+                    )}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  {uploads.filter(b => b.status === 'complete').length > 0 && (
+                    <>
+                      <button
+                        onClick={toggleSelectAll}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg text-sm transition-all border border-white/10"
+                      >
+                        {selectedSamples.length === uploads.length ? 'Unselect all' : 'Select all'}
+                      </button>
+                      
+                      {selectedSamples.length > 0 && (
+                        <button
+                          onClick={() => setShowBulkEdit(true)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Edit
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={loadExistingUploads}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg text-sm transition-all border border-white/10"
+                      >
+                        Refresh List
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Uploads Grid */}
+              <div className="grid gap-4">
               {uploads.map((beat) => (
                 <motion.div
                   key={beat.id}
@@ -311,6 +507,18 @@ export default function AdminPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, height: 0 }}
                 >
+                  {/* Checkbox for Selection (only for completed uploads) */}
+                  {beat.status === 'complete' && (
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedSamples.includes(beat.id)}
+                        onChange={() => toggleSampleSelection(beat.id)}
+                        className="w-5 h-5 rounded border-2 border-white/20 bg-white/5 checked:bg-purple-600 checked:border-purple-600 cursor-pointer transition-colors"
+                      />
+                    </div>
+                  )}
+                  
                   {/* Image Upload / Preview */}
                   <div className="relative w-20 h-20 flex-shrink-0">
                     <input
@@ -355,7 +563,7 @@ export default function AdminPage() {
                         placeholder="Track Name"
                         disabled={beat.status === 'analyzing' || beat.status === 'complete'}
                       />
-                      <p className="text-xs text-white/40 mt-1">{beat.file.name}</p>
+                      <p className="text-xs text-white/40 mt-1">{beat.file?.name || beat.filename || 'Uploaded'}</p>
                     </div>
 
                     <div className="col-span-2">
@@ -406,10 +614,19 @@ export default function AdminPage() {
                   </div>
                 </motion.div>
               ))}
+              </div>
             </div>
           )}
         </AnimatePresence>
       </div>
+      
+      {/* Bulk Edit Modal */}
+      <BulkEditModal
+        isOpen={showBulkEdit}
+        onClose={() => setShowBulkEdit(false)}
+        selectedCount={selectedSamples.length}
+        onApply={handleBulkEdit}
+      />
     </div>
   )
 }
