@@ -340,56 +340,6 @@
     "duration": "0:00"
   },
   {
-    "id": "5za5r620z",
-    "name": "Manifxtsounds - Bada Perc Loop 116BPM",
-    "filename": "1765276037191_Manifxtsounds___Bada_Perc_Loop_116BPM.wav",
-    "bpm": 116,
-    "key": {
-      "tonic": "F",
-      "scale": "major",
-      "strength": 0.5656941533088684
-    },
-    "timeSignature": "4/4",
-    "category": "Full Drums",
-    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/Full_Drums_1765276037191_Manifxtsounds___Bada_Perc_Loop_116BPM.wav",
-    "imageUrl": "/placeholder.jpg",
-    "duration": "0:00",
-    "uploadedAt": "2025-12-09T10:27:22.545Z",
-    "storage": "r2",
-    "energy": 1,
-    "danceability": 1,
-    "valence": 0.8,
-    "moodTag": "dance",
-    "genres": [],
-    "instruments": [],
-    "keywords": []
-  },
-  {
-    "id": "ybzd1m4kz",
-    "name": "Manifxtsounds - Bounce Perc Loop 98BPM",
-    "filename": "1765276042568_Manifxtsounds___Bounce_Perc_Loop_98BPM.wav",
-    "bpm": 98,
-    "key": {
-      "tonic": "C",
-      "scale": "minor",
-      "strength": 0.7262988686561584
-    },
-    "timeSignature": "4/4",
-    "category": "Full Drums",
-    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/Full_Drums_1765276042568_Manifxtsounds___Bounce_Perc_Loop_98BPM.wav",
-    "imageUrl": "/placeholder.jpg",
-    "duration": "0:00",
-    "uploadedAt": "2025-12-09T10:27:31.626Z",
-    "storage": "r2",
-    "energy": 1,
-    "danceability": 1,
-    "valence": 0.7,
-    "moodTag": "dance",
-    "genres": [],
-    "instruments": [],
-    "keywords": []
-  },
-  {
     "id": "ynwrxqzil",
     "name": "Manifxtsounds - Champion Perc Loop 113BPM",
     "filename": "1765276051645_Manifxtsounds___Champion_Perc_Loop_113BPM.wav",
@@ -415,28 +365,56 @@
     "keywords": []
   },
   {
-    "id": "wzvz5fyyo",
-    "name": "Manifxtsounds - Cold Riddim Perc Loop 98BPM",
-    "filename": "1765276054946_Manifxtsounds___Cold_Riddim_Perc_Loop_98BPM.wav",
-    "bpm": 135,
-    "key": {
-      "tonic": "C",
-      "scale": "minor",
-      "strength": 0.6352708339691162
-    },
-    "timeSignature": "4/4",
-    "category": "Full Drums",
-    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/Full_Drums_1765276054946_Manifxtsounds___Cold_Riddim_Perc_Loop_98BPM.wav",
-    "imageUrl": "/placeholder.jpg",
-    "duration": "0:00",
-    "uploadedAt": "2025-12-09T10:27:39.786Z",
-    "storage": "r2",
-    "energy": 1,
-    "danceability": 1,
-    "valence": 0.7,
-    "moodTag": "dance",
+    "id": "6r4yfe9bv",
+    "name": "Manifxtsounds - Bada Perc Loop 116BPM",
+    "tempo": "",
+    "key": "C Minor",
+    "license": "Royalty Free",
+    "pricing": "1 Credit",
+    "genres": [
+      "Hip Hop",
+      "Rock"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "keywords": "",
+    "selected": true,
+    "fileName": "Manifxtsounds - Bada Perc Loop 116BPM.wav",
+    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_okok_1765595783695_Manifxtsounds___Bada_Perc_Loop_116BPM.wav",
+    "uploadedAt": "2025-12-13T03:16:24.689Z",
+    "storage": "r2"
+  },
+  {
+    "id": "2wjh61cn9",
+    "name": "Manifxtsounds - Bounce Perc Loop 98BPM",
+    "tempo": "",
+    "key": "",
+    "license": "Royalty Free",
+    "pricing": "1 Credit",
     "genres": [],
     "instruments": [],
-    "keywords": []
+    "keywords": "",
+    "selected": true,
+    "fileName": "Manifxtsounds - Bounce Perc Loop 98BPM.wav",
+    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_okok_1765595784689_Manifxtsounds___Bounce_Perc_Loop_98BPM.wav",
+    "uploadedAt": "2025-12-13T03:16:27.073Z",
+    "storage": "r2"
+  },
+  {
+    "id": "opgyh1yey",
+    "name": "Manifxtsounds - Champion Perc Loop 113BPM",
+    "tempo": "",
+    "key": "",
+    "license": "Royalty Free",
+    "pricing": "1 Credit",
+    "genres": [],
+    "instruments": [],
+    "keywords": "",
+    "selected": true,
+    "fileName": "Manifxtsounds - Champion Perc Loop 113BPM.wav",
+    "audioUrl": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_okok_1765595787073_Manifxtsounds___Champion_Perc_Loop_113BPM.wav",
+    "uploadedAt": "2025-12-13T03:16:27.610Z",
+    "storage": "r2"
   }
 ]

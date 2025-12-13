@@ -36,12 +36,16 @@ export default function RecommendedSection() {
     const [canScrollRight, setCanScrollRight] = useState(true)
     const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
     const { samples, loading } = useSamples({ autoFetch: true })
-    
-    // Group samples by category and get first from each
+
+    // Group samples by category and get featured or first from each
     const categoryMap = new Map<string, any>()
     samples.forEach(sample => {
-        if (sample.category && !categoryMap.has(sample.category)) {
-            categoryMap.set(sample.category, sample)
+        if (sample.category) {
+            const existing = categoryMap.get(sample.category)
+            // If no existing sample for this category, or if current sample is featured and existing is not
+            if (!existing || (sample.featured && !existing.featured)) {
+                categoryMap.set(sample.category, sample)
+            }
         }
     })
     const recommendedSamples = Array.from(categoryMap.values()).slice(0, 10)
@@ -122,7 +126,12 @@ export default function RecommendedSection() {
                 ) : recommendedSamples.map((sample, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
-                    const imageUrl = sampleImages[index % sampleImages.length]
+                    const fallbackIndex = sample.category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
+                    const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
+
+                    const imageUrl = sample.imageUrl && sample.imageUrl !== '/placeholder.jpg'
+                        ? sample.imageUrl
+                        : fallbackImage
 
                     return (
                         <motion.div
@@ -144,7 +153,7 @@ export default function RecommendedSection() {
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
 
                                 {/* Hover overlay / Play Button */}
-                                <div 
+                                <div
                                     className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center z-20 ${isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                     onClick={(e) => handlePlayClick(e, sample, imageUrl)}
                                 >

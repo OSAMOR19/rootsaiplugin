@@ -1,632 +1,176 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, Music, Lock, CheckCircle, XCircle, Trash2, Play, Pause, Image as ImageIcon, Plus, ArrowLeft, Edit } from "lucide-react"
+import { X, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
-import CustomDropdown from "@/components/CustomDropdown"
-import BulkEditModal, { BulkEditData } from "@/components/BulkEditModal"
-
-interface UploadedBeat {
-  id: string
-  file?: File
-  imageFile?: File
-  imagePreview?: string
-  name: string
-  bpm?: number
-  timeSignature?: string
-  category?: string
-  status: 'pending' | 'analyzing' | 'complete' | 'error'
-  error?: string
-  audioUrl?: string
-  imageUrl?: string
-  filename?: string
-  genres?: string[]
-  instruments?: string[]
-  keywords?: string[]
-}
-
-const categories = [
-  'Full Drums',
-  'Top Loops',
-  'Kick Loops',
-  'Shaker Loops',
-  'Fills & Rolls',
-  'Percussions'
-]
-
-const timeSignatures = [
-  '4/4', '3/4', '6/8', '12/8', '2/4', '5/4', '7/8', '9/8'
-]
+import PackDetailsStep from "@/components/admin/PackDetailsStep"
+import FilesUploadStep from "@/components/admin/FilesUploadStep"
+import EditSamplesStep from "@/components/admin/EditSamplesStep"
 
 export default function AdminPage() {
   const router = useRouter()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [password, setPassword] = useState("")
-  const [uploads, setUploads] = useState<UploadedBeat[]>([])
-  const [isDragging, setIsDragging] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1)
+
+  // Data State
+  const [packDetails, setPackDetails] = useState<any>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [samples, setSamples] = useState<any[]>([])
+
+  const handlePackDetailsNext = (data: any) => {
+    setPackDetails(data)
+    setCurrentStep(2)
+  }
+
+  const handleFilesNext = (uploadedFiles: File[]) => {
+    setFiles(uploadedFiles)
+    setCurrentStep(3)
+  }
+
   const [isUploading, setIsUploading] = useState(false)
-  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
-  const [selectedSamples, setSelectedSamples] = useState<string[]>([])
-  const [showBulkEdit, setShowBulkEdit] = useState(false)
 
-  // Simple password check (In production, use proper authentication!)
-  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "rootsai2024"
-
-  // Load existing uploads from metadata.json
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadExistingUploads()
-    }
-  }, [isAuthenticated])
-
-  const loadExistingUploads = async () => {
-    setIsLoadingMetadata(true)
-    try {
-      const response = await fetch('/audio/metadata.json')
-      if (response.ok) {
-        const metadata = await response.json()
-        
-        // Convert metadata entries to UploadedBeat format
-        const existingBeats: UploadedBeat[] = metadata
-          .filter((item: any) => item.id) // Only show items with IDs (recently uploaded ones)
-          .map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            bpm: item.bpm,
-            timeSignature: item.timeSignature,
-            category: item.category,
-            status: 'complete' as const,
-            audioUrl: item.audioUrl,
-            imageUrl: item.imageUrl,
-            imagePreview: item.imageUrl,
-            filename: item.filename,
-            genres: item.genres || [],
-            instruments: item.instruments || [],
-            keywords: item.keywords || [],
-          }))
-        
-        setUploads(existingBeats)
-      }
-    } catch (error) {
-      console.error('Failed to load metadata:', error)
-    } finally {
-      setIsLoadingMetadata(false)
-    }
-  }
-
-  const toggleSampleSelection = (id: string) => {
-    setSelectedSamples(prev => 
-      prev.includes(id) 
-        ? prev.filter(sId => sId !== id)
-        : [...prev, id]
-    )
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedSamples.length === uploads.length) {
-      setSelectedSamples([])
-    } else {
-      setSelectedSamples(uploads.map(u => u.id))
-    }
-  }
-
-  const handleBulkEdit = async (edits: BulkEditData) => {
-    // Apply edits to selected samples
-    setUploads(prev => prev.map(beat => {
-      if (selectedSamples.includes(beat.id)) {
-        return {
-          ...beat,
-          genres: edits.genres || beat.genres,
-          instruments: edits.instruments || beat.instruments,
-          keywords: edits.keywords || beat.keywords,
-        }
-      }
-      return beat
-    }))
-
-    // Save to metadata.json
-    try {
-      const response = await fetch('/api/admin/bulk-edit', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sampleIds: selectedSamples,
-          edits
-        })
-      })
-
-      if (response.ok) {
-        console.log('✅ Bulk edit applied successfully')
-        await loadExistingUploads() // Reload to ensure sync
-        setSelectedSamples([]) // Clear selection
-      }
-    } catch (error) {
-      console.error('Bulk edit failed:', error)
-      alert('Failed to apply changes. Please try again.')
-    }
-  }
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-    } else {
-      alert("Incorrect password!")
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = () => {
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-
-    const files = Array.from(e.dataTransfer.files).filter(file =>
-      file.type.startsWith('audio/')
-    )
-
-    processFiles(files)
-  }
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      processFiles(files)
-    }
-  }
-
-  const processFiles = (files: File[]) => {
-    const newUploads: UploadedBeat[] = files.map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      name: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-      status: 'pending'
-    }))
-
-    setUploads(prev => [...prev, ...newUploads])
-  }
-
-  const handleImageUpload = (beatId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      const previewUrl = URL.createObjectURL(file)
-
-      setUploads(prev => prev.map(beat =>
-        beat.id === beatId ? { ...beat, imageFile: file, imagePreview: previewUrl } : beat
-      ))
-    }
-  }
-
-  const updateBeat = (id: string, updates: Partial<UploadedBeat>) => {
-    setUploads(prev => prev.map(beat =>
-      beat.id === id ? { ...beat, ...updates } : beat
-    ))
-  }
-
-  const removeBeat = async (id: string) => {
-    const beat = uploads.find(b => b.id === id)
-    
-    // If it's a completed upload (no file object), delete from server
-    if (beat && beat.status === 'complete' && !beat.file) {
-      const confirmed = confirm(`Are you sure you want to permanently delete "${beat.name}"? This cannot be undone.`)
-      if (!confirmed) return
-
-      try {
-        const response = await fetch('/api/admin/delete-beat', {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id })
-        })
-
-        if (!response.ok) {
-          throw new Error('Delete failed')
-        }
-
-        // Remove from state
-        setUploads(prev => prev.filter(beat => beat.id !== id))
-        
-        // Reload metadata to ensure sync
-        await loadExistingUploads()
-      } catch (error) {
-        alert('Failed to delete file. Please try again.')
-        console.error('Delete error:', error)
-      }
-    } else {
-      // Just remove from state (pending upload)
-      setUploads(prev => prev.filter(beat => beat.id !== id))
-    }
-  }
-
-  const handleUploadAll = async () => {
+  const handleFinalSubmit = async (finalSamples: any[]) => {
+    setSamples(finalSamples)
     setIsUploading(true)
 
-    for (const beat of uploads) {
-      // Skip if already complete or if there's no file to upload
-      if (beat.status === 'complete' || !beat.file) continue
+    try {
+      const formData = new FormData()
 
-      try {
-        updateBeat(beat.id, { status: 'analyzing' })
-
-        const formData = new FormData()
-        formData.append('audio', beat.file)
-        if (beat.imageFile) {
-          formData.append('image', beat.imageFile)
-        }
-        formData.append('name', beat.name)
-        formData.append('category', beat.category || 'Full Drums')
-        if (beat.bpm) formData.append('bpm', beat.bpm.toString())
-        if (beat.timeSignature) formData.append('timeSignature', beat.timeSignature)
-
-        const response = await fetch('/api/admin/upload-beat', {
-          method: 'POST',
-          body: formData
-        })
-
-        if (!response.ok) {
-          throw new Error('Upload failed')
-        }
-
-        const result = await response.json()
-        updateBeat(beat.id, {
-          status: 'complete',
-          bpm: result.bpm || beat.bpm,
-          timeSignature: result.timeSignature || beat.timeSignature,
-          audioUrl: result.audioUrl,
-          imageUrl: result.imageUrl,
-          filename: result.filename
-        })
-
-      } catch (error) {
-        updateBeat(beat.id, {
-          status: 'error',
-          error: 'Upload failed. Please try again.'
-        })
+      // 1. Append Cover Image
+      if (packDetails?.coverArt) {
+        formData.append('coverImage', packDetails.coverArt)
       }
+
+      // 2. Append Audio Files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
+
+      // 3. Append Pack Details (exclude file objects)
+      const { coverArt, coverPreview, ...cleanPackDetails } = packDetails
+      formData.append('packDetails', JSON.stringify(cleanPackDetails))
+
+      // 4. Append Samples Metadata (exclude file objects)
+      const cleanSamples = finalSamples.map(({ file, ...rest }) => ({
+        ...rest,
+        fileName: file.name // Ensure we link back to the file
+      }))
+      formData.append('samplesMetadata', JSON.stringify(cleanSamples))
+
+      // 5. Send Request
+      const response = await fetch('/api/admin/create-pack', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed')
+      }
+
+      alert("Pack uploaded successfully!")
+      router.push('/browse')
+
+    } catch (error: any) {
+      console.error('Upload Error:', error)
+      alert(`Upload failed: ${error.message}`)
+    } finally {
+      setIsUploading(false)
     }
-
-    setIsUploading(false)
-    
-    // Reload metadata to refresh the list
-    await loadExistingUploads()
   }
 
-  // Login Screen
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-8 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-green-900/20 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-emerald-900/20 rounded-full blur-[120px]" />
-        </div>
-
-        <motion.div
-          className="max-w-md w-full bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-8 shadow-2xl relative z-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-700 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/20">
-              <Lock className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Admin Access</h1>
-            <p className="text-white/40">Enter password to manage your library</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-green-500/50 transition-colors text-center tracking-widest"
-                placeholder="••••••••"
-                autoFocus
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full px-6 py-4 bg-white text-black hover:bg-green-400 transition-colors rounded-xl font-bold text-lg"
-            >
-              Unlock Dashboard
-            </button>
-          </form>
-
-          <button
-            onClick={() => router.push('/')}
-            className="w-full mt-4 text-sm text-white/40 hover:text-white transition-colors"
-          >
-            Back to Home
-          </button>
-        </motion.div>
-      </div>
-    )
-  }
-
-  // Admin Dashboard
   return (
-    <div className="min-h-screen bg-black text-white relative">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden font-sans">
       {/* Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-green-900/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-emerald-900/10 rounded-full blur-[150px]" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-8 py-12 relative z-10">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-12">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/')}
-              className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all border border-white/10"
-              title="Back to Home"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-green-100 to-green-200 bg-clip-text text-transparent">
-                Upload sounds
-              </h1>
-              <p className="text-white/40 mt-2">
-                Add new sounds to the Roots library
-              </p>
-            </div>
-          </div>
+      {/* Top Navigation Bar */}
+      <div className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/')}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          >
+            <X className="w-6 h-6 text-white/60" />
+          </button>
+          <h1 className="text-xl font-bold text-white">
+            {packDetails?.title || "Create Pack"}
+          </h1>
+          {currentStep === 1 && <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/40">Requires user update</span>}
+        </div>
 
-          <div className="flex gap-4">
-            <button
-              onClick={() => router.push('/browse')}
-              className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-medium transition-all border border-white/10"
-            >
-              View Library
-            </button>
-            <button
-              onClick={handleUploadAll}
-              disabled={isUploading || uploads.filter(b => b.status !== 'complete' && b.file).length === 0}
-              className="px-8 py-3 bg-white text-black hover:bg-green-400 disabled:bg-white/10 disabled:text-white/40 rounded-xl font-bold transition-all shadow-lg shadow-white/5"
-            >
-              {isUploading ? 'Uploading...' : `Publish ${uploads.filter(b => b.status !== 'complete' && b.file).length > 0 ? `(${uploads.filter(b => b.status !== 'complete' && b.file).length})` : ''}`}
-            </button>
-          </div>
-        </header>
+        {/* Stepper */}
+        <div className="flex items-center gap-4">
+          <StepIndicator step={1} currentStep={currentStep} label="Pack details" />
+          <StepIndicator step={2} currentStep={currentStep} label="Files" />
+          <StepIndicator step={3} currentStep={currentStep} label="Edit samples" />
+        </div>
 
-        {/* Upload Zone */}
-        <motion.div
-          className={`mb-12 p-16 rounded-3xl border-2 border-dashed transition-all duration-300 ${isDragging
-            ? 'border-green-500 bg-green-500/10 scale-[1.01]'
-            : 'border-white/10 bg-white/5 hover:border-white/20'
-            }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="text-center max-w-lg mx-auto">
-            <div className="w-24 h-24 bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl border border-white/5">
-              <Upload className="w-10 h-10 text-green-400" />
-            </div>
-            <h3 className="text-3xl font-bold text-white mb-4">
-              Drag & Drop Audio Files
-            </h3>
-            <p className="text-white/40 mb-8 text-lg">
-              Support for WAV, MP3, AIFF. High quality preferred.
-            </p>
+        <div className="w-[200px] flex justify-end">
+          {/* Placeholder for right side actions if needed */}
+        </div>
+      </div>
 
-            <input
-              type="file"
-              multiple
-              accept="audio/*"
-              onChange={handleFileInput}
-              className="hidden"
-              id="file-input"
+      {/* Main Content Area */}
+      <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
+        <AnimatePresence mode="wait">
+          {currentStep === 1 && (
+            <PackDetailsStep
+              key="step1"
+              onNext={handlePackDetailsNext}
+              initialData={packDetails}
             />
-            <label
-              htmlFor="file-input"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black hover:bg-green-400 rounded-xl font-bold transition-all cursor-pointer text-lg"
-            >
-              <Plus className="w-5 h-5" />
-              Browse Files
-            </label>
-          </div>
-        </motion.div>
-
-        {/* Loading State */}
-        {isLoadingMetadata && (
-          <div className="text-center py-12">
-            <div className="w-12 h-12 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-white/40">Loading your uploads...</p>
-          </div>
-        )}
-
-        {/* Uploads List */}
-        <AnimatePresence>
-          {uploads.length > 0 && !isLoadingMetadata && (
-            <div className="space-y-6">
-              {/* Stats Header */}
-              <div className="flex items-center justify-between px-4">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Your Uploads</h2>
-                  <p className="text-white/40 text-sm mt-1">
-                    {uploads.filter(b => b.status === 'complete').length} samples
-                    {selectedSamples.length > 0 && (
-                      <span className="ml-2 text-green-400">• {selectedSamples.length} selected</span>
-                    )}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  {uploads.filter(b => b.status === 'complete').length > 0 && (
-                    <>
-                      <button
-                        onClick={toggleSelectAll}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg text-sm transition-all border border-white/10"
-                      >
-                        {selectedSamples.length === uploads.length ? 'Unselect all' : 'Select all'}
-                      </button>
-                      
-                      {selectedSamples.length > 0 && (
-                        <button
-                          onClick={() => setShowBulkEdit(true)}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-                        >
-                          <Edit className="w-4 h-4" />
-                          Edit
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={loadExistingUploads}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg text-sm transition-all border border-white/10"
-                      >
-                        Refresh List
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Uploads Grid */}
-              <div className="grid gap-4">
-              {uploads.map((beat) => (
-                <motion.div
-                  key={beat.id}
-                  className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/5 p-4 flex items-center gap-6 group hover:bg-white/10 transition-colors"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  {/* Checkbox for Selection (only for completed uploads) */}
-                  {beat.status === 'complete' && (
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedSamples.includes(beat.id)}
-                        onChange={() => toggleSampleSelection(beat.id)}
-                        className="w-5 h-5 rounded border-2 border-white/20 bg-white/5 checked:bg-purple-600 checked:border-purple-600 cursor-pointer transition-colors"
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Image Upload / Preview */}
-                  <div className="relative w-20 h-20 flex-shrink-0">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      id={`image-${beat.id}`}
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(beat.id, e)}
-                      disabled={beat.status === 'analyzing' || beat.status === 'complete'}
-                    />
-                    <label
-                      htmlFor={`image-${beat.id}`}
-                      className={`w-full h-full rounded-xl flex items-center justify-center overflow-hidden cursor-pointer border border-white/10 transition-all ${beat.imagePreview ? '' : 'bg-black/40 hover:bg-white/10'}`}
-                    >
-                      {beat.imagePreview ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={beat.imagePreview} alt="Art" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1 text-white/20 group-hover:text-white/60">
-                          <ImageIcon className="w-6 h-6" />
-                          <span className="text-[10px] font-medium">Add Art</span>
-                        </div>
-                      )}
-
-                      {/* Overlay for changing image */}
-                      {beat.imagePreview && beat.status !== 'complete' && (
-                        <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <ImageIcon className="w-6 h-6 text-white" />
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  {/* Beat Info Inputs */}
-                  <div className="flex-1 grid grid-cols-12 gap-4 items-center">
-                    <div className="col-span-4">
-                      <input
-                        type="text"
-                        value={beat.name}
-                        onChange={(e) => updateBeat(beat.id, { name: e.target.value })}
-                        className="w-full bg-transparent border-none text-white font-medium text-lg focus:ring-0 p-0 placeholder-white/20"
-                        placeholder="Track Name"
-                        disabled={beat.status === 'analyzing' || beat.status === 'complete'}
-                      />
-                      <p className="text-xs text-white/40 mt-1">{beat.file?.name || beat.filename || 'Uploaded'}</p>
-                    </div>
-
-                    <div className="col-span-2">
-                      <CustomDropdown
-                        options={categories}
-                        value={beat.category}
-                        onChange={(value) => updateBeat(beat.id, { category: value })}
-                        placeholder="Category"
-                        disabled={beat.status === 'analyzing' || beat.status === 'complete'}
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        value={beat.bpm || ''}
-                        onChange={(e) => updateBeat(beat.id, { bpm: parseInt(e.target.value) })}
-                        placeholder="BPM"
-                        className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-green-500/50 transition-colors"
-                        disabled={beat.status === 'analyzing' || beat.status === 'complete'}
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <CustomDropdown
-                        options={timeSignatures}
-                        value={beat.timeSignature}
-                        onChange={(value) => updateBeat(beat.id, { timeSignature: value })}
-                        placeholder="Time Sig"
-                        disabled={beat.status === 'analyzing' || beat.status === 'complete'}
-                      />
-                    </div>
-
-                    {/* Status & Actions */}
-                    <div className="col-span-2 flex items-center justify-end gap-3">
-                      {beat.status === 'complete' && <CheckCircle className="w-6 h-6 text-green-400" />}
-                      {beat.status === 'error' && <XCircle className="w-6 h-6 text-rose-400" />}
-                      {beat.status === 'analyzing' && <div className="w-6 h-6 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />}
-
-                      <button
-                        onClick={() => removeBeat(beat.id)}
-                        className="p-2 text-white/20 hover:text-rose-400 transition-colors"
-                        disabled={beat.status === 'analyzing'}
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-              </div>
-            </div>
+          )}
+          {currentStep === 2 && (
+            <FilesUploadStep
+              key="step2"
+              onNext={handleFilesNext}
+              onBack={() => setCurrentStep(1)}
+              initialFiles={files}
+            />
+          )}
+          {currentStep === 3 && (
+            <EditSamplesStep
+              key="step3"
+              files={files}
+              onBack={() => setCurrentStep(2)}
+              onSubmit={handleFinalSubmit}
+            />
           )}
         </AnimatePresence>
       </div>
-      
-      {/* Bulk Edit Modal */}
-      <BulkEditModal
-        isOpen={showBulkEdit}
-        onClose={() => setShowBulkEdit(false)}
-        selectedCount={selectedSamples.length}
-        onApply={handleBulkEdit}
-      />
+
+      {/* Loading Overlay */}
+      {isUploading && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <h2 className="text-xl font-bold text-white">Uploading Pack...</h2>
+          <p className="text-white/40">Please wait while we process your files</p>
+        </div>
+      )}
     </div>
   )
 }
+
+function StepIndicator({ step, currentStep, label }: { step: number, currentStep: number, label: string }) {
+  const isActive = currentStep === step
+  const isCompleted = currentStep > step
+
+  return (
+    <div className={`flex items-center gap-2 ${isActive ? 'text-white' : 'text-white/40'}`}>
+      <div className={`
+        w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors
+        ${isActive ? 'bg-white text-black' : isCompleted ? 'bg-green-500 text-black' : 'bg-white/10 text-white'}
+      `}>
+        {isCompleted ? <Check className="w-3 h-3" /> : step}
+      </div>
+      <span className="text-sm font-medium">{label}</span>
+      {step < 3 && <div className="w-8 h-[1px] bg-white/10 mx-2" />}
+    </div>
+  )
+}
+

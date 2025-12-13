@@ -22,11 +22,11 @@ interface PageProps {
 export default function PackDetailPage({ params }: PageProps) {
   const router = useRouter()
   const resolvedParams = use(params)
-  const categoryName = decodeURIComponent(resolvedParams.category)
-  
+  const categoryName = typeof resolvedParams.category === 'string' ? decodeURIComponent(resolvedParams.category) : String(resolvedParams.category)
+
   const { samples, loading } = useSamples({ autoFetch: true })
   const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
-  
+
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
   const [selectedKey, setSelectedKey] = useState<string>("all")
@@ -34,28 +34,35 @@ export default function PackDetailPage({ params }: PageProps) {
 
   // Filter samples by category
   const categorySamples = samples.filter(s => s.category === categoryName)
-  
+
   // Apply search filter
-  const filteredSamples = categorySamples.filter(sample => 
+  const filteredSamples = categorySamples.filter(sample =>
     sample.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Helper to format key (handle string or object)
+  const formatKey = (key: any) => {
+    if (!key) return '--'
+    if (typeof key === 'string') return key
+    if (typeof key === 'object') {
+      return `${key.tonic}${key.scale ? ' ' + key.scale : ''}`
+    }
+    return String(key)
+  }
+
   // Get unique BPMs and Keys for filters
   const uniqueBPMs = [...new Set(categorySamples.map(s => s.bpm).filter(Boolean))].sort((a, b) => a! - b!)
-  const uniqueKeys = [...new Set(categorySamples.map(s => s.key).filter(Boolean))].sort()
+  const uniqueKeys = [...new Set(categorySamples.map(s => formatKey(s.key)).filter(k => k !== '--'))].sort()
 
   // Pack image (use first sample's image or default fallback)
-  const packImage = categorySamples[0]?.imageUrl && categorySamples[0]?.imageUrl !== '/placeholder.jpg' 
-    ? categorySamples[0].imageUrl 
-    : sampleImages[Math.floor(Math.random() * sampleImages.length)]
-  
-  // Helper to get sample image with fallback
-  const getSampleImage = (sample: any, index: number) => {
-    if (sample.imageUrl && sample.imageUrl !== '/placeholder.jpg') {
-      return sample.imageUrl
-    }
-    return sampleImages[index % sampleImages.length]
-  }
+  const fallbackIndex = categoryName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
+
+  const packImage = (categorySamples[0]?.imageUrl && categorySamples[0]?.imageUrl !== '/placeholder.jpg'
+    ? categorySamples[0].imageUrl
+    : fallbackImage) || '/placeholder.jpg'
+
+  console.log('PackDetailPage:', { categoryName, packImage, samplesCount: categorySamples.length })
 
   const handlePlayClick = (sample: any) => {
     if (currentTrack?.id === sample.id && isPlaying) {
@@ -66,7 +73,7 @@ export default function PackDetailPage({ params }: PageProps) {
         title: sample.name,
         artist: sample.category,
         audioUrl: sample.audioUrl || sample.url,
-        imageUrl: getSampleImage(sample, 0),
+        imageUrl: packImage, // Use the consistent pack image
         duration: sample.duration || '0:00'
       })
     }
@@ -103,7 +110,7 @@ export default function PackDetailPage({ params }: PageProps) {
 
           {/* Pack Details */}
           <div className="flex-1">
-            <p className="text-sm text-green-400 mb-2">Roots AI Sample Pack</p>
+            <p className="text-sm text-green-400 mb-2">Sample Pack</p>
             <h1 className="text-5xl font-bold mb-4">{categoryName}</h1>
             <p className="text-white/60 mb-6">
               {categoryName} • {categorySamples.length} Samples
@@ -111,10 +118,7 @@ export default function PackDetailPage({ params }: PageProps) {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-4">
-              <button className="px-6 py-3 bg-green-500 hover:bg-green-600 rounded-full font-semibold flex items-center gap-2 transition-colors">
-                <Plus className="w-5 h-5" />
-                Get Pack
-              </button>
+
               <button
                 onClick={() => filteredSamples.length > 0 && handlePlayClick(filteredSamples[0])}
                 className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full font-semibold flex items-center gap-2 transition-colors"
@@ -150,7 +154,7 @@ export default function PackDetailPage({ params }: PageProps) {
             <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors">
               Rare Finds
             </button>
-            
+
             {/* BPM Filter */}
             <select
               value={selectedBPM}
@@ -179,7 +183,7 @@ export default function PackDetailPage({ params }: PageProps) {
           {/* Search and Sort */}
           <div className="flex items-center justify-between mb-4">
             <p className="text-white/60">{filteredSamples.length} results</p>
-            
+
             <div className="flex items-center gap-4">
               {/* Search */}
               <div className="relative">
@@ -240,9 +244,8 @@ export default function PackDetailPage({ params }: PageProps) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.02 }}
-                    className={`grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer ${
-                      isCurrent ? 'bg-white/10' : ''
-                    }`}
+                    className={`grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer ${isCurrent ? 'bg-white/10' : ''
+                      }`}
                     onClick={() => handlePlayClick(sample)}
                   >
                     {/* Pack Image + Play Button */}
@@ -250,7 +253,7 @@ export default function PackDetailPage({ params }: PageProps) {
                       <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={getSampleImage(sample, index)}
+                          src={packImage}
                           alt={sample.name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -259,9 +262,8 @@ export default function PackDetailPage({ params }: PageProps) {
                             target.src = sampleImages[index % sampleImages.length]
                           }}
                         />
-                        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${
-                          isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}>
+                        <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}>
                           {isCurrentPlaying ? (
                             <Pause className="w-4 h-4 text-white" />
                           ) : (
@@ -288,7 +290,7 @@ export default function PackDetailPage({ params }: PageProps) {
 
                     {/* Key */}
                     <div className="col-span-1 flex items-center justify-center">
-                      <p className="text-sm text-white/60">{sample.key || '--'}</p>
+                      <p className="text-sm text-white/60">{formatKey(sample.key)}</p>
                     </div>
 
                     {/* BPM */}

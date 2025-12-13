@@ -18,6 +18,8 @@ export interface Sample {
   danceability?: number
   valence?: number
   moodTag?: string
+  featured?: boolean
+  artist?: string
 }
 
 export interface UseSamplesOptions {
@@ -52,7 +54,7 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
 
     try {
       const response = await fetch('/audio/metadata.json')
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch samples: ${response.statusText}`)
       }
@@ -77,6 +79,8 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
         danceability: item.danceability,
         valence: item.valence,
         moodTag: item.moodTag,
+        featured: item.featured,
+        artist: item.artist,
       }))
 
       // Filter by category if specified

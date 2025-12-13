@@ -31,13 +31,15 @@ export default function WhatsNewSection() {
             .sort((a, b) => new Date(b.uploadedAt!).getTime() - new Date(a.uploadedAt!).getTime())
             .slice(0, 10)
         : samples.slice(-10).reverse() // Get last 10 samples (most recent)
-    
+
     // Helper to get sample image with fallback
-    const getSampleImage = (sample: any, index: number) => {
+    const getSampleImage = (sample: any) => {
         if (sample.imageUrl && sample.imageUrl !== '/placeholder.jpg') {
             return sample.imageUrl
         }
-        return sampleImages[index % sampleImages.length]
+        const category = sample.category || sample.name || 'default'
+        const hash = category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
+        return sampleImages[hash % sampleImages.length]
     }
 
     const checkScroll = () => {
@@ -117,7 +119,7 @@ export default function WhatsNewSection() {
                 ) : newSamples.map((sample, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
-                    const imageUrl = getSampleImage(sample, index)
+                    const imageUrl = getSampleImage(sample)
 
                     return (
                         <motion.div
