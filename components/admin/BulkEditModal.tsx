@@ -15,7 +15,7 @@ interface BulkEditModalProps {
 }
 
 // Define lists here to be self-contained
-const genresList = ["Hip Hop", "Electronic", "Rock", "Jazz", "Classical", "Ambient", "Trap", "R&B", "Pop", "Soul", "Funk", "Lo-Fi"]
+const genresList = ["Afrobeats", "Amapiano", "Afrohouse", "World"]
 const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings", "Brass", "Woodwinds", "Vocals", "Percussion", "FX"]
 const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
 // Pricing and License were requested to be removed from here or replaced, but usually Pricing/License are bulk editable. 

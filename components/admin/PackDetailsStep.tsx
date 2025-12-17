@@ -5,20 +5,20 @@ import CustomDropdown from "@/components/CustomDropdown"
 
 interface PackDetailsStepProps {
     onNext: (data: any) => void
-    initialData?: any
+    data?: any
 }
 
 const genres = [
-    'Afrobeat', 'Amapiano', 'Hip Hop', 'Trap', 'R&B', 'Soul', 'Pop', 'Electronic', 'House', 'Techno'
+    'Afrobeats', 'Amapiano', 'Afrohouse', 'World'
 ]
 
-export default function PackDetailsStep({ onNext, initialData }: PackDetailsStepProps) {
-    const [title, setTitle] = useState(initialData?.title || "")
-    const [genre, setGenre] = useState(initialData?.genre || "")
-    const [description, setDescription] = useState(initialData?.description || "")
-    const [coverArt, setCoverArt] = useState<File | null>(initialData?.coverArt || null)
-    const [coverPreview, setCoverPreview] = useState<string>(initialData?.coverPreview || "")
-    const [allowCash, setAllowCash] = useState(initialData?.allowCash || false)
+export default function PackDetailsStep({ onNext, data }: PackDetailsStepProps) {
+    const [title, setTitle] = useState(data?.name || data?.title || "")
+    const [genre, setGenre] = useState(data?.genre || "")
+    const [description, setDescription] = useState(data?.description || "")
+    const [coverArt, setCoverArt] = useState<File | null>(data?.coverArt || null)
+    const [coverPreview, setCoverPreview] = useState<string>(data?.coverPreview || "")
+    const [allowCash, setAllowCash] = useState(data?.allowCash || false)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -122,15 +122,7 @@ export default function PackDetailsStep({ onNext, initialData }: PackDetailsStep
                 <div className="pt-4 border-t border-white/5">
                     <p className="text-xs font-bold text-white/30 uppercase tracking-widest mb-6">Optional Fields ↓</p>
 
-                    <div className="flex items-center gap-3">
-                        <div
-                            className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-colors ${allowCash ? 'bg-green-500' : 'bg-white/10'}`}
-                            onClick={() => setAllowCash(!allowCash)}
-                        >
-                            <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${allowCash ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </div>
-                        <span className="text-sm font-medium text-white">Allow cash purchase</span>
-                    </div>
+
                 </div>
             </div>
 

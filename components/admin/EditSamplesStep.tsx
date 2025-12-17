@@ -20,6 +20,7 @@ interface SampleMetadata {
     name: string
     tempo: string
     key: string
+    timeSignature?: string
     genres: string[]
     instruments: string[]
     drumType: string
@@ -31,9 +32,10 @@ interface SampleMetadata {
 }
 
 const keys = ['C Major', 'C Minor', 'C# Major', 'C# Minor', 'D Major', 'D Minor', 'Eb Major', 'Eb Minor', 'E Major', 'E Minor', 'F Major', 'F Minor', 'F# Major', 'F# Minor', 'G Major', 'G Minor', 'Ab Major', 'Ab Minor', 'A Major', 'A Minor', 'Bb Major', 'Bb Minor', 'B Major', 'B Minor']
-const genresList = ["Hip Hop", "Electronic", "Rock", "Jazz", "Classical", "Ambient", "Trap", "R&B", "Pop", "Soul", "Funk", "Lo-Fi"]
+const genresList = ["Afrobeats", "Amapiano", "Afrohouse", "World"]
 const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings", "Brass", "Woodwinds", "Vocals", "Percussion", "FX"]
 const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
+const timeSignatures = ["4/4", "6/8", "3/4"]
 
 export default function EditSamplesStep({ files, initialData, onBack, onSubmit }: EditSamplesStepProps) {
     const [samples, setSamples] = useState<SampleMetadata[]>([])
@@ -49,31 +51,41 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit }
     // Initialize samples from files
     useEffect(() => {
         if (files.length > 0 && samples.length === 0) {
-            if (initialData && initialData.length > 0) {
-                // Use provided initial data (for editing existing packs)
-                setSamples(initialData.map((d, i) => ({
-                    ...d,
-                    id: d.id || `sample-${i}`, // Ensure ID
-                    selected: false // Reset selection state
-                })))
-            } else {
-                // Default initialization (for new uploads)
-                const initialSamples = files.map((file, index) => ({
-                    id: `sample-${index}`,
-                    file,
-                    name: file.name.replace(/\.[^/.]+$/, ""),
-                    tempo: "",
-                    key: "",
-                    genres: [],
-                    instruments: [],
-                    drumType: "",
-                    keywords: [],
-                    category: "Uncategorized",
-                    selected: false,
-                    featured: index === 0 // Default first one as featured
-                }))
-                setSamples(initialSamples)
-                setSelectedId(initialSamples[0].id)
+            const mergedSamples = files.map((file, index) => {
+                // Try to find existing metadata for this file
+                const existing = initialData?.find(d => d.file.name === file.name || d.name === file.name)
+
+                if (existing) {
+                    return {
+                        ...existing,
+                        file: file, // Keep the file object reference
+                        id: existing.id || `sample-${index}`,
+                        selected: false
+                    }
+                } else {
+                    // New file, create default structure
+                    return {
+                        id: `new-${Date.now()}-${index}`,
+                        file: file,
+                        name: file.name.replace(/\.[^/.]+$/, ""),
+                        tempo: "",
+                        key: "",
+                        timeSignature: "4/4",
+                        genres: [],
+                        instruments: [],
+                        drumType: "",
+                        keywords: [],
+                        // Inherit category from existing samples if available, or default
+                        category: initialData?.[0]?.category || "Uncategorized",
+                        selected: false,
+                        featured: false
+                    }
+                }
+            })
+
+            setSamples(mergedSamples)
+            if (mergedSamples.length > 0) {
+                setSelectedId(mergedSamples[0].id)
             }
         }
     }, [files, initialData])
@@ -368,6 +380,17 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit }
                                 />
                             </div>
 
+                            {/* Time Signature */}
+                            <div>
+                                <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Time Sig</label>
+                                <CustomDropdown
+                                    options={timeSignatures}
+                                    value={currentSample.timeSignature || "4/4"}
+                                    onChange={(val) => handleUpdate('timeSignature', val)}
+                                    placeholder="4/4"
+                                />
+                            </div>
+
                             {/* Replaced License with Drum Type */}
                             <div className="col-span-2">
                                 <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Drum Type</label>
@@ -444,6 +467,6 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit }
                     Submit
                 </button>
             </div>
-        </motion.div>
+        </motion.div >
     )
 }

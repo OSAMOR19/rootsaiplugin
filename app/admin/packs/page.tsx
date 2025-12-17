@@ -62,8 +62,50 @@ export default function PacksPage() {
         pack.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
+    const [packToDelete, setPackToDelete] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    // ... (useEffect remains same) ...
+
+    const handleDeletePack = (e: React.MouseEvent, packId: string) => {
+        e.stopPropagation()
+        setPackToDelete(packId)
+    }
+
+    const confirmDelete = async () => {
+        if (!packToDelete) return
+        setIsDeleting(true)
+
+        try {
+            const response = await fetch('/api/admin/delete-pack', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id: packToDelete }),
+            })
+
+            if (!response.ok) throw new Error('Delete failed')
+
+            // Optimistic UI update
+            setPacks(prev => prev.filter(p => p.id !== packToDelete))
+            setPackToDelete(null)
+
+        } catch (error) {
+            console.error('Delete error:', error)
+            alert('Failed to delete pack')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
+            {/* ... (Header and Table remain the same) ... */}
+            {/* Table Header/Content code ... (just pasting the part that renders children to avoid full replacement if tool is smart, else I will replace full return if needed, but I should use StartLine/EndLine carefully) */}
+
+            {/* Wait, the task is to replace the file content significantly or add the modal. Let's effectively keep the main structure but append the modal at the end. */}
+
             {/* Header / Actions */}
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-white">My Packs</h2>
@@ -124,7 +166,10 @@ export default function PacksPage() {
                                 </div>
                                 <div className="col-span-2 flex items-center justify-end gap-3 text-white/60">
                                     <span className="text-sm">{pack.dateAdded}</span>
-                                    <button className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all">
+                                    <button
+                                        onClick={(e) => handleDeletePack(e, pack.id)}
+                                        className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                    >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -133,6 +178,39 @@ export default function PacksPage() {
                     )}
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {packToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setPackToDelete(null)} />
+                    <div className="relative bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center">
+                        <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6">
+                            <Trash2 className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Delete Pack?</h3>
+                        <p className="text-white/60 mb-8 text-sm">
+                            Are you sure you want to delete <span className="text-white font-medium">"{packs.find(p => p.id === packToDelete)?.name}"</span>?
+                            <br />This action cannot be undone.
+                        </p>
+
+                        <div className="flex gap-3 w-full">
+                            <button
+                                onClick={() => setPackToDelete(null)}
+                                className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-xl font-bold transition-all text-sm"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

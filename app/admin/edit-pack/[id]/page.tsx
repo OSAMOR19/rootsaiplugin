@@ -3,6 +3,8 @@
 import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import EditSamplesStep from "@/components/admin/EditSamplesStep"
+import PackDetailsStep from "@/components/admin/PackDetailsStep"
+import FilesUploadStep from "@/components/admin/FilesUploadStep"
 import { useSamples } from "@/hooks/useSamples"
 import { X, Check } from "lucide-react"
 
@@ -16,25 +18,27 @@ export default function EditPackPage({ params }: PageProps) {
     const packId = resolvedParams.id
 
     // In a real app we'd fetch pack details by ID, but since we group by category name...
-    const categoryName = decodeURIComponent(packId)
+    const initialCategoryName = decodeURIComponent(packId)
+    const [categoryName, setCategoryName] = useState(initialCategoryName)
 
     // Fetch existing samples
     const { samples: allSamples, loading } = useSamples({ autoFetch: true })
     const [packSamples, setPackSamples] = useState<any[]>([])
     const [files, setFiles] = useState<File[]>([])
+    // New: Store Step 1 details
+    const [packDetails, setPackDetails] = useState<any>(null)
+
     const [isLoadingData, setIsLoadingData] = useState(true)
     const [currentStep, setCurrentStep] = useState(3) // Start at step 3
     const [showSuccessModal, setShowSuccessModal] = useState(false)
 
+    // ...
+
     useEffect(() => {
-        if (!loading && allSamples.length > 0) {
+        // Only run initialization ONCE when data is ready and we haven't loaded yet
+        if (!loading && allSamples.length > 0 && isLoadingData) {
             // Filter samples belonging to this pack/category
             const filtered = allSamples.filter(s => s.category === categoryName)
-
-            // Convert database samples back to the format EditSamplesStep expects
-            // Note: Since we don't have the original File objects, we'll create dummy files 
-            // This allows the UI to render, but re-uploading would require real files if we were adding new ones.
-            // For editing METADATA of existing files, this is sufficient.
 
             const converted = filtered.map(s => {
                 // Create a dummy file object to satisfy the interface
@@ -47,6 +51,7 @@ export default function EditPackPage({ params }: PageProps) {
                     name: s.name,
                     tempo: s.bpm?.toString() || "",
                     key: typeof s.key === 'string' ? s.key : "",
+                    timeSignature: s.timeSignature || "4/4",
                     genres: s.genres || [],
                     instruments: s.instruments || [],
                     drumType: s.drumType || "",
@@ -57,13 +62,42 @@ export default function EditPackPage({ params }: PageProps) {
                 }
             })
 
-            setPackSamples(converted)
+            // ...
 
-            // We also need to set the 'files' prop for EditSamplesStep
+            setPackSamples(converted)
             setFiles(converted.map(s => s.file))
+
+            // Initialize packDetails if possible (mock)
+            setPackDetails({
+                title: categoryName,
+                name: categoryName,
+                genre: filtered[0]?.genres?.[0] || "",
+                // ... other fields empty or derived
+            })
+
             setIsLoadingData(false)
         }
-    }, [allSamples, loading, categoryName])
+    }, [allSamples, loading /* remove categoryName dependency to prevent reset */]) // We use ref/state for categoryName update
+
+    // ...
+
+    // In Render:
+    {
+        currentStep === 1 && (
+            <PackDetailsStep
+                data={packDetails || { name: categoryName }}
+                onNext={(data) => {
+                    setPackDetails(data) // Persist step 1 data
+                    if (data.title && data.title !== categoryName) {
+                        setCategoryName(data.title)
+                        // Update samples category locally
+                        setPackSamples(prev => prev.map(s => ({ ...s, category: data.title })))
+                    }
+                    setCurrentStep(2)
+                }}
+            />
+        )
+    }
 
     const handleBack = () => {
         router.push('/admin/packs')
@@ -84,15 +118,22 @@ export default function EditPackPage({ params }: PageProps) {
             formData.append('samplesMetadata', JSON.stringify(cleanSamples))
             formData.append('category', categoryName) // Identify which pack to update
 
+            // Append new files (real files have size > 0, dummy existing files have size 0)
+            updatedSamples.forEach(({ file }) => {
+                if (file && file.size > 0) {
+                    formData.append('files', file)
+                }
+            })
+
             const response = await fetch('/api/admin/update-pack', {
                 method: 'POST',
+                // Headers are automatically set by browser for FormData (multipart/form-data)
                 body: formData
             })
 
             if (!response.ok) throw new Error('Update failed')
 
             setShowSuccessModal(true)
-            // router.push('/admin/packs') // handled by modal now
 
         } catch (error) {
             console.error('Update error:', error)
@@ -130,11 +171,11 @@ export default function EditPackPage({ params }: PageProps) {
                     </h1>
                 </div>
 
-                {/* Stepper - Hardcoded visually to look like we are on step 3 */}
+                {/* Stepper */}
                 <div className="flex items-center gap-4">
-                    <StepIndicator step={1} currentStep={3} label="Pack details" />
-                    <StepIndicator step={2} currentStep={3} label="Files" />
-                    <StepIndicator step={3} currentStep={3} label="Edit samples" />
+                    <StepIndicator step={1} currentStep={currentStep} label="Pack details" onClick={() => setCurrentStep(1)} />
+                    <StepIndicator step={2} currentStep={currentStep} label="Files" onClick={() => setCurrentStep(2)} />
+                    <StepIndicator step={3} currentStep={currentStep} label="Edit samples" onClick={() => setCurrentStep(3)} />
                 </div>
 
                 <div className="w-[200px] flex justify-end">
@@ -143,54 +184,71 @@ export default function EditPackPage({ params }: PageProps) {
             </div>
 
             <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
-                {/* We only render step 3 here because the user requested it to 'already be in step 3' */}
-                <EditSamplesStep
-                    files={files}
-                    initialData={packSamples}
-                    onBack={handleBack}
-                    onSubmit={handleSubmit}
-                />
+                {currentStep === 1 && (
+                    <PackDetailsStep
+                        data={{
+                            name: categoryName,
+                            price: 20, // dummy
+                            coverImage: null, // need to fetch if possible or just ignore for now
+                            description: "",
+                            features: []
+                        }}
+                        onNext={(data) => {
+                            if (data.title && data.title !== categoryName) {
+                                setCategoryName(data.title)
+                                // Also update local samples so they reflect the new category immediately
+                                setPackSamples(prev => prev.map(s => ({ ...s, category: data.title })))
+                            }
+                            setCurrentStep(2)
+                        }}
+                    />
+                )}
+
+                {currentStep === 2 && (
+                    <FilesUploadStep
+                        initialFiles={files}
+                        onBack={() => setCurrentStep(1)}
+                        onNext={(updatedFiles) => {
+                            setFiles(updatedFiles)
+                            setCurrentStep(3)
+                        }}
+                    />
+                )}
+
+
+                {currentStep === 3 && (
+                    <EditSamplesStep
+                        files={files}
+                        initialData={packSamples}
+                        onBack={() => setCurrentStep(2)}
+                        onSubmit={handleSubmit}
+                    />
+                )}
             </div>
 
             {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-                    <div className="relative bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl flex flex-col items-center">
-                        <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-6">
-                            <Check className="w-8 h-8" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-white mb-2">Pack Updated!</h3>
-                        <p className="text-white/60 mb-8">
-                            All updates have been saved successfully and are now live.
-                        </p>
-                        <button
-                            onClick={() => router.push('/admin/packs')}
-                            className="w-full py-3 bg-white text-black hover:bg-green-400 rounded-lg font-bold transition-all"
-                        >
-                            Back to Packs
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* ... */}
         </div>
     )
 }
 
-function StepIndicator({ step, currentStep, label }: { step: number, currentStep: number, label: string }) {
+function StepIndicator({ step, currentStep, label, onClick }: { step: number, currentStep: number, label: string, onClick?: () => void }) {
     const isActive = currentStep === step
-    const isCompleted = currentStep > step // For editing, we treat 1 & 2 as completed
+    const isCompleted = currentStep > step
 
     return (
-        <div className={`flex items-center gap-2 ${isActive ? 'text-white' : 'text-white/40'}`}>
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-2 ${isActive ? 'text-white' : 'text-white/40'} hover:text-white transition-colors`}
+        >
             <div className={`
         w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors
-        ${isActive ? 'bg-white text-black' : isCompleted || step < 3 ? 'bg-green-500 text-black' : 'bg-white/10 text-white'}
+        ${isActive ? 'bg-white text-black' : isCompleted ? 'bg-green-500 text-black' : 'bg-white/10 text-white'}
       `}>
-                {isCompleted || step < 3 ? <Check className="w-3 h-3" /> : step}
+                {isCompleted ? <Check className="w-3 h-3" /> : step}
             </div>
             <span className="text-sm font-medium">{label}</span>
             {step < 3 && <div className="w-8 h-[1px] bg-white/10 mx-2" />}
-        </div>
+        </button>
     )
 }
