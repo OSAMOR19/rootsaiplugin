@@ -7,27 +7,9 @@ import { motion } from "framer-motion"
 import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
-const sampleImages = [
-    "/images/afro.jpeg",
-    "/images/afro.png",
-    "/images/afro5.jpg",
-    "/images/afrobeat.jpeg",
-    "/images/afrobeat1.png",
-    "/images/afrobeat2.jpg",
-    "/images/afrobeats4.jpg",
-    "/images/afrooo.jpg",
-    "/images/albumimage2.jpg",
-    "/images/albumimage3.webp",
-    "/images/albumimage4.webp",
-    "/images/albumimage5.jpg",
-    "/images/alnumimag1.jpg",
-    "/images/hihat.png",
-    "/images/kickdrum.jpg",
-    "/images/shekere.jpg",
-    "/images/talkingdrum.jpg",
-    "/images/tomimage.jpg",
-    "/images/womanafrobeat.jpeg"
-]
+import { SAMPLE_IMAGES } from "@/constants/images"
+
+const sampleImages = SAMPLE_IMAGES
 
 export default function RecommendedSection() {
     const router = useRouter()
@@ -38,16 +20,42 @@ export default function RecommendedSection() {
     const { samples, loading } = useSamples({ autoFetch: true })
 
     // Group samples by category and get featured or first from each
-    const categoryMap = new Map<string, any>()
+    // Also track the best available image for the category (Featured > Any > Fallback)
+    const categoryMap = new Map<string, { sample: any, bestImageUrl?: string, isImageFromFeatured?: boolean }>()
+
     samples.forEach(sample => {
         if (sample.category) {
             const existing = categoryMap.get(sample.category)
-            // If no existing sample for this category, or if current sample is featured and existing is not
-            if (!existing || (sample.featured && !existing.featured)) {
-                categoryMap.set(sample.category, sample)
+            const hasImage = sample.imageUrl && sample.imageUrl !== '/placeholder.jpg'
+
+            let representativeSample = existing?.sample
+            let bestImageUrl = existing?.bestImageUrl
+            let isImageFromFeatured = existing?.isImageFromFeatured || false
+
+            // 1. Determine Representative Sample (Featured > First encountered)
+            if (!representativeSample || (sample.featured && !representativeSample.featured)) {
+                representativeSample = sample
             }
+
+            // 2. Determine Best Image (First Featured w/ Image > First w/ Image)
+            if (hasImage) {
+                // If we don't have an image yet, take this one
+                if (!bestImageUrl) {
+                    bestImageUrl = sample.imageUrl
+                    isImageFromFeatured = sample.featured || false
+                }
+                // If we have an image, but it's NOT from a featured sample, and THIS one IS featured
+                else if (sample.featured && !isImageFromFeatured) {
+                    bestImageUrl = sample.imageUrl
+                    isImageFromFeatured = true
+                }
+                // If we already have a featured image, we keep the first one we found (don't overwrite)
+            }
+
+            categoryMap.set(sample.category, { sample: representativeSample, bestImageUrl, isImageFromFeatured })
         }
     })
+
     const recommendedSamples = Array.from(categoryMap.values()).slice(0, 10)
 
     const checkScroll = () => {
@@ -123,15 +131,13 @@ export default function RecommendedSection() {
                     <div className="text-white/40">Loading samples...</div>
                 ) : recommendedSamples.length === 0 ? (
                     <div className="text-white/40">No samples available</div>
-                ) : recommendedSamples.map((sample, index) => {
+                ) : recommendedSamples.map(({ sample, bestImageUrl }, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
                     const fallbackIndex = sample.category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
                     const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
 
-                    const imageUrl = sample.imageUrl && sample.imageUrl !== '/placeholder.jpg'
-                        ? sample.imageUrl
-                        : fallbackImage
+                    const imageUrl = bestImageUrl || fallbackImage
 
                     return (
                         <motion.div

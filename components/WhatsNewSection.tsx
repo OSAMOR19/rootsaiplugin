@@ -7,13 +7,10 @@ import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
 // Reusing images for consistency, or we could have a separate set
-const sampleImages = [
-    "/images/afrobeat1.png",
-    "/images/afrobeat2.jpg",
-    "/images/afrobeats4.jpg",
-    "/images/albumimage2.jpg",
-    "/images/albumimage3.webp",
-]
+import { SAMPLE_IMAGES } from "@/constants/images"
+
+// Reusing images for consistency
+const sampleImages = SAMPLE_IMAGES
 
 export default function WhatsNewSection() {
     const scrollContainerRef = useRef<HTMLDivElement>(null)

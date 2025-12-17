@@ -2,72 +2,182 @@
   {
     "filename": "Manifxtsounds - Aza Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "C",
+    "key": "C Major",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Aza Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Aza Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Aza Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": true
   },
   {
     "filename": "Manifxtsounds - Biza Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "Am",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Biza Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Biza Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Biza Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Cana Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "F",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Cana Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Cana Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Cana Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Colors Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "G",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Colors Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Colors Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Colors Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Colours Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "Dm",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Colours Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Colours Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Colours Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Gaza Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "C",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Gaza Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Gaza Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Gaza Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Gbedu Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "Am",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Gbedu Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Gbedu Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Gbedu Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Havard Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "F",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Havard Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Havard Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Havard Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Idan Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "G",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Idan Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Idan Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Idan Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Kizo Drum Fill 110BPM.wav",
     "bpm": 110,
-    "key": "Dm",
+    "key": "",
     "category": "Fills & Rolls",
-    "url": "/audio/Fills & Rolls/Manifxtsounds - Kizo Drum Fill 110BPM.wav"
+    "url": "/audio/Fills & Rolls/Manifxtsounds - Kizo Drum Fill 110BPM.wav",
+    "name": "Manifxtsounds - Kizo Drum Fill 110BPM",
+    "genres": [
+      "Electronic",
+      "Jazz"
+    ],
+    "instruments": [
+      "Drums"
+    ],
+    "drumType": "",
+    "keywords": [],
+    "featured": false
   },
   {
     "filename": "Manifxtsounds - Alcohol Drum Loop 100BPM.wav",

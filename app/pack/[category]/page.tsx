@@ -7,13 +7,9 @@ import { motion } from "framer-motion"
 import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
-const sampleImages = [
-  "/images/afro.jpeg",
-  "/images/afrobeat1.png",
-  "/images/afrobeat2.jpg",
-  "/images/afrobeats4.jpg",
-  "/images/albumimage2.jpg",
-]
+import { SAMPLE_IMAGES } from "@/constants/images"
+
+const sampleImages = SAMPLE_IMAGES
 
 interface PageProps {
   params: Promise<{ category: string }>
@@ -58,11 +54,14 @@ export default function PackDetailPage({ params }: PageProps) {
   const fallbackIndex = categoryName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
 
-  const packImage = (categorySamples[0]?.imageUrl && categorySamples[0]?.imageUrl !== '/placeholder.jpg'
-    ? categorySamples[0].imageUrl
-    : fallbackImage) || '/placeholder.jpg'
+  // Pack image logic:
+  // 1. Try to find a featured sample that HAS an image
+  // 2. Fall back to the first sample with an image
+  // 3. Fall back to the deterministic hash-based image
+  const featuredSampleWithImage = categorySamples.find(s => s.featured && s.imageUrl && s.imageUrl !== '/placeholder.jpg')
+  const firstSampleWithImage = categorySamples.find(s => s.imageUrl && s.imageUrl !== '/placeholder.jpg')
 
-  console.log('PackDetailPage:', { categoryName, packImage, samplesCount: categorySamples.length })
+  const packImage = (featuredSampleWithImage?.imageUrl) || (firstSampleWithImage?.imageUrl) || fallbackImage || '/placeholder.jpg'
 
   const handlePlayClick = (sample: any) => {
     if (currentTrack?.id === sample.id && isPlaying) {

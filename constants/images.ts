@@ -1,0 +1,21 @@
+export const SAMPLE_IMAGES = [
+    "/images/afro.jpeg",
+    "/images/afro.png",
+    "/images/afro5.jpg",
+    "/images/afrobeat.jpeg",
+    "/images/afrobeat1.png",
+    "/images/afrobeat2.jpg",
+    "/images/afrobeats4.jpg",
+    "/images/afrooo.jpg",
+    "/images/albumimage2.jpg",
+    "/images/albumimage3.webp",
+    "/images/albumimage4.webp",
+    "/images/albumimage5.jpg",
+    "/images/alnumimag1.jpg",
+    "/images/hihat.png",
+    "/images/kickdrum.jpg",
+    "/images/shekere.jpg",
+    "/images/talkingdrum.jpg",
+    "/images/tomimage.jpg",
+    "/images/womanafrobeat.jpeg"
+]

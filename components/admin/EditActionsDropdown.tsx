@@ -62,7 +62,7 @@ export default function EditActionsDropdown({
                             <div className="px-3 py-2 text-xs font-bold text-white/40 uppercase tracking-wider">
                                 Bulk Edit
                             </div>
-                            {['Genre', 'Instrument', 'Keywords', 'Pricing', 'License'].map((option) => (
+                            {['Genre', 'Instrument', 'Keywords', 'Drum Type'].map((option) => (
                                 <button
                                     key={option}
                                     onClick={() => handleAction(() => onEdit(option.toLowerCase()))}

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Play, Pause, CheckCircle, Circle, Music, Star } from "lucide-react"
+import { Play, Pause, CheckCircle, Circle, Music, Star, X } from "lucide-react"
 import CustomDropdown from "@/components/CustomDropdown"
 import EditActionsDropdown from "@/components/admin/EditActionsDropdown"
 import MultiSelectDropdown from "@/components/MultiSelectDropdown"
@@ -9,6 +9,7 @@ import BulkEditModal from "@/components/admin/BulkEditModal"
 
 interface EditSamplesStepProps {
     files: File[]
+    initialData?: SampleMetadata[]
     onBack: () => void
     onSubmit: (data: any) => void
 }
@@ -19,23 +20,22 @@ interface SampleMetadata {
     name: string
     tempo: string
     key: string
-    license: string
-    pricing: string
     genres: string[]
     instruments: string[]
-    keywords: string
+    drumType: string
+    keywords: string[]
+    category?: string
     isPlaying?: boolean
     selected?: boolean
     featured?: boolean
 }
 
 const keys = ['C Major', 'C Minor', 'C# Major', 'C# Minor', 'D Major', 'D Minor', 'Eb Major', 'Eb Minor', 'E Major', 'E Minor', 'F Major', 'F Minor', 'F# Major', 'F# Minor', 'G Major', 'G Minor', 'Ab Major', 'Ab Minor', 'A Major', 'A Minor', 'Bb Major', 'Bb Minor', 'B Major', 'B Minor']
-const licenses = ['Royalty Free', 'Exclusive', 'Lease']
-const pricings = ['1 Credit', '2 Credits', '3 Credits', 'Free']
 const genresList = ["Hip Hop", "Electronic", "Rock", "Jazz", "Classical", "Ambient", "Trap", "R&B", "Pop", "Soul", "Funk", "Lo-Fi"]
 const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings", "Brass", "Woodwinds", "Vocals", "Percussion", "FX"]
+const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
 
-export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamplesStepProps) {
+export default function EditSamplesStep({ files, initialData, onBack, onSubmit }: EditSamplesStepProps) {
     const [samples, setSamples] = useState<SampleMetadata[]>([])
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [playingId, setPlayingId] = useState<string | null>(null)
@@ -49,24 +49,41 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
     // Initialize samples from files
     useEffect(() => {
         if (files.length > 0 && samples.length === 0) {
-            const initialSamples = files.map((file, index) => ({
-                id: `sample-${index}`,
-                file,
-                name: file.name.replace(/\.[^/.]+$/, ""),
-                tempo: "",
-                key: "",
-                license: "Royalty Free",
-                pricing: "1 Credit",
-                genres: [],
-                instruments: [],
-                keywords: "",
-                selected: false,
-                featured: index === 0 // Default first one as featured
-            }))
-            setSamples(initialSamples)
-            setSelectedId(initialSamples[0].id)
+            if (initialData && initialData.length > 0) {
+                // Use provided initial data (for editing existing packs)
+                setSamples(initialData.map((d, i) => ({
+                    ...d,
+                    id: d.id || `sample-${i}`, // Ensure ID
+                    selected: false // Reset selection state
+                })))
+            } else {
+                // Default initialization (for new uploads)
+                const initialSamples = files.map((file, index) => ({
+                    id: `sample-${index}`,
+                    file,
+                    name: file.name.replace(/\.[^/.]+$/, ""),
+                    tempo: "",
+                    key: "",
+                    genres: [],
+                    instruments: [],
+                    drumType: "",
+                    keywords: [],
+                    category: "Uncategorized",
+                    selected: false,
+                    featured: index === 0 // Default first one as featured
+                }))
+                setSamples(initialSamples)
+                setSelectedId(initialSamples[0].id)
+            }
         }
-    }, [files])
+    }, [files, initialData])
+
+    // Set selected ID if we loaded from initial Data
+    useEffect(() => {
+        if (samples.length > 0 && !selectedId) {
+            setSelectedId(samples[0].id)
+        }
+    }, [samples])
 
     // Audio Playback Logic
     useEffect(() => {
@@ -78,8 +95,17 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                     URL.revokeObjectURL(audioRef.current.src)
                 }
 
-                const url = URL.createObjectURL(sample.file)
-                const audio = new Audio(url)
+                // Handle existing R2 URL for editing or Create Object URL for new files
+                let src = ""
+                // @ts-ignore
+                if (sample.file.r2_url) {
+                    // @ts-ignore
+                    src = sample.file.r2_url
+                } else {
+                    src = URL.createObjectURL(sample.file)
+                }
+
+                const audio = new Audio(src)
                 audioRef.current = audio
 
                 audio.play().catch(e => console.error("Playback failed:", e))
@@ -94,10 +120,12 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
         return () => {
             if (audioRef.current) {
                 audioRef.current.pause()
-                URL.revokeObjectURL(audioRef.current.src)
+                if (audioRef.current.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(audioRef.current.src)
+                }
             }
         }
-    }, [playingId, samples]) // Added samples to dependency array to ensure correct sample.file is accessed
+    }, [playingId, samples])
 
     const handleUpdate = (field: keyof SampleMetadata, value: any) => {
         if (!selectedId) return
@@ -148,18 +176,51 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
         setBulkEditField(field)
     }
 
-    const handleBulkSave = (value: any) => {
+    const handleBulkSave = (updates: Record<string, any>) => {
         if (!bulkEditField) return
 
-        // Map field names if necessary (e.g. 'genre' -> 'genres')
-        let targetField = bulkEditField
-        if (bulkEditField === 'genre') targetField = 'genres'
-        if (bulkEditField === 'instrument') targetField = 'instruments'
+        setSamples(prev => prev.map(s => {
+            if (s.selected) {
+                // Clone object
+                const updatedSample = { ...s }
 
-        setSamples(prev => prev.map(s =>
-            s.selected ? { ...s, [targetField]: value } : s
-        ))
+                // Apply all updates
+                Object.keys(updates).forEach(key => {
+                    // Check if it's a valid key on SampleMetadata to be safe (optional but good practice)
+                    // Because of the 'bulkEditField' mapping in previous logic, we might need to map keys back if they differ
+                    // But in BulkEditModal we normalized keys to match SampleMetadata properties: 'genres', 'instruments', 'drumType', etc.
+                    // 'keywords' is also direct.
+                    // The only potential mismatch is if old logic used 'genre' singular. But BulkEditModal now sends 'genres'.
+                    // So we can directly assign.
+
+                    // @ts-ignore - Dynamic assignment
+                    updatedSample[key] = updates[key]
+                })
+                return updatedSample
+            }
+            return s
+        }))
         setBulkEditField(null)
+    }
+
+    // Keyword Tag Input Handler
+    const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault()
+            const input = e.currentTarget
+            const value = input.value.trim()
+
+            if (value && currentSample && !currentSample.keywords.includes(value)) {
+                handleUpdate('keywords', [...currentSample.keywords, value])
+                input.value = ''
+            }
+        }
+    }
+
+    const removeKeyword = (keyword: string) => {
+        if (currentSample) {
+            handleUpdate('keywords', currentSample.keywords.filter(k => k !== keyword))
+        }
     }
 
     const currentSample = samples.find(s => s.id === selectedId)
@@ -175,8 +236,9 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
             <BulkEditModal
                 isOpen={!!bulkEditField}
                 onClose={() => setBulkEditField(null)}
+                // @ts-ignore
                 onSave={handleBulkSave}
-                field={bulkEditField || ""}
+                initialField={bulkEditField || ""}
                 count={selectedCount}
             />
 
@@ -184,24 +246,27 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
             <div className="w-1/3 flex flex-col h-full">
                 <div className="flex items-center justify-between mb-4 px-2">
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{samples.length} samples</span>
-                        {selectedCount > 0 ? (
-                            <div className="flex items-center gap-2">
-                                <span className="text-green-400 text-sm">{selectedCount} selected</span>
-                                <button onClick={handleDeselectAll} className="text-xs text-white/40 hover:text-white">Unselect all</button>
-                            </div>
-                        ) : (
-                            <button onClick={handleSelectAll} className="text-xs text-white/40 hover:text-white">Select all</button>
-                        )}
+                        <div className="flex flex-col">
+                            <span className="font-bold text-white">{samples.length} samples</span>
+                            <span className="text-[10px] text-white/40 uppercase tracking-widest">Select files to bulk edit</span>
+                        </div>
                     </div>
-                    <EditActionsDropdown
-                        onSelectAll={handleSelectAll}
-                        onDeselectAll={handleDeselectAll}
-                        onDeleteSelected={handleDeleteSelected}
-                        onEdit={handleBulkEdit}
-                        selectedCount={selectedCount}
-                        totalCount={samples.length}
-                    />
+
+                    <div className="flex items-center gap-2">
+                        {selectedCount > 0 ? (
+                            <button onClick={handleDeselectAll} className="text-xs text-white/40 hover:text-white bg-white/5 px-2 py-1 rounded">Unselect All</button>
+                        ) : (
+                            <button onClick={handleSelectAll} className="text-xs text-white/40 hover:text-white bg-white/5 px-2 py-1 rounded">Select All</button>
+                        )}
+                        <EditActionsDropdown
+                            onSelectAll={handleSelectAll}
+                            onDeselectAll={handleDeselectAll}
+                            onDeleteSelected={handleDeleteSelected}
+                            onEdit={handleBulkEdit}
+                            selectedCount={selectedCount}
+                            totalCount={samples.length}
+                        />
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
@@ -209,14 +274,19 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                         <div
                             key={sample.id}
                             onClick={() => setSelectedId(sample.id)}
-                            className={`p - 3 rounded - xl flex items - center gap - 3 cursor - pointer transition - all border group ${selectedId === sample.id
+                            className={`p-3 rounded-xl flex items-center gap-3 cursor-pointer transition-all border group relative overflow-hidden ${selectedId === sample.id
                                 ? 'bg-white/10 border-white/20'
                                 : 'bg-transparent border-transparent hover:bg-white/5'
                                 } `}
                         >
+                            {/* Selection Effect */}
+                            {sample.selected && (
+                                <div className="absolute inset-0 bg-green-500/5 pointer-events-none" />
+                            )}
+
                             <div
                                 onClick={(e) => toggleSelection(sample.id, e)}
-                                className={`w - 5 h - 5 rounded border flex items - center justify - center transition - colors ${sample.selected
+                                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors z-10 ${sample.selected
                                     ? 'bg-green-500 border-green-500'
                                     : 'border-white/20 hover:border-white/40'
                                     } `}
@@ -226,13 +296,13 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
 
                             <button
                                 onClick={(e) => { e.stopPropagation(); togglePlay(sample.id); }}
-                                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors z-10"
                             >
                                 {playingId === sample.id ? <Pause className="w-3 h-3 text-white" /> : <Play className="w-3 h-3 text-white" />}
                             </button>
 
-                            <div className="flex-1 min-w-0">
-                                <p className={`text - sm font - medium truncate ${selectedId === sample.id ? 'text-white' : 'text-white/60'} `}>
+                            <div className="flex-1 min-w-0 z-10">
+                                <p className={`text-sm font-medium truncate ${selectedId === sample.id ? 'text-white' : 'text-white/60'} `}>
                                     {sample.name}
                                 </p>
                             </div>
@@ -240,14 +310,18 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                             {/* Featured Toggle */}
                             <button
                                 onClick={(e) => toggleFeatured(sample.id, e)}
-                                className={`p - 1 rounded - full transition - colors ${sample.featured ? 'text-yellow-400' : 'text-white/10 hover:text-white/40'} `}
+                                className={`p-1 rounded-full transition-colors z-10 ${sample.featured ? 'text-yellow-400' : 'text-white/10 hover:text-white/40'} `}
                                 title="Set as featured sample"
                             >
                                 <Star className="w-4 h-4 fill-current" />
                             </button>
 
-                            {/* Completion Indicator - Mock logic for now */}
-                            <div className={`w - 2 h - 2 rounded - full ${sample.genres.length > 0 ? 'bg-green-500' : 'bg-white/10'} `} />
+                            {/* Category/Type Indicator */}
+                            {sample.drumType && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/40 max-w-[60px] truncate">
+                                    {sample.drumType}
+                                </span>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -264,7 +338,10 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                             >
                                 {playingId === currentSample.id ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
                             </button>
-                            <h2 className="text-xl font-bold text-white truncate">{currentSample.name}</h2>
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-xl font-bold text-white truncate">{currentSample.name}</h2>
+                                <p className="text-xs text-white/40 mt-1">{currentSample.file.size ? (currentSample.file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Existing File'}</p>
+                            </div>
                             {currentSample.featured && (
                                 <span className="px-2 py-1 bg-yellow-400/10 text-yellow-400 text-xs rounded border border-yellow-400/20">Featured</span>
                             )}
@@ -291,22 +368,14 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-white/60 mb-2 uppercase">License</label>
+                            {/* Replaced License with Drum Type */}
+                            <div className="col-span-2">
+                                <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Drum Type</label>
                                 <CustomDropdown
-                                    options={licenses}
-                                    value={currentSample.license}
-                                    onChange={(val) => handleUpdate('license', val)}
-                                    placeholder="License"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Pricing</label>
-                                <CustomDropdown
-                                    options={pricings}
-                                    value={currentSample.pricing}
-                                    onChange={(val) => handleUpdate('pricing', val)}
-                                    placeholder="Pricing"
+                                    options={drumTypes}
+                                    value={currentSample.drumType}
+                                    onChange={(val) => handleUpdate('drumType', val)}
+                                    placeholder="Select drum type (e.g. Kick Loop)"
                                 />
                             </div>
                         </div>
@@ -333,13 +402,23 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
 
                         <div>
                             <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Keywords</label>
-                            <input
-                                type="text"
-                                value={currentSample.keywords}
-                                onChange={(e) => handleUpdate('keywords', e.target.value)}
-                                placeholder="Comma separated"
-                                className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
-                            />
+                            <div className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white focus-within:border-white/30 transition-colors flex flex-wrap gap-2 items-center min-h-[50px]">
+                                {currentSample.keywords.map((keyword, i) => (
+                                    <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm flex items-center gap-1">
+                                        {keyword}
+                                        <button onClick={() => removeKeyword(keyword)} className="hover:text-red-400">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                                <input
+                                    type="text"
+                                    onKeyDown={handleKeywordKeyDown}
+                                    placeholder={currentSample.keywords.length === 0 ? "Type and press Enter..." : ""}
+                                    className="bg-transparent border-none focus:outline-none flex-1 min-w-[100px] text-white placeholder-white/20 h-full"
+                                />
+                            </div>
+                            <p className="text-[10px] text-white/20 mt-1">Press Enter or Comma to add tags</p>
                         </div>
                     </div>
                 ) : (
@@ -362,7 +441,7 @@ export default function EditSamplesStep({ files, onBack, onSubmit }: EditSamples
                     onClick={() => onSubmit(samples)}
                     className="px-8 py-3 bg-white text-black hover:bg-green-400 rounded-full font-bold transition-all"
                 >
-                    Submit for review
+                    Submit
                 </button>
             </div>
         </motion.div>

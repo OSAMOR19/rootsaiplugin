@@ -45,27 +45,51 @@ function ResultsContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [syncPlayingSampleId, setSyncPlayingSampleId] = useState<string | null>(null) // Track which sample is sync playing
-  const [currentSyncSample, setCurrentSyncSample] = useState<{ id: string; bpm: number; url: string } | null>(null) // Store current sync sample info for re-syncing
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
   // ✅ NEW: Load initial compatible sounds from local library
   const loadInitialCompatibleSounds = async (bpm: number | null, key: string, limit: number = 10) => {
-    if (!bpm) return []
+    console.log('🔍 loadInitialCompatibleSounds CALLED:', { bpm, key, limit })
+    
+    if (!bpm) {
+      console.error('❌ NO BPM - returning empty array')
+      return []
+    }
     
     try {
+      console.log('📂 Fetching metadata.json...')
       const metadataResponse = await fetch('/audio/metadata.json')
       if (!metadataResponse.ok) {
-        console.warn('Could not load metadata.json')
+        console.error('❌ Could not load metadata.json, status:', metadataResponse.status)
         return []
       }
       
       const allLoops: any[] = await metadataResponse.json()
+      console.log('✅ Loaded metadata.json:', allLoops.length, 'loops')
+      
+      // ✅ Filter out invalid entries (no filename/fileName and no url/audioUrl)
+      const validLoops = allLoops.filter(loop => {
+        const hasFileName = !!(loop.filename || loop.fileName || loop.name)
+        const hasAudioUrl = !!(loop.url || loop.audioUrl)
+        return hasFileName && hasAudioUrl
+      })
+      
+      console.log('✅ Valid loops (with filename & URL):', validLoops.length)
       
       // Calculate compatibility scores (same algorithm as handleViewMore)
-      const scoredLoops = allLoops.map((loop: any) => {
-        const loopBPM = loop.bpm ?? extractBPMFromString(loop.filename) ?? 120
-        const loopKey = loop.key || 'C'
+      const scoredLoops = validLoops.map((loop: any) => {
+        // ✅ Handle both 'filename' and 'fileName' fields
+        const fileName = loop.filename || loop.fileName || loop.name || ''
+        const loopBPM = loop.bpm ?? extractBPMFromString(fileName) ?? 120
+        
+        // ✅ Handle both string keys ("C", "Am") and object keys ({ tonic: "C", scale: "major" })
+        let loopKey = 'C'
+        if (typeof loop.key === 'string') {
+          loopKey = loop.key
+        } else if (loop.key?.tonic) {
+          loopKey = loop.key.tonic
+        }
         
         let score = 0
         
@@ -85,14 +109,27 @@ function ResultsContent() {
         }
         
         // Rhythmic complexity
-        const filename = loop.filename.toLowerCase()
-        if (filename.includes('kick') || filename.includes('bass')) {
+        const fileNameLower = fileName.toLowerCase()
+        if (fileNameLower.includes('kick') || fileNameLower.includes('bass')) {
           score += 15
-        } else if (filename.includes('perc') || filename.includes('shaker')) {
+        } else if (fileNameLower.includes('perc') || fileNameLower.includes('shaker')) {
           score += 20
         }
         
         return { loop, score }
+      })
+      
+      // Log scoring results
+      const sortedScores = [...scoredLoops].sort((a, b) => b.score - a.score)
+      console.log('🎯 Scoring results:', {
+        totalLoops: validLoops.length,
+        scoredLoops: scoredLoops.length,
+        topScores: sortedScores.slice(0, 10).map(l => {
+          const fileName = l.loop.filename || l.loop.fileName || l.loop.name
+          return { name: fileName, score: l.score, bpm: l.loop.bpm, key: l.loop.key }
+        }),
+        lowestScore: sortedScores[sortedScores.length - 1]?.score || 0,
+        highestScore: sortedScores[0]?.score || 0
       })
       
       // Sort by compatibility score and take top N
@@ -100,16 +137,28 @@ function ResultsContent() {
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
         .map((item: any, index: number) => {
-          const originalBpm = item.loop.bpm ?? extractBPMFromString(item.loop.filename)
+          // ✅ Handle both 'filename' and 'fileName' fields
+          const fileName = item.loop.filename || item.loop.fileName || item.loop.name || 'Unknown'
+          const originalBpm = item.loop.bpm ?? extractBPMFromString(fileName)
+          const audioUrl = item.loop.url || item.loop.audioUrl
+          
+          // ✅ Handle both string keys and object keys
+          let loopKey = key
+          if (typeof item.loop.key === 'string') {
+            loopKey = item.loop.key
+          } else if (item.loop.key?.tonic) {
+            loopKey = item.loop.key.tonic
+          }
+          
           return {
             id: `compatible-${index}`,
-            name: item.loop.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+            name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
             artist: 'Compatible Match',
             category: item.loop.category || 'audio-analysis',
             bpm: bpm,
             originalBpm: originalBpm,
-            key: item.loop.key || key,
-            audioUrl: item.loop.url,
+            key: loopKey,
+            audioUrl: audioUrl,
             imageUrl: '/placeholder.jpg',
             duration: '4 bars',
             tags: ['compatible', 'matching-bpm'],
@@ -128,6 +177,9 @@ function ResultsContent() {
 
   useEffect(() => {
     const loadData = async () => {
+      console.log('🎬 Results page loading data...')
+      console.log('📦 URL params:', { recommendationsParam: !!recommendationsParam, detectedBPM, detectedKey })
+      
       // If we have recommendations from audio analysis, use those
       if (recommendationsParam) {
         try {
@@ -137,13 +189,18 @@ function ResultsContent() {
           // Use edited BPM if available, otherwise fall back to detected BPM
           const universalBPM = editedBPM ?? (detectedBPM ? parseInt(detectedBPM) : null)
           
+          console.log('🎵 Calculated universalBPM:', universalBPM, 'from editedBPM:', editedBPM, 'detectedBPM:', detectedBPM)
+          
           // Set recorded BPM from URL params (for DraggableSample to use)
           if (detectedBPM) {
             const initialBPM = parseInt(detectedBPM)
+            console.log('✅ Setting BPM states to:', initialBPM)
             setRecordedBPM(initialBPM)
             setOriginalDetectedBPM(initialBPM) // Store original detected BPM
             setEditedBPM(initialBPM) // Initialize edited BPM
             setBpmInputValue(initialBPM.toString()) // Initialize input value
+          } else {
+            console.error('❌ NO detectedBPM in URL params!')
           }
           
           // Add the recently played song as the first card
@@ -162,8 +219,14 @@ function ResultsContent() {
             isRecentSong: true
           }
           
+          console.log('🎸 Created recentSong card')
+          
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
+          console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM)
           const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10)
+          
+          console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
+          console.log('📋 Setting samples to:', [recentSong, ...initialCompatibleSounds].length, 'total samples')
           
           setSamples([recentSong, ...initialCompatibleSounds])
           
@@ -229,15 +292,7 @@ function ResultsContent() {
       
       // Also update recordedBPM so playback uses the new BPM
       setRecordedBPM(editedBPM)
-      
-      // ✅ NEW: If a sample is currently syncing, restart it with the new BPM
-      if (currentSyncSample && recordedAudioBuffer) {
-        console.log(`🔄 Re-syncing with new BPM: ${editedBPM}`)
-        // Restart the sync with updated BPM
-        restartSyncWithNewBPM(currentSyncSample.id, currentSyncSample.url)
-      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedBPM])
 
   // Helper function to apply BPM change (used when user types/edits)
@@ -253,45 +308,12 @@ function ResultsContent() {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
   }
 
-  // ✅ Helper function to restart sync with new BPM
-  const restartSyncWithNewBPM = async (sampleId: string, sampleUrl: string) => {
-    if (!recordedAudioBuffer || !editedBPM) return
-    
-    try {
-      // Stop current playback
-      syncEngine.stopAll()
-      
-      // Get the updated sample BPM (which is now the edited BPM)
-      const updatedSampleBPM = editedBPM
-      
-      // Load sample audio
-      const sampleBuffer = await loadAudioBuffer(sampleUrl)
-      
-      // Restart sync playback with new BPM
-      await syncEngine.syncPlay(
-        recordedAudioBuffer,
-        sampleBuffer,
-        updatedSampleBPM,
-        {
-          recordedBPM: editedBPM,
-          recordedVolume: recordedVolume / 100,
-          sampleVolume: sampleVolume / 100
-        }
-      )
-      
-      console.log(`✅ Re-synced with new BPM: ${editedBPM}`)
-    } catch (error) {
-      console.error('Error re-syncing with new BPM:', error)
-    }
-  }
-
   // ✅ NEW: Handle sync play (play captured audio + sample together)
   const handleSyncPlay = async (sampleId: string, sampleBPM: number, sampleUrl: string) => {
     if (syncPlayingSampleId === sampleId) {
       // Stop sync playback
       syncEngine.stopAll()
       setSyncPlayingSampleId(null)
-      setCurrentSyncSample(null) // Clear the sync sample info
       setCurrentlyPlaying(null)
       
       toast({
@@ -344,8 +366,6 @@ function ResultsContent() {
         )
         
         setSyncPlayingSampleId(sampleId)
-        // Store current sync sample info for re-syncing when BPM changes
-        setCurrentSyncSample({ id: sampleId, bpm: sampleBPM, url: sampleUrl })
         console.log(`✅ Sync playing: Your audio + ${sampleId}`)
         
         toast({
@@ -469,17 +489,33 @@ function ResultsContent() {
       
       // Score all loops and filter out already shown ones
       const scoredLoops = allLoops
-        .filter(loop => !existingUrls.has(loop.url)) // Exclude already shown
-        .map(loop => ({
-          ...loop,
-          score: calculateCompatibilityScore(
-            bpmToUse,
-            detectedKey,
-            loop.bpm,
-            loop.key,
-            loop.filename
-          )
-        }))
+        .filter(loop => {
+          const loopUrl = loop.url || loop.audioUrl
+          return !existingUrls.has(loopUrl)
+        })
+        .map(loop => {
+          // ✅ Handle both 'filename' and 'fileName' fields
+          const fileName = loop.filename || loop.fileName || loop.name || ''
+          
+          // ✅ Handle both string keys and object keys
+          let loopKey = 'C'
+          if (typeof loop.key === 'string') {
+            loopKey = loop.key
+          } else if (loop.key?.tonic) {
+            loopKey = loop.key.tonic
+          }
+          
+          return {
+            ...loop,
+            score: calculateCompatibilityScore(
+              bpmToUse,
+              detectedKey,
+              loop.bpm,
+              loopKey,
+              fileName
+            )
+          }
+        })
         .filter(loop => loop.score > 0) // Only compatible matches
         .sort((a, b) => b.score - a.score) // Sort by compatibility
       
@@ -489,16 +525,28 @@ function ResultsContent() {
       // Convert to sample format
       const universalBPMForAdditional = bpmToUse
       const additionalSamples = topMatches.map((loop, index) => {
+        // ✅ Handle both 'filename' and 'fileName' fields
+        const fileName = loop.filename || loop.fileName || loop.name || 'Unknown'
+        const audioUrl = loop.url || loop.audioUrl
         const originalBpm = loop.bpm
+        
+        // ✅ Handle both string keys and object keys
+        let loopKey = detectedKey
+        if (typeof loop.key === 'string') {
+          loopKey = loop.key
+        } else if (loop.key?.tonic) {
+          loopKey = loop.key.tonic
+        }
+        
         return {
           id: `additional-${Date.now()}-${index}`,
-          name: loop.filename.replace('Manifxtsounds - ', '').replace('.wav', ''),
+          name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
           artist: 'Audio Library Match',
           category: loop.category?.toLowerCase() || 'matching',
           bpm: universalBPMForAdditional, // Use detected BPM for display
           originalBpm: originalBpm, // Store actual BPM for tempo matching
-          key: loop.key,
-          audioUrl: loop.url,
+          key: loopKey,
+          audioUrl: audioUrl,
           imageUrl: '/placeholder.jpg',
           duration: '4 bars',
           tags: ['audio-library', 'matching-bpm', 'matching-key', loop.category?.toLowerCase() || ''],

@@ -20,6 +20,10 @@ export interface Sample {
   moodTag?: string
   featured?: boolean
   artist?: string
+  genres?: string[]
+  instruments?: string[]
+  drumType?: string
+  keywords?: string[]
 }
 
 export interface UseSamplesOptions {
@@ -81,6 +85,10 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
         moodTag: item.moodTag,
         featured: item.featured,
         artist: item.artist,
+        genres: item.genres || [],
+        instruments: item.instruments || [],
+        drumType: item.drumType || '',
+        keywords: item.keywords || [],
       }))
 
       // Filter by category if specified
