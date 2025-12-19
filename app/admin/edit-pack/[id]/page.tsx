@@ -35,49 +35,65 @@ export default function EditPackPage({ params }: PageProps) {
     // ...
 
     useEffect(() => {
-        // Only run initialization ONCE when data is ready and we haven't loaded yet
-        if (!loading && allSamples.length > 0 && isLoadingData) {
-            // Filter samples belonging to this pack/category
-            const filtered = allSamples.filter(s => s.category === categoryName)
+        const initData = async () => {
+            // Only run initialization ONCE when data is ready and we haven't loaded yet
+            if (!loading && allSamples.length > 0 && isLoadingData) {
+                // Filter samples belonging to this pack/category
+                const filtered = allSamples.filter(s => s.category === categoryName)
 
-            const converted = filtered.map(s => {
-                // Create a dummy file object to satisfy the interface
-                const dummyFile = new File([""], s.filename || s.name, { type: "audio/wav" })
-                Object.defineProperty(dummyFile, 'r2_url', { value: s.audioUrl || s.url }) // custom prop to track url
-
-                return {
-                    id: s.id,
-                    file: dummyFile,
-                    name: s.name,
-                    tempo: s.bpm?.toString() || "",
-                    key: typeof s.key === 'string' ? s.key : "",
-                    timeSignature: s.timeSignature || "4/4",
-                    genres: s.genres || [],
-                    instruments: s.instruments || [],
-                    drumType: s.drumType || "",
-                    category: s.category || "Uncategorized",
-                    keywords: s.keywords || [],
-                    selected: false,
-                    featured: s.featured || false
+                // Fetch pack metadata (Description, Cover, etc) from packs.json to ensure we don't overwrite with empty
+                let existingPackDetails: any = null
+                try {
+                    const packsRes = await fetch('/audio/packs.json')
+                    if (packsRes.ok) {
+                        const packsData = await packsRes.json()
+                        existingPackDetails = packsData.find((p: any) => p.name === categoryName || p.title === categoryName)
+                    }
+                } catch (err) {
+                    console.error("Could not fetch packs.json", err)
                 }
-            })
 
-            // ...
+                const converted = filtered.map(s => {
+                    // Create a dummy file object to satisfy the interface
+                    const dummyFile = new File([""], s.filename || s.name, { type: "audio/wav" })
+                    Object.defineProperty(dummyFile, 'r2_url', { value: s.audioUrl || s.url }) // custom prop to track url
 
-            setPackSamples(converted)
-            setFiles(converted.map(s => s.file))
+                    return {
+                        id: s.id,
+                        file: dummyFile,
+                        name: s.name,
+                        tempo: s.bpm?.toString() || "",
+                        key: typeof s.key === 'string' ? s.key : "",
+                        timeSignature: s.timeSignature || "4/4",
+                        genres: s.genres || [],
+                        instruments: s.instruments || [],
+                        drumType: s.drumType || "",
+                        category: s.category || "Uncategorized",
+                        keywords: s.keywords || [],
+                        selected: false,
+                        featured: s.featured || false
+                    }
+                })
 
-            // Initialize packDetails if possible (mock)
-            setPackDetails({
-                title: categoryName,
-                name: categoryName,
-                genre: filtered[0]?.genres?.[0] || "",
-                // ... other fields empty or derived
-            })
+                setPackSamples(converted)
+                setFiles(converted.map(s => s.file))
 
-            setIsLoadingData(false)
+                // Initialize packDetails with REAL data from packs.json or fallbacks
+                setPackDetails({
+                    title: categoryName,
+                    name: categoryName,
+                    genre: existingPackDetails?.genre || filtered[0]?.genres?.[0] || "",
+                    description: existingPackDetails?.description || "",
+                    coverPreview: existingPackDetails?.coverImage || filtered[0]?.imageUrl || "", // Existing URL
+                    coverArt: null // No new file yet
+                })
+
+                setIsLoadingData(false)
+            }
         }
-    }, [allSamples, loading /* remove categoryName dependency to prevent reset */]) // We use ref/state for categoryName update
+
+        initData()
+    }, [allSamples, loading, isLoadingData, categoryName])
 
     // ...
 
@@ -112,11 +128,26 @@ export default function EditPackPage({ params }: PageProps) {
 
             const cleanSamples = updatedSamples.map(({ file, ...rest }) => ({
                 ...rest,
-                fileName: file.name
+                fileName: file.name,
+                category: categoryName // Force category to match current pack name
             }))
 
             formData.append('samplesMetadata', JSON.stringify(cleanSamples))
-            formData.append('category', categoryName) // Identify which pack to update
+            formData.append('originalCategory', initialCategoryName) // Identify which pack to update (old name)
+
+            // Append Pack Details
+            if (packDetails) {
+                const { coverArt, coverPreview, ...cleanPackDetails } = packDetails
+                formData.append('packDetails', JSON.stringify(cleanPackDetails))
+
+                // Append Cover Image if changed (it's a File)
+                if (coverArt instanceof File) {
+                    formData.append('coverImage', coverArt)
+                }
+            } else {
+                // If no changes to details, just send current name as details
+                formData.append('packDetails', JSON.stringify({ title: categoryName }))
+            }
 
             // Append new files (real files have size > 0, dummy existing files have size 0)
             updatedSamples.forEach(({ file }) => {
@@ -222,6 +253,7 @@ export default function EditPackPage({ params }: PageProps) {
                         initialData={packSamples}
                         onBack={() => setCurrentStep(2)}
                         onSubmit={handleSubmit}
+                        defaultCategory={categoryName}
                     />
                 )}
             </div>

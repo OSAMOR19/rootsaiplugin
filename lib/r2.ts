@@ -77,7 +77,7 @@ export async function uploadFile(
   try {
     // Sanitize filename to prevent path traversal
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    
+
     const command = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: sanitizedFileName,
@@ -111,14 +111,22 @@ export async function uploadFile(
  * @returns Public URL to access the file
  */
 export function getPublicFileUrl(fileName: string): string {
-  // For public R2 buckets with custom domain or R2.dev subdomain
-  // Format: https://{bucket-name}.{account-id}.r2.cloudflarestorage.com/{fileName}
-  // OR if you have a custom domain: https://your-domain.com/{fileName}
-  
+  // 1. Custom Public Domain (e.g., https://assets.rootsai.com)
+  if (process.env.R2_PUBLIC_DOMAIN) {
+    const domain = process.env.R2_PUBLIC_DOMAIN.replace(/\/$/, '');
+    return `${domain}/${fileName}`;
+  }
+
+  // 2. R2.dev Subdomain (e.g., https://pub-xxxx.r2.dev)
+  if (process.env.R2_DEV_SUBDOMAIN) {
+    const domain = process.env.R2_DEV_SUBDOMAIN.replace(/\/$/, '');
+    return `${domain}/${fileName}`;
+  }
+
+  // 3. Fallback: Direct R2 Endpoint (Requires Auth by default, so images might not load)
   const accountId = process.env.R2_ACCOUNT_ID!;
   const bucketName = BUCKET_NAME;
-  
-  // Using the direct R2 endpoint (this requires the bucket to be publicly accessible)
+
   return `https://${bucketName}.${accountId}.r2.cloudflarestorage.com/${fileName}`;
 }
 

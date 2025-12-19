@@ -17,6 +17,9 @@ export default function AdminUploadPage() {
     const [files, setFiles] = useState<File[]>([])
     const [samples, setSamples] = useState<any[]>([])
 
+    // Success State
+    const [showSuccess, setShowSuccess] = useState(false)
+
     const handlePackDetailsNext = (data: any) => {
         setPackDetails(data)
         setCurrentStep(2)
@@ -53,7 +56,8 @@ export default function AdminUploadPage() {
             // 4. Append Samples Metadata (exclude file objects)
             const cleanSamples = finalSamples.map(({ file, ...rest }) => ({
                 ...rest,
-                fileName: file.name // Ensure we link back to the file
+                fileName: file.name, // Ensure we link back to the file
+                category: packDetails.title // Double safety: ensure category matches pack title
             }))
             formData.append('samplesMetadata', JSON.stringify(cleanSamples))
 
@@ -69,14 +73,14 @@ export default function AdminUploadPage() {
                 throw new Error(result.error || 'Upload failed')
             }
 
-            alert("Pack uploaded successfully!")
-            router.push('/browse')
+            // Success!
+            setIsUploading(false)
+            setShowSuccess(true)
 
         } catch (error: any) {
+            setIsUploading(false)
             console.error('Upload Error:', error)
             alert(`Upload failed: ${error.message}`)
-        } finally {
-            setIsUploading(false)
         }
     }
 
@@ -89,7 +93,7 @@ export default function AdminUploadPage() {
             </div>
 
             {/* Top Navigation Bar */}
-            <div className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md">
+            <div className={`relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md transition-opacity duration-300 ${isUploading || showSuccess ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => router.push('/admin/dashboard')}
@@ -116,13 +120,13 @@ export default function AdminUploadPage() {
             </div>
 
             {/* Main Content Area */}
-            <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
+            <div className={`relative z-10 container mx-auto px-4 py-8 pb-32 transition-opacity duration-300 ${isUploading || showSuccess ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                 <AnimatePresence mode="wait">
                     {currentStep === 1 && (
                         <PackDetailsStep
                             key="step1"
                             onNext={handlePackDetailsNext}
-                            initialData={packDetails}
+                            data={packDetails}
                         />
                     )}
                     {currentStep === 2 && (
@@ -139,19 +143,64 @@ export default function AdminUploadPage() {
                             files={files}
                             onBack={() => setCurrentStep(2)}
                             onSubmit={handleFinalSubmit}
+                            defaultCategory={packDetails?.title}
                         />
                     )}
                 </AnimatePresence>
             </div>
 
-            {/* Loading Overlay */}
-            {isUploading && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4" />
-                    <h2 className="text-xl font-bold text-white">Uploading Pack...</h2>
-                    <p className="text-white/40">Please wait while we process your files</p>
-                </div>
-            )}
+            {/* Global Overlay for Uploading/Success */}
+            <AnimatePresence>
+                {(isUploading || showSuccess) && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+                    >
+                        {isUploading ? (
+                            <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-full">
+                                <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6" />
+                                <h2 className="text-2xl font-bold text-white mb-2">Uploading Pack...</h2>
+                                <p className="text-white/40 text-center text-sm">Please wait while we process your files and create the pack.</p>
+                            </div>
+                        ) : showSuccess ? (
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl flex flex-col items-center max-w-md w-full relative overflow-hidden"
+                            >
+                                {/* Success Gradient Background */}
+                                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 to-emerald-500" />
+
+                                <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mb-6">
+                                    <Check className="w-10 h-10 text-green-500" />
+
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-2">Pack Published!</h2>
+                                <p className="text-white/40 text-center mb-8">
+                                    Your pack <strong className="text-white">"{packDetails?.title}"</strong> has been successfully uploaded and is now live.
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4 w-full">
+                                    <button
+                                        onClick={() => router.push('/browse')}
+                                        className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-medium rounded-xl transition-colors border border-white/5"
+                                    >
+                                        View in Browse
+                                    </button>
+                                    <button
+                                        onClick={() => router.push('/admin/dashboard')}
+                                        className="px-6 py-3 bg-white text-black hover:bg-gray-200 font-bold rounded-xl transition-colors"
+                                    >
+                                        Admin Dashboard
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ) : null}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

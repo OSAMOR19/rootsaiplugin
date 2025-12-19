@@ -13,5 +13,37 @@
       "2wjh61cn9",
       "opgyh1yey"
     ]
+  },
+  {
+    "title": "DUDU",
+    "genre": "Afrobeats",
+    "description": "AFROOOJUJUU",
+    "allowCash": false,
+    "id": "ds4g5av40",
+    "coverImage": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_1765945618467_DUDU_cover.png",
+    "sampleCount": 3,
+    "createdAt": "2025-12-17T04:27:03.508Z",
+    "samples": [
+      "lm1zod2ik",
+      "rge5yg58z",
+      "47iixfxxb"
+    ],
+    "featuredSampleId": "lm1zod2ik"
+  },
+  {
+    "title": "MY GUY",
+    "genre": "Afrobeats",
+    "description": "OKO",
+    "allowCash": false,
+    "id": "kqljdq8er",
+    "coverImage": "/placeholder.jpg",
+    "sampleCount": 3,
+    "createdAt": "2025-12-19T21:01:38.868Z",
+    "samples": [
+      "luu1csoes",
+      "ape3f28a4",
+      "l7r5gacyc"
+    ],
+    "featuredSampleId": "luu1csoes"
   }
 ]

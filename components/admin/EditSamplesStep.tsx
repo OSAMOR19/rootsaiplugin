@@ -12,6 +12,7 @@ interface EditSamplesStepProps {
     initialData?: SampleMetadata[]
     onBack: () => void
     onSubmit: (data: any) => void
+    defaultCategory?: string
 }
 
 interface SampleMetadata {
@@ -37,7 +38,7 @@ const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings",
 const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
 const timeSignatures = ["4/4", "6/8", "3/4"]
 
-export default function EditSamplesStep({ files, initialData, onBack, onSubmit }: EditSamplesStepProps) {
+export default function EditSamplesStep({ files, initialData, onBack, onSubmit, defaultCategory }: EditSamplesStepProps) {
     const [samples, setSamples] = useState<SampleMetadata[]>([])
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [playingId, setPlayingId] = useState<string | null>(null)
@@ -76,7 +77,7 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit }
                         drumType: "",
                         keywords: [],
                         // Inherit category from existing samples if available, or default
-                        category: initialData?.[0]?.category || "Uncategorized",
+                        category: initialData?.[0]?.category || defaultCategory || "Uncategorized",
                         selected: false,
                         featured: false
                     }
@@ -370,17 +371,8 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit }
                                     className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-white/30 transition-colors"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Key</label>
-                                <CustomDropdown
-                                    options={keys}
-                                    value={currentSample.key}
-                                    onChange={(val) => handleUpdate('key', val)}
-                                    placeholder="Select key"
-                                />
-                            </div>
 
-                            {/* Time Signature */}
+                            {/* Time Signature - Moved here replacing Key */}
                             <div>
                                 <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Time Sig</label>
                                 <CustomDropdown

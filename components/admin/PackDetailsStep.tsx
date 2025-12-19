@@ -50,7 +50,12 @@ export default function PackDetailsStep({ onNext, data }: PackDetailsStepProps) 
                 >
                     {coverPreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
+                        <img
+                            src={coverPreview}
+                            alt="Cover"
+                            className="w-full h-full object-cover"
+                            onError={() => setCoverPreview("")}
+                        />
                     ) : (
                         <div className="flex flex-col items-center text-white/20 group-hover:text-white/40 transition-colors">
                             <ImageIcon className="w-10 h-10 mb-2" />

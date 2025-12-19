@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
                     packId: packDetails.id, // Link to pack
                     uploadedAt: new Date().toISOString(),
                     storage: 'r2',
-                    imageUrl: coverImageUrl // Ensure sample has pack cover
+                    imageUrl: coverImageUrl, // Ensure sample has pack cover
+                    category: packDetails.title // Force category to match pack title
                 })
             } else {
                 console.warn(`File not found for sample: ${sampleMeta.name}`)
