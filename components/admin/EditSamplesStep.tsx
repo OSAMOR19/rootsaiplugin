@@ -13,6 +13,7 @@ interface EditSamplesStepProps {
     onBack: () => void
     onSubmit: (data: any) => void
     defaultCategory?: string
+    onChange?: (data: SampleMetadata[]) => void
 }
 
 interface SampleMetadata {
@@ -38,7 +39,7 @@ const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings",
 const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
 const timeSignatures = ["4/4", "6/8", "3/4"]
 
-export default function EditSamplesStep({ files, initialData, onBack, onSubmit, defaultCategory }: EditSamplesStepProps) {
+export default function EditSamplesStep({ files, initialData, onBack, onSubmit, defaultCategory, onChange }: EditSamplesStepProps) {
     const [samples, setSamples] = useState<SampleMetadata[]>([])
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [playingId, setPlayingId] = useState<string | null>(null)
@@ -235,6 +236,11 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
             handleUpdate('keywords', currentSample.keywords.filter(k => k !== keyword))
         }
     }
+
+    // Sync local state changes to parent (for persistence across steps)
+    useEffect(() => {
+        onChange?.(samples)
+    }, [samples, onChange])
 
     const currentSample = samples.find(s => s.id === selectedId)
     const selectedCount = samples.filter(s => s.selected).length
@@ -453,10 +459,19 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                 </button>
 
                 <button
-                    onClick={() => onSubmit(samples)}
-                    className="px-8 py-3 bg-white text-black hover:bg-green-400 rounded-full font-bold transition-all"
+                    onClick={async () => {
+                        const btn = document.activeElement as HTMLButtonElement
+                        if (btn) btn.disabled = true;
+                        btn.innerText = "Saving..."
+                        await onSubmit(samples)
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerText = "Save Changes"
+                        }
+                    }}
+                    className="px-8 py-3 bg-white text-black hover:bg-green-400 rounded-full font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Submit
+                    Save Changes
                 </button>
             </div>
         </motion.div >

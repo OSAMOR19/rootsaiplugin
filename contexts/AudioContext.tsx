@@ -58,17 +58,32 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const playTrack = (track: Track) => {
+  const playTrack = async (track: Track) => {
     if (audioRef.current) {
       if (currentTrack?.id === track.id) {
         togglePlay()
         return
       }
 
-      audioRef.current.src = track.audioUrl
-      audioRef.current.play()
-      setCurrentTrack(track)
-      setIsPlaying(true)
+      try {
+        audioRef.current.src = track.audioUrl
+        audioRef.current.load() // Ensure new source is loaded
+
+        const playPromise = audioRef.current.play()
+
+        if (playPromise !== undefined) {
+          await playPromise
+          setCurrentTrack(track)
+          setIsPlaying(true)
+        }
+      } catch (error) {
+        console.error("Playback failed:", error)
+        setIsPlaying(false)
+        // Verify if URL is valid or empty
+        if (!track.audioUrl) {
+          console.error("Track has no audio URL")
+        }
+      }
     }
   }
 
@@ -79,18 +94,26 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const resumeTrack = () => {
+  const resumeTrack = async () => {
     if (audioRef.current && currentTrack) {
-      audioRef.current.play()
-      setIsPlaying(true)
+      try {
+        const playPromise = audioRef.current.play()
+        if (playPromise !== undefined) {
+          await playPromise
+          setIsPlaying(true)
+        }
+      } catch (error) {
+        console.error("Resume failed:", error)
+        setIsPlaying(false)
+      }
     }
   }
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (isPlaying) {
       pauseTrack()
     } else {
-      resumeTrack()
+      await resumeTrack()
     }
   }
 

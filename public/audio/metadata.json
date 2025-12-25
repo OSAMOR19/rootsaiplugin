@@ -6,8 +6,7 @@
     "key": "",
     "timeSignature": "4/4",
     "genres": [
-      "Afrobeats",
-      "Amapiano"
+      "Afrobeats"
     ],
     "instruments": [
       "Drums",
@@ -22,7 +21,7 @@
     "audioUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766178087656_Manifxtsounds___Essence_Perc_Loop_104BPM.wav",
     "uploadedAt": "2025-12-19T21:01:31.442Z",
     "storage": "r2",
-    "imageUrl": "/placeholder.jpg"
+    "imageUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766622627532_cover.png"
   },
   {
     "id": "ape3f28a4",
@@ -30,7 +29,9 @@
     "tempo": "",
     "key": "",
     "timeSignature": "4/4",
-    "genres": [],
+    "genres": [
+      "Afrobeats"
+    ],
     "instruments": [],
     "drumType": "",
     "keywords": [],
@@ -41,7 +42,7 @@
     "audioUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766178091442_Manifxtsounds___High_Perc_Loop_116BPM.wav",
     "uploadedAt": "2025-12-19T21:01:34.504Z",
     "storage": "r2",
-    "imageUrl": "/placeholder.jpg"
+    "imageUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766622627532_cover.png"
   },
   {
     "id": "l7r5gacyc",
@@ -49,7 +50,9 @@
     "tempo": "",
     "key": "",
     "timeSignature": "4/4",
-    "genres": [],
+    "genres": [
+      "Afrobeats"
+    ],
     "instruments": [],
     "drumType": "",
     "keywords": [],
@@ -60,6 +63,6 @@
     "audioUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766178094504_Manifxtsounds___Infinity_Perc_Loop_102BPM.wav",
     "uploadedAt": "2025-12-19T21:01:38.865Z",
     "storage": "r2",
-    "imageUrl": "/placeholder.jpg"
+    "imageUrl": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766622627532_cover.png"
   }
 ]

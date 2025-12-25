@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Image as ImageIcon, Upload } from "lucide-react"
 import CustomDropdown from "@/components/CustomDropdown"
@@ -17,8 +17,23 @@ export default function PackDetailsStep({ onNext, data }: PackDetailsStepProps) 
     const [genre, setGenre] = useState(data?.genre || "")
     const [description, setDescription] = useState(data?.description || "")
     const [coverArt, setCoverArt] = useState<File | null>(data?.coverArt || null)
-    const [coverPreview, setCoverPreview] = useState<string>(data?.coverPreview || "")
+    const [coverPreview, setCoverPreview] = useState<string>(data?.coverPreview || data?.coverImage || "")
     const [allowCash, setAllowCash] = useState(data?.allowCash || false)
+
+    // Sync state if `data` prop changes (e.g. after async fetch)
+    useEffect(() => {
+        if (data) {
+            setTitle(data.name || data.title || "")
+            setGenre(data.genre || "")
+            setDescription(data.description || "")
+            // Only update coverPreview if it's a string URL (not when we have a pending file upload)
+            if (typeof data.coverPreview === 'string' && data.coverPreview) {
+                setCoverPreview(data.coverPreview)
+            } else if (data.coverImage) {
+                setCoverPreview(data.coverImage)
+            }
+        }
+    }, [data])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
 

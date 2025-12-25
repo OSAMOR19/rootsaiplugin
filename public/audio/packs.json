@@ -5,7 +5,7 @@
     "description": "iouboiub",
     "allowCash": false,
     "id": "ctfg24lrr",
-    "coverImage": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_1765595782737_okok_cover.png",
+    "coverImage": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_1765595782737_okok_cover.png",
     "sampleCount": 3,
     "createdAt": "2025-12-13T03:16:27.612Z",
     "samples": [
@@ -20,7 +20,7 @@
     "description": "AFROOOJUJUU",
     "allowCash": false,
     "id": "ds4g5av40",
-    "coverImage": "https://roots-samples.175367b0a4073c8d283294a8a4612373.r2.cloudflarestorage.com/packs_1765945618467_DUDU_cover.png",
+    "coverImage": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_1765945618467_DUDU_cover.png",
     "sampleCount": 3,
     "createdAt": "2025-12-17T04:27:03.508Z",
     "samples": [
@@ -33,10 +33,10 @@
   {
     "title": "MY GUY",
     "genre": "Afrobeats",
-    "description": "OKO",
+    "description": "OKO00000",
     "allowCash": false,
     "id": "kqljdq8er",
-    "coverImage": "/placeholder.jpg",
+    "coverImage": "https://pub-341adae064d44f7e82eea95b2797aca2.r2.dev/packs_MY_GUY_1766622627532_cover.png",
     "sampleCount": 3,
     "createdAt": "2025-12-19T21:01:38.868Z",
     "samples": [
@@ -44,6 +44,7 @@
       "ape3f28a4",
       "l7r5gacyc"
     ],
-    "featuredSampleId": "luu1csoes"
+    "featuredSampleId": "luu1csoes",
+    "name": "MY GUY"
   }
 ]

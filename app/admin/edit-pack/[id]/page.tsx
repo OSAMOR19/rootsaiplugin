@@ -217,14 +217,14 @@ export default function EditPackPage({ params }: PageProps) {
             <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
                 {currentStep === 1 && (
                     <PackDetailsStep
-                        data={{
+                        data={packDetails || {
                             name: categoryName,
-                            price: 20, // dummy
-                            coverImage: null, // need to fetch if possible or just ignore for now
-                            description: "",
-                            features: []
+                            title: categoryName,
+                            coverPreview: packSamples[0]?.imageUrl || "", // Fallback to sample image if available
+                            description: ""
                         }}
                         onNext={(data) => {
+                            setPackDetails(data) // Persist
                             if (data.title && data.title !== categoryName) {
                                 setCategoryName(data.title)
                                 // Also update local samples so they reflect the new category immediately
@@ -254,6 +254,7 @@ export default function EditPackPage({ params }: PageProps) {
                         onBack={() => setCurrentStep(2)}
                         onSubmit={handleSubmit}
                         defaultCategory={categoryName}
+                        onChange={(updatedSamples) => setPackSamples(updatedSamples)}
                     />
                 )}
             </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Search, Filter, MoreVertical, Trash2 } from "lucide-react"
 import { useSamples } from "@/hooks/useSamples"
+import { usePacks } from "@/hooks/usePacks"
 
 import { useRouter } from "next/navigation"
 
@@ -13,11 +14,13 @@ interface PackRow {
     type: string
     fileCount: number
     dateAdded: string
+    imageUrl?: string
 }
 
 export default function PacksPage() {
     const router = useRouter()
     const { samples, loading } = useSamples({ autoFetch: true })
+    const { packs: packsData, loading: packsLoading } = usePacks()
     const [packs, setPacks] = useState<PackRow[]>([])
     const [searchQuery, setSearchQuery] = useState("")
 
@@ -31,7 +34,8 @@ export default function PacksPage() {
                 acc[category] = {
                     count: 0,
                     lastDate: sample.uploadedAt || new Date().toISOString(),
-                    id: category // Using category name as ID for filtering
+                    id: category, // Using category name as ID for filtering
+                    firstImage: sample.imageUrl
                 }
             }
             acc[category].count++
@@ -40,23 +44,33 @@ export default function PacksPage() {
                 acc[category].lastDate = sample.uploadedAt
             }
             return acc
-        }, {} as Record<string, { count: number, lastDate: string, id: string }>)
+        }, {} as Record<string, { count: number, lastDate: string, id: string, firstImage?: string }>)
 
-        const packRows: PackRow[] = Object.entries(grouped).map(([category, data]) => ({
-            id: data.id,
-            name: category,
-            status: "Active",
-            type: "Samples",
-            fileCount: data.count,
-            dateAdded: new Date(data.lastDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            })
-        }))
+        const packRows: PackRow[] = Object.entries(grouped).map(([category, data]) => {
+            // Find specific pack metadata (cover image)
+            const packMeta = packsData.find(p => p.title === category || p.name === category)
+            // Priority: Pack Metadata Cover -> First Sample Image -> Placeholder
+            const coverImage = (packMeta?.coverImage && packMeta.coverImage !== '/placeholder.jpg' ? packMeta.coverImage : null) ||
+                (data.firstImage && data.firstImage !== '/placeholder.jpg' ? data.firstImage : null) ||
+                '/placeholder.jpg'
+
+            return {
+                id: data.id,
+                name: category,
+                status: "Active",
+                type: "Samples",
+                fileCount: data.count,
+                dateAdded: new Date(data.lastDate).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                }),
+                imageUrl: coverImage
+            }
+        })
 
         setPacks(packRows)
-    }, [samples, loading])
+    }, [samples, loading, packsData])
 
     const filteredPacks = packs.filter(pack =>
         pack.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -150,7 +164,18 @@ export default function PacksPage() {
                                 className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/5 transition-colors group cursor-pointer"
                             >
                                 <div className="col-span-4 flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded bg-gradient-to-br from-gray-800 to-gray-700 flex-shrink-0" />
+                                    <div className="w-10 h-10 rounded bg-gradient-to-br from-gray-800 to-gray-700 flex-shrink-0 overflow-hidden">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={pack.imageUrl || '/placeholder.jpg'}
+                                            alt={pack.name}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement
+                                                target.src = '/placeholder.jpg'
+                                            }}
+                                        />
+                                    </div>
                                     <span className="font-medium text-white">{pack.name}</span>
                                 </div>
                                 <div className="col-span-2">

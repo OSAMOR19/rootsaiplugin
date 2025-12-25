@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Play, Pause, Heart, Plus, Download, Search, ArrowLeft, MoreVertical } from "lucide-react"
 import { motion } from "framer-motion"
 import { useSamples } from "@/hooks/useSamples"
+import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
@@ -20,13 +21,17 @@ export default function PackDetailPage({ params }: PageProps) {
   const resolvedParams = use(params)
   const categoryName = typeof resolvedParams.category === 'string' ? decodeURIComponent(resolvedParams.category) : String(resolvedParams.category)
 
-  const { samples, loading } = useSamples({ autoFetch: true })
+  const { samples, loading: samplesLoading } = useSamples({ autoFetch: true })
+  const { packs, loading: packsLoading, getPackByTitle } = usePacks()
   const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
   const [selectedKey, setSelectedKey] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("popular")
+
+  // Find the current pack details
+  const currentPack = getPackByTitle(categoryName)
 
   // Filter samples by category
   const categorySamples = samples.filter(s => s.category === categoryName)
@@ -50,20 +55,27 @@ export default function PackDetailPage({ params }: PageProps) {
   const uniqueBPMs = [...new Set(categorySamples.map(s => s.bpm).filter(Boolean))].sort((a, b) => a! - b!)
   const uniqueKeys = [...new Set(categorySamples.map(s => formatKey(s.key)).filter(k => k !== '--'))].sort()
 
-  // Pack image (use first sample's image or default fallback)
+  // Pack image (use pack cover image, or featured sample's image, or fallback)
   const fallbackIndex = categoryName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
 
-  // Pack image logic:
-  // 1. Try to find a featured sample that HAS an image
-  // 2. Fall back to the first sample with an image
-  // 3. Fall back to the deterministic hash-based image
   const featuredSampleWithImage = categorySamples.find(s => s.featured && s.imageUrl && s.imageUrl !== '/placeholder.jpg')
   const firstSampleWithImage = categorySamples.find(s => s.imageUrl && s.imageUrl !== '/placeholder.jpg')
 
-  const packImage = (featuredSampleWithImage?.imageUrl) || (firstSampleWithImage?.imageUrl) || fallbackImage || '/placeholder.jpg'
+  // Priority: 1. Pack Cover (from metadata) 2. Featured sample 3. First sample 4. Fallback
+  const packImage = (currentPack?.coverImage && currentPack.coverImage !== '/placeholder.jpg' ? currentPack.coverImage : null) ||
+    (featuredSampleWithImage?.imageUrl) ||
+    (firstSampleWithImage?.imageUrl) ||
+    fallbackImage ||
+    '/placeholder.jpg'
 
   const handlePlayClick = (sample: any) => {
+    const audioUrl = sample.audioUrl || sample.url
+    if (!audioUrl) {
+      console.error("No audio URL for sample:", sample)
+      return
+    }
+
     if (currentTrack?.id === sample.id && isPlaying) {
       pauseTrack()
     } else {
@@ -71,12 +83,14 @@ export default function PackDetailPage({ params }: PageProps) {
         id: sample.id,
         title: sample.name,
         artist: sample.category,
-        audioUrl: sample.audioUrl || sample.url,
+        audioUrl: audioUrl,
         imageUrl: packImage, // Use the consistent pack image
         duration: sample.duration || '0:00'
       })
     }
   }
+
+  const loading = samplesLoading || packsLoading
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -110,9 +124,9 @@ export default function PackDetailPage({ params }: PageProps) {
           {/* Pack Details */}
           <div className="flex-1">
             <p className="text-sm text-green-400 mb-2">Sample Pack</p>
-            <h1 className="text-5xl font-bold mb-4">{categoryName}</h1>
+            <h1 className="text-5xl font-bold mb-4">{currentPack?.title || categoryName}</h1>
             <p className="text-white/60 mb-6">
-              {categoryName} • {categorySamples.length} Samples
+              {currentPack?.title || categoryName} • {currentPack?.genre ? `${currentPack.genre} • ` : ''} {categorySamples.length} Samples
             </p>
 
             {/* Action Buttons */}
@@ -134,10 +148,8 @@ export default function PackDetailPage({ params }: PageProps) {
 
         {/* Description */}
         <div className="mb-8 max-w-4xl">
-          <p className="text-white/60 leading-relaxed">
-            Dive into the vibrant world of {categoryName} with this meticulously
-            curated pack for enthusiasts and producers alike. This dynamic collection
-            features {categorySamples.length} carefully selected samples.
+          <p className="text-white/60 leading-relaxed whitespace-pre-wrap">
+            {currentPack?.description || `Dive into the vibrant world of ${categoryName} with this meticulously curated pack for enthusiasts and producers alike. This dynamic collection features ${categorySamples.length} carefully selected samples.`}
           </p>
         </div>
 
