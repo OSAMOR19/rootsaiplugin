@@ -116,7 +116,7 @@ export default function PackDetailPage({ params }: PageProps) {
               className="w-full h-full object-cover"
               onError={(e) => {
                 const target = e.target as HTMLImageElement
-                target.src = sampleImages[0]
+                target.src = '/placeholder.jpg'
               }}
             />
           </div>

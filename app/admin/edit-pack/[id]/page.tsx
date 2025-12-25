@@ -170,6 +170,10 @@ export default function EditPackPage({ params }: PageProps) {
             if (!response.ok) throw new Error('Update failed')
 
             setShowSuccessModal(true)
+            // Force a hard reload after a short delay to ensure UI updates with new image
+            setTimeout(() => {
+                window.location.reload()
+            }, 1500)
 
         } catch (error) {
             console.error('Update error:', error)
