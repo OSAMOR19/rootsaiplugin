@@ -36,28 +36,34 @@ export default function EditPackPage({ params }: PageProps) {
 
     useEffect(() => {
         const initData = async () => {
-            // Only run initialization ONCE when data is ready and we haven't loaded yet
-            if (!loading && allSamples.length > 0 && isLoadingData) {
+            // Wait for samples to finish loading
+            if (loading) return
+
+            // If we are still "loading data" for this specific page logic
+            if (isLoadingData) {
                 // Filter samples belonging to this pack/category
+                // If allSamples is empty, filtered will just be empty, preventing the deadlock
                 const filtered = allSamples.filter(s => s.category === categoryName)
 
-                // Fetch pack metadata (Description, Cover, etc) from packs.json to ensure we don't overwrite with empty
+                // Fetch pack metadata (Description, Cover, etc) from packs.json
                 let existingPackDetails: any = null
                 try {
                     const packsRes = await fetch('/audio/packs.json')
                     if (packsRes.ok) {
                         const packsData = await packsRes.json()
+                        // Find matching pack
                         existingPackDetails = packsData.find((p: any) => p.name === categoryName || p.title === categoryName)
                     }
                 } catch (err) {
                     console.error("Could not fetch packs.json", err)
                 }
 
-                const converted = filtered.map(s => {
-                    // Create a dummy file object to satisfy the interface
-                    const dummyFile = new File([""], s.filename || s.name, { type: "audio/wav" })
-                    Object.defineProperty(dummyFile, 'r2_url', { value: s.audioUrl || s.url }) // custom prop to track url
+                // If no samples AND no pack details found, we might want to alert or redirect
+                // But for now let's allow editing an empty pack (to add files)
 
+                const converted = filtered.map(s => {
+                    const dummyFile = new File([""], s.filename || s.name, { type: "audio/wav" })
+                    Object.defineProperty(dummyFile, 'r2_url', { value: s.audioUrl || s.url })
                     return {
                         id: s.id,
                         file: dummyFile,
@@ -78,14 +84,13 @@ export default function EditPackPage({ params }: PageProps) {
                 setPackSamples(converted)
                 setFiles(converted.map(s => s.file))
 
-                // Initialize packDetails with REAL data from packs.json or fallbacks
                 setPackDetails({
                     title: categoryName,
                     name: categoryName,
                     genre: existingPackDetails?.genre || filtered[0]?.genres?.[0] || "",
                     description: existingPackDetails?.description || "",
-                    coverPreview: existingPackDetails?.coverImage || filtered[0]?.imageUrl || "", // Existing URL
-                    coverArt: null // No new file yet
+                    coverPreview: existingPackDetails?.coverImage || filtered[0]?.imageUrl || "",
+                    coverArt: null
                 })
 
                 setIsLoadingData(false)

@@ -48,7 +48,7 @@ export default function PacksPage() {
 
         const packRows: PackRow[] = Object.entries(grouped).map(([category, data]) => {
             // Find specific pack metadata (cover image)
-            const packMeta = packsData.find(p => p.title === category || p.name === category)
+            const packMeta = packsData.find((p: any) => p.title === category || p.name === category)
             // Priority: Pack Metadata Cover -> First Sample Image -> Placeholder
             const coverImage = (packMeta?.coverImage && packMeta.coverImage !== '/placeholder.jpg' ? packMeta.coverImage : null) ||
                 (data.firstImage && data.firstImage !== '/placeholder.jpg' ? data.firstImage : null) ||
