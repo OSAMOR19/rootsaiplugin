@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from "@/lib/supabase"
 
 export interface Sample {
   id: string
@@ -14,12 +15,7 @@ export interface Sample {
   timeSignature?: string
   storage?: string
   uploadedAt?: string
-  energy?: number
-  danceability?: number
-  valence?: number
-  moodTag?: string
   featured?: boolean
-  artist?: string
   genres?: string[]
   instruments?: string[]
   drumType?: string
@@ -37,17 +33,10 @@ export interface UseSamplesResult {
   error: string | null
   refetch: () => Promise<void>
   filterByCategory: (category: string) => Sample[]
-  filterByMood: (mood: string) => Sample[]
-  filterByBPM: (minBpm: number, maxBpm: number) => Sample[]
 }
 
-/**
- * Hook to fetch and manage samples from metadata.json
- * Works with both local and R2-stored samples
- */
 export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
   const { category, autoFetch = true } = options
-
   const [samples, setSamples] = useState<Sample[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,85 +44,59 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
   const fetchSamples = async () => {
     setLoading(true)
     setError(null)
-
     try {
-      const response = await fetch('/audio/metadata.json')
+      let query = supabase.from('samples').select('*').order('created_at', { ascending: false })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch samples: ${response.statusText}`)
+      // Optional category filter at database level
+      if (category) {
+        // query = query.eq('category', category) 
+        // Don't filter at DB level yet since category names might need normalization
       }
 
-      const data = await response.json()
+      const { data, error } = await query
 
-      // Normalize the data to ensure consistent format
-      const normalizedSamples: Sample[] = data.map((item: any) => ({
-        id: item.id || Math.random().toString(36).substr(2, 9),
-        name: item.name || item.filename?.replace(/\.[^/.]+$/, '') || 'Untitled',
-        filename: item.filename || '',
-        bpm: item.bpm || 120,
-        key: item.key || 'C',
-        category: item.category || 'Uncategorized',
-        audioUrl: item.audioUrl || item.url || '',
-        imageUrl: item.imageUrl || '/placeholder.jpg',
-        duration: item.duration || '0:00',
-        timeSignature: item.timeSignature || '4/4',
-        storage: item.storage || 'local',
-        uploadedAt: item.uploadedAt,
-        energy: item.energy,
-        danceability: item.danceability,
-        valence: item.valence,
-        moodTag: item.moodTag,
-        featured: item.featured,
-        artist: item.artist,
-        genres: item.genres || [],
-        instruments: item.instruments || [],
-        drumType: item.drumType || '',
-        keywords: item.keywords || [],
-      }))
+      if (error) throw error
 
-      // Filter by category if specified
-      const filtered = category
-        ? normalizedSamples.filter(s => s.category === category)
-        : normalizedSamples
-
-      setSamples(filtered)
+      if (data) {
+        const mappedSamples: Sample[] = data.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          filename: s.filename,
+          bpm: s.bpm,
+          key: s.key,
+          category: s.category,
+          audioUrl: s.audio_url,
+          url: s.audio_url, // Alias for legacy support
+          imageUrl: s.image_url,
+          duration: s.duration,
+          timeSignature: s.time_signature,
+          uploadedAt: s.created_at,
+          featured: s.is_featured,
+          genres: s.genres || [],
+          instruments: s.instruments || [],
+          drumType: s.drum_type,
+          keywords: s.keywords || [],
+          storage: 'supabase', // Mark as supabase source
+        }))
+        setSamples(mappedSamples)
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
-      setError(errorMessage)
-      console.error('Error fetching samples:', err)
+      console.error("Failed to fetch samples:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch samples")
     } finally {
       setLoading(false)
     }
   }
 
-  // Filter functions
-  const filterByCategory = (cat: string): Sample[] => {
-    return samples.filter(s => s.category === cat)
+  const filterByCategory = (cat: string) => {
+    return samples.filter(s => s.category?.toLowerCase() === cat.toLowerCase())
   }
 
-  const filterByMood = (mood: string): Sample[] => {
-    return samples.filter(s => s.moodTag === mood)
-  }
-
-  const filterByBPM = (minBpm: number, maxBpm: number): Sample[] => {
-    return samples.filter(s => s.bpm && s.bpm >= minBpm && s.bpm <= maxBpm)
-  }
-
-  // Auto-fetch on mount
   useEffect(() => {
     if (autoFetch) {
       fetchSamples()
     }
   }, [autoFetch, category])
 
-  return {
-    samples,
-    loading,
-    error,
-    refetch: fetchSamples,
-    filterByCategory,
-    filterByMood,
-    filterByBPM,
-  }
+  return { samples, loading, error, refetch: fetchSamples, filterByCategory }
 }
-

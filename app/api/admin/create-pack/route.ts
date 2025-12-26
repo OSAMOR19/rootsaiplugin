@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile, writeFile } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
-import { uploadFile } from '@/lib/r2'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const config = {
     api: {
@@ -16,8 +13,6 @@ export async function POST(request: NextRequest) {
         const coverImage = formData.get('coverImage') as File
         const packDetailsStr = formData.get('packDetails') as string
         const samplesMetadataStr = formData.get('samplesMetadata') as string
-
-        // Get all audio files
         const audioFiles = formData.getAll('files') as File[]
 
         if (!packDetailsStr || !samplesMetadataStr) {
@@ -30,100 +25,117 @@ export async function POST(request: NextRequest) {
         const packDetails = JSON.parse(packDetailsStr)
         const samplesMetadata = JSON.parse(samplesMetadataStr)
 
-        // 1. Upload Cover Image
+        // 1. Upload Cover Image to Supabase Storage
         let coverImageUrl = '/placeholder.jpg'
         if (coverImage) {
             const timestamp = Date.now()
             const safeNameBase = packDetails.title.replace(/[^a-z0-9]/gi, '_')
             const imageExt = coverImage.name.split('.').pop()
-            const safeImageFilename = `packs/${timestamp}_${safeNameBase}_cover.${imageExt}`
+            const imagePath = `packs/${timestamp}_${safeNameBase}_cover.${imageExt}`
 
-            console.log(`Uploading pack cover to R2: ${safeImageFilename}`)
-            const imageUploadResult = await uploadFile(
-                Buffer.from(await coverImage.arrayBuffer()),
-                safeImageFilename,
-                coverImage.type || 'image/jpeg'
-            )
-            coverImageUrl = imageUploadResult.url
+            console.log(`Uploading cover to Supabase: ${imagePath}`)
+            const { data: uploadData, error: uploadError } = await supabaseAdmin
+                .storage
+                .from('audio')
+                .upload(imagePath, coverImage, {
+                    contentType: coverImage.type || 'image/jpeg',
+                    upsert: true
+                })
+
+            if (uploadError) throw uploadError
+
+            // Get Public URL
+            const { data: publicUrlData } = supabaseAdmin
+                .storage
+                .from('audio')
+                .getPublicUrl(imagePath)
+
+            coverImageUrl = publicUrlData.publicUrl
         }
 
-        // 2. Process Samples & Upload Audio
+        // 2. Insert Pack into DB
+        const { data: packData, error: packError } = await supabaseAdmin
+            .from('packs')
+            .insert({
+                title: packDetails.title,
+                genre: packDetails.genre,
+                description: packDetails.description,
+                cover_image: coverImageUrl,
+                allow_cash: packDetails.allowCash || false,
+                price: 20
+            })
+            .select() // return created object
+            .single()
+
+        if (packError) throw packError
+
+        console.log("Pack created in DB:", packData.id)
+
+        // 3. Upload Audio Files & Insert Samples
         const processedSamples = []
 
         for (const sampleMeta of samplesMetadata) {
-            // Find the corresponding file
-            // We assume sampleMeta.name or some ID links to the file. 
-            // In EditSamplesStep, we used `sample.file` but we can't pass File objects in JSON.
-            // We'll match by filename.
             const audioFile = audioFiles.find(f => f.name === sampleMeta.fileName)
 
             if (audioFile) {
                 const timestamp = Date.now()
                 const safeNameBase = sampleMeta.name.replace(/[^a-z0-9]/gi, '_')
                 const audioExt = audioFile.name.split('.').pop()
-                const categoryFolder = packDetails.title.replace(/[^a-z0-9]/gi, '_') // Use pack title as folder
-                const safeAudioFilename = `packs/${categoryFolder}/${timestamp}_${safeNameBase}.${audioExt}`
+                const audioPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/${timestamp}_${safeNameBase}.${audioExt}`
 
-                console.log(`Uploading sample to R2: ${safeAudioFilename}`)
-                const audioUploadResult = await uploadFile(
-                    Buffer.from(await audioFile.arrayBuffer()),
-                    safeAudioFilename,
-                    audioFile.type || 'audio/wav'
-                )
+                console.log(`Uploading sample to Supabase: ${audioPath}`)
 
-                processedSamples.push({
-                    ...sampleMeta,
-                    id: Math.random().toString(36).substr(2, 9),
-                    audioUrl: audioUploadResult.url,
-                    packId: packDetails.id, // Link to pack
-                    uploadedAt: new Date().toISOString(),
-                    storage: 'r2',
-                    imageUrl: coverImageUrl, // Ensure sample has pack cover
-                    category: packDetails.title // Force category to match pack title
-                })
-            } else {
-                console.warn(`File not found for sample: ${sampleMeta.name}`)
+                const { error: audioUploadError } = await supabaseAdmin
+                    .storage
+                    .from('audio')
+                    .upload(audioPath, audioFile, {
+                        contentType: audioFile.type || 'audio/wav',
+                        upsert: true
+                    })
+
+                if (audioUploadError) {
+                    console.error("Audio upload failed", audioUploadError)
+                    continue
+                }
+
+                const { data: publicUrlData } = supabaseAdmin
+                    .storage
+                    .from('audio')
+                    .getPublicUrl(audioPath)
+
+                const sampleRecord = {
+                    name: sampleMeta.name,
+                    filename: sampleMeta.fileName,
+                    category: packDetails.title,
+                    bpm: sampleMeta.tempo ? parseInt(sampleMeta.tempo) : 0,
+                    key: sampleMeta.key || '',
+                    time_signature: sampleMeta.timeSignature || '4/4',
+                    genres: sampleMeta.genres || [],
+                    instruments: sampleMeta.instruments || [],
+                    drum_type: sampleMeta.drumType || '',
+                    keywords: sampleMeta.keywords || [],
+                    audio_url: publicUrlData.publicUrl,
+                    image_url: coverImageUrl,
+                    is_featured: sampleMeta.featured || false,
+                    duration: '0:00' // Placeholder
+                }
+
+                processedSamples.push(sampleRecord)
             }
         }
 
-        // 3. Update Metadata Files
-        const metadataPath = path.join(process.cwd(), 'public', 'audio', 'metadata.json')
-        const packsPath = path.join(process.cwd(), 'public', 'audio', 'packs.json')
+        if (processedSamples.length > 0) {
+            const { error: samplesError } = await supabaseAdmin
+                .from('samples')
+                .insert(processedSamples)
 
-        // Update Samples Metadata
-        let metadata: any[] = []
-        if (existsSync(metadataPath)) {
-            const content = await readFile(metadataPath, 'utf-8')
-            metadata = JSON.parse(content)
+            if (samplesError) throw samplesError
         }
-        metadata.push(...processedSamples)
-        await writeFile(metadataPath, JSON.stringify(metadata, null, 2))
-
-        // Update Packs Metadata
-        let packs: any[] = []
-        if (existsSync(packsPath)) {
-            const content = await readFile(packsPath, 'utf-8')
-            packs = JSON.parse(content)
-        }
-
-        const newPack = {
-            ...packDetails,
-            id: Math.random().toString(36).substr(2, 9),
-            coverImage: coverImageUrl,
-            sampleCount: processedSamples.length,
-            createdAt: new Date().toISOString(),
-            samples: processedSamples.map(s => s.id), // Store IDs
-            featuredSampleId: processedSamples.find(s => s.featured)?.id || processedSamples[0]?.id // Default to first if none featured
-        }
-
-        packs.push(newPack)
-        await writeFile(packsPath, JSON.stringify(packs, null, 2))
 
         return NextResponse.json({
             success: true,
-            message: 'Pack created successfully',
-            pack: newPack,
-            samplesCount: processedSamples.length
+            message: 'Pack created successfully in Supabase',
+            pack: packData
         })
 
     } catch (error: any) {

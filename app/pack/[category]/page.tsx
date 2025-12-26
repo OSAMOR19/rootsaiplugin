@@ -290,7 +290,7 @@ export default function PackDetailPage({ params }: PageProps) {
                         {sample.name}
                       </p>
                       <p className="text-xs text-white/40 truncate">
-                        {sample.moodTag ? `${sample.moodTag} • ` : ''}{sample.category}
+                        {sample.category}
                       </p>
                     </div>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from "@/lib/supabase"
 
 export interface Pack {
     id: string
@@ -11,6 +12,8 @@ export interface Pack {
     createdAt?: string
     samples?: string[]
     featuredSampleId?: string
+    // Added for compatibility with legacy code
+    name?: string
 }
 
 export interface UsePacksResult {
@@ -31,19 +34,27 @@ export function usePacks(): UsePacksResult {
         setError(null)
 
         try {
-            const response = await fetch('/audio/packs.json')
+            const { data, error } = await supabase
+                .from('packs')
+                .select('*')
+                .order('created_at', { ascending: false })
 
-            if (!response.ok) {
-                // If file doesn't exist yet, we can return empty array
-                if (response.status === 404) {
-                    setPacks([])
-                    return
-                }
-                throw new Error(`Failed to fetch packs: ${response.statusText}`)
+            if (error) throw error
+
+            if (data) {
+                const mappedPacks: Pack[] = data.map((p: any) => ({
+                    id: p.id,
+                    title: p.title,
+                    name: p.title, // Map title to name for backward compatibility
+                    genre: p.genre,
+                    description: p.description,
+                    coverImage: p.cover_image,
+                    allowCash: p.allow_cash,
+                    sampleCount: 0, // Need to implement sample counting
+                    createdAt: p.created_at
+                }))
+                setPacks(mappedPacks)
             }
-
-            const data = await response.json()
-            setPacks(data)
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
             setError(errorMessage)

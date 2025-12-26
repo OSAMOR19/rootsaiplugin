@@ -6,6 +6,7 @@ import EditSamplesStep from "@/components/admin/EditSamplesStep"
 import PackDetailsStep from "@/components/admin/PackDetailsStep"
 import FilesUploadStep from "@/components/admin/FilesUploadStep"
 import { useSamples } from "@/hooks/useSamples"
+import { supabase } from "@/lib/supabase"
 import { X, Check } from "lucide-react"
 
 interface PageProps {
@@ -45,17 +46,26 @@ export default function EditPackPage({ params }: PageProps) {
                 // If allSamples is empty, filtered will just be empty, preventing the deadlock
                 const filtered = allSamples.filter(s => s.category === categoryName)
 
-                // Fetch pack metadata (Description, Cover, etc) from packs.json
+                // Fetch pack metadata (Description, Cover, etc) from Supabase
                 let existingPackDetails: any = null
                 try {
-                    const packsRes = await fetch('/audio/packs.json')
-                    if (packsRes.ok) {
-                        const packsData = await packsRes.json()
-                        // Find matching pack
-                        existingPackDetails = packsData.find((p: any) => p.name === categoryName || p.title === categoryName)
+                    const { data, error } = await supabase
+                        .from('packs')
+                        .select('*')
+                        .or(`title.eq.${categoryName},title.eq.${decodeURIComponent(packId)}`)
+                        .single()
+
+                    if (data) {
+                        existingPackDetails = {
+                            ...data,
+                            coverImage: data.cover_image,
+                            title: data.title,
+                            genre: data.genre,
+                            description: data.description
+                        }
                     }
                 } catch (err) {
-                    console.error("Could not fetch packs.json", err)
+                    console.error("Could not fetch pack details", err)
                 }
 
                 // If no samples AND no pack details found, we might want to alert or redirect
