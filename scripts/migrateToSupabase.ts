@@ -1,5 +1,5 @@
 
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import packsData from '@/public/audio/packs.json'
 import samplesData from '@/public/audio/metadata.json'
 
@@ -31,7 +31,7 @@ export async function migrateData() {
     for (let i = 0; i < samplesData.length; i += chunkSize) {
         const chunk = samplesData.slice(i, i + chunkSize)
 
-        const validSamples = chunk.map(sample => ({
+        const validSamples = chunk.map((sample: any) => ({
             name: sample.name,
             filename: sample.filename,
             category: sample.category || 'Uncategorized', // This links to pack title
