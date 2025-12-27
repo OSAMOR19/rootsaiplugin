@@ -100,7 +100,7 @@ export default function RecommendedSection() {
         <div className="mb-12">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h2 className="text-xl font-bold text-white">Recommended for You</h2>
+                    <h2 className="text-xl font-bold text-white">Curated for You</h2>
                     <p className="text-sm text-white/60 mt-1">Packs selected just for you, based on your recent purchases. Updated daily.</p>
                 </div>
                 <div className="flex items-center gap-2">

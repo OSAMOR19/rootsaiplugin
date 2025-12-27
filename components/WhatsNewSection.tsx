@@ -48,7 +48,7 @@ export default function WhatsNewSection() {
         <div className="mb-12">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h2 className="text-xl font-bold text-white">What's New This Week</h2>
+                    <h2 className="text-xl font-bold text-white">Fresh Drops</h2>
                     <p className="text-sm text-white/60 mt-1">Check out brand-new sample packs newly added to the library.</p>
                 </div>
                 <div className="flex items-center gap-2">

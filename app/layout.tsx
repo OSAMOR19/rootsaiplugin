@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Providers } from "@/components/Providers"
+import LayoutWrapper from "@/components/LayoutWrapper"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -11,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "ROOTS - Creative Sample Co-Producer",
   description: "AI-powered sample discovery and music production tool",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -29,7 +30,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Providers>
-            {children}
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
             <Toaster />
           </Providers>
         </ThemeProvider>

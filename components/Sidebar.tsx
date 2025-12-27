@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, Library, User, Settings, GraduationCap } from "lucide-react"
+import { Home, Search, Library, Settings, Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import SearchModal from "./SearchModal"
 
@@ -13,12 +13,12 @@ export default function Sidebar() {
 
   const navItems = [
     { icon: Home, href: "/", label: "Home" },
-    { icon: Library, href: "/library", label: "Library" },
-    { icon: User, href: "/profile", label: "Profile" },
+    { icon: Search, href: "/browse", label: "Explore" },
+    { icon: Library, href: "/sounds", label: "Sounds" },
+    { icon: Heart, href: "/favourite", label: "Favourite" },
   ]
 
   const bottomItems = [
-    { icon: GraduationCap, href: "/learn", label: "Learn" },
     { icon: Settings, href: "/settings", label: "Settings" },
   ]
 
@@ -49,7 +49,7 @@ export default function Sidebar() {
             </Link>
           )
         })}
-        
+
         {/* Search Button (Opens Modal) */}
         <button
           onClick={() => setIsSearchOpen(true)}
@@ -59,7 +59,7 @@ export default function Sidebar() {
           <Search className="w-6 h-6" />
         </button>
       </nav>
-      
+
       {/* Search Modal */}
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 

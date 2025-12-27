@@ -6,7 +6,7 @@ import WhatsNewSection from "@/components/WhatsNewSection"
 
 export default function BrowsePage() {
   return (
-    <div className="max-w-7xl mx-auto pb-20">
+    <div className="w-full h-full p-6 text-white bg-black">
       <BrowseHeader />
 
       <RecommendedSection />
