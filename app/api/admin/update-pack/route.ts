@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { parseBuffer } from 'music-metadata'
 
 export async function POST(request: Request) {
     try {
@@ -139,6 +140,22 @@ export async function POST(request: Request) {
                     const audioPath = `samples/${newCategoryName.replace(/[^a-z0-9]/gi, '_')}/${timestamp}_${safeNameBase}.${audioExt}`
 
                     console.log(`Uploading new sample to Supabase: ${audioPath}`)
+
+                    // Calculate duration
+                    const arrayBuffer = await audioFile.arrayBuffer()
+                    const buffer = Buffer.from(arrayBuffer)
+                    let duration = '0:00'
+                    try {
+                        const metadata = await parseBuffer(buffer)
+                        if (metadata.format.duration) {
+                            const minutes = Math.floor(metadata.format.duration / 60)
+                            const seconds = Math.floor(metadata.format.duration % 60)
+                            duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse audio duration", e)
+                    }
+
                     const { error: uploadError } = await supabaseAdmin
                         .storage
                         .from('audio')
@@ -168,7 +185,7 @@ export async function POST(request: Request) {
                         category: newCategoryName,
                         audio_url: publicUrlData.publicUrl,
                         image_url: finalImageUrl,
-                        duration: '0:00',
+                        duration: duration,
                         time_signature: sampleMeta.timeSignature || "4/4",
                         is_featured: sampleMeta.featured || false
                     })

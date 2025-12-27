@@ -1,43 +1,26 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
+import { ChevronLeft, ChevronRight, Disc } from "lucide-react"
 import { motion } from "framer-motion"
-import { useSamples } from "@/hooks/useSamples"
-import { useAudio } from "@/contexts/AudioContext"
-
-// Reusing images for consistency, or we could have a separate set
-import { SAMPLE_IMAGES } from "@/constants/images"
-
-// Reusing images for consistency
-const sampleImages = SAMPLE_IMAGES
+import { usePacks } from "@/hooks/usePacks"
+import { useRouter } from "next/navigation"
 
 export default function WhatsNewSection() {
+    const router = useRouter()
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(true)
-    const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
-    const { samples, loading } = useSamples({ autoFetch: true })
+    const { packs, loading } = usePacks()
 
-    // Get recently uploaded samples
-    // First try to get samples with uploadedAt field (new uploads)
-    // If none exist, show the last 10 samples from the array
-    const samplesWithDate = samples.filter(s => s.uploadedAt)
-    const newSamples = samplesWithDate.length > 0
-        ? samplesWithDate
-            .sort((a, b) => new Date(b.uploadedAt!).getTime() - new Date(a.uploadedAt!).getTime())
-            .slice(0, 10)
-        : samples.slice(-10).reverse() // Get last 10 samples (most recent)
-
-    // Helper to get sample image with fallback
-    const getSampleImage = (sample: any) => {
-        if (sample.imageUrl && sample.imageUrl !== '/placeholder.jpg') {
-            return sample.imageUrl
-        }
-        const category = sample.category || sample.name || 'default'
-        const hash = category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
-        return sampleImages[hash % sampleImages.length]
-    }
+    // Get recently uploaded packs
+    const newPacks = [...packs]
+        .sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA
+        })
+        .slice(0, 10)
 
     const checkScroll = () => {
         if (scrollContainerRef.current) {
@@ -57,19 +40,8 @@ export default function WhatsNewSection() {
         }
     }
 
-    const handlePlayClick = (sample: any, imageUrl: string) => {
-        if (currentTrack?.id === sample.id && isPlaying) {
-            pauseTrack()
-        } else {
-            playTrack({
-                id: sample.id,
-                title: sample.name,
-                artist: sample.artist || sample.category,
-                audioUrl: sample.audioUrl || sample.url, // Support both R2 and local URLs
-                imageUrl: sample.imageUrl || imageUrl, // Use uploaded image or fallback
-                duration: sample.duration || '0:00'
-            })
-        }
+    const handlePackClick = (packTitle: string) => {
+        router.push(`/pack/${encodeURIComponent(packTitle)}`)
     }
 
     return (
@@ -77,7 +49,7 @@ export default function WhatsNewSection() {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-xl font-bold text-white">What's New This Week</h2>
-                    <p className="text-sm text-white/60 mt-1">Check out brand-new loops and one-shots from newly released sample packs.</p>
+                    <p className="text-sm text-white/60 mt-1">Check out brand-new sample packs newly added to the library.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -106,54 +78,50 @@ export default function WhatsNewSection() {
                 {loading ? (
                     <div className="flex gap-4">
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="flex-shrink-0 w-64 h-48 bg-white/5 rounded-lg animate-pulse" />
+                            <div key={i} className="flex-shrink-0 w-64 h-64 bg-white/5 rounded-lg animate-pulse" />
                         ))}
                     </div>
-                ) : newSamples.length === 0 ? (
+                ) : newPacks.length === 0 ? (
                     <div className="text-white/40 text-center py-12 w-full">
-                        No samples yet. Upload some samples to see them here!
+                        No packs yet.
                     </div>
-                ) : newSamples.map((sample, index) => {
-                    const isCurrent = currentTrack?.id === sample.id
-                    const isCurrentPlaying = isCurrent && isPlaying
-                    const imageUrl = getSampleImage(sample)
-
+                ) : newPacks.map((pack) => {
                     return (
                         <motion.div
-                            key={sample.id}
+                            key={pack.id}
                             className="flex-shrink-0 w-64 group cursor-pointer"
                             whileHover={{ y: -4 }}
-                            onClick={() => handlePlayClick(sample, imageUrl)}
+                            onClick={() => handlePackClick(pack.title)}
                         >
-                            <div className={`w-full aspect-video rounded-lg mb-3 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
+                            <div className={`w-full aspect-square rounded-xl mb-3 bg-gradient-to-br from-gray-900 to-gray-800 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
                                 {/* Image */}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
-                                    src={imageUrl}
-                                    alt={sample.name}
-                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-80 group-hover:opacity-100"
+                                    src={pack.coverImage || '/placeholder.jpg'}
+                                    alt={pack.title}
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement
-                                        target.src = sampleImages[index % sampleImages.length]
+                                        target.src = '/placeholder.jpg'
                                     }}
                                 />
 
                                 {/* Gradient Overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
 
                                 <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                                    <span className="font-bold text-white text-shadow-sm line-clamp-1 text-lg">{sample.name}</span>
-                                    <p className="text-xs text-white/60 mt-1">{sample.artist}</p>
+                                    <span className="font-bold text-white text-shadow-sm line-clamp-1 text-lg">{pack.title}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full text-white/90">
+                                            {pack.genre || 'Multi-Genre'}
+                                        </span>
+                                        {/* <span className="text-xs text-white/60">{pack.sampleCount || 0} samples</span> */}
+                                    </div>
                                 </div>
 
-                                {/* Hover overlay / Play Button */}
-                                <div className={`absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center z-20 ${isCurrentPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                    <div className={`w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md border border-white/20 ${isCurrentPlaying ? 'bg-green-500 text-white' : 'bg-white/20 text-white hover:scale-110 transition-transform'}`}>
-                                        {isCurrentPlaying ? (
-                                            <Pause className="w-6 h-6 fill-current" />
-                                        ) : (
-                                            <Play className="w-6 h-6 fill-current ml-1" />
-                                        )}
+                                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
+                                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-black shadow-lg">
+                                        <Disc className="w-4 h-4" />
                                     </div>
                                 </div>
                             </div>
