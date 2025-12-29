@@ -7,6 +7,7 @@ import { motion } from "framer-motion"
 import { useSamples } from "@/hooks/useSamples"
 import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
+import { useFavorites } from "@/hooks/useFavorites"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
 
@@ -24,6 +25,7 @@ export default function PackDetailPage({ params }: PageProps) {
   const { samples, loading: samplesLoading } = useSamples({ autoFetch: true })
   const { packs, loading: packsLoading, getPackByTitle } = usePacks()
   const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
@@ -86,6 +88,38 @@ export default function PackDetailPage({ params }: PageProps) {
         audioUrl: audioUrl,
         imageUrl: packImage, // Use the consistent pack image
         duration: sample.duration || '0:00'
+      })
+    }
+  }
+
+  const handleDownload = (e: React.MouseEvent, sample: any) => {
+    e.stopPropagation()
+    const audioUrl = sample.audioUrl || sample.url
+    if (!audioUrl) return
+
+    const link = document.createElement('a')
+    link.href = audioUrl
+    link.download = `${sample.name}.wav` // Assuming wav, or just name
+    link.target = "_blank" // Fallback for cross-origin
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const toggleFavorite = (e: React.MouseEvent, sample: any) => {
+    e.stopPropagation()
+    if (isFavorite(sample.id)) {
+      removeFavorite(sample.id)
+    } else {
+      addFavorite({
+        id: sample.id,
+        name: sample.name,
+        category: sample.category,
+        bpm: sample.bpm || 0,
+        key: formatKey(sample.key),
+        duration: sample.duration || '0:00',
+        imageUrl: packImage,
+        audioUrl: sample.audioUrl || sample.url
       })
     }
   }
@@ -162,9 +196,9 @@ export default function PackDetailPage({ params }: PageProps) {
             <button className="px-4 py-2 bg-white/10 rounded-full text-sm font-medium whitespace-nowrap">
               Your Library
             </button>
-            <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors">
+            {/* <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors">
               Rare Finds
-            </button>
+            </button> */}
 
             {/* BPM Filter */}
             <select
@@ -224,9 +258,35 @@ export default function PackDetailPage({ params }: PageProps) {
 
           {/* Samples Table */}
           {loading ? (
-            <div className="text-center py-12">
-              <div className="w-12 h-12 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-white/40">Loading samples...</p>
+            <div className="space-y-2">
+              {/* Skeleton Header */}
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 border-b border-white/5">
+                <div className="col-span-1 bg-white/5 h-4 rounded animate-pulse"></div>
+                <div className="col-span-11 bg-white/5 h-4 rounded animate-pulse w-1/4"></div>
+              </div>
+
+              {/* Skeleton Rows */}
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="grid grid-cols-12 gap-4 px-4 py-3 rounded-lg bg-white/5 animate-pulse">
+                  <div className="col-span-1">
+                    <div className="w-12 h-12 bg-white/10 rounded"></div>
+                  </div>
+                  <div className="col-span-5 flex flex-col justify-center gap-2">
+                    <div className="h-4 bg-white/10 rounded w-3/4"></div>
+                    <div className="h-3 bg-white/10 rounded w-1/2"></div>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-center">
+                    <div className="h-4 bg-white/10 rounded w-10"></div>
+                  </div>
+                  <div className="col-span-1 flex items-center justify-center">
+                    <div className="h-4 bg-white/10 rounded w-8"></div>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-center">
+                    <div className="h-4 bg-white/10 rounded w-8"></div>
+                  </div>
+                  <div className="col-span-1"></div>
+                </div>
+              ))}
             </div>
           ) : filteredSamples.length === 0 ? (
             <div className="text-center py-12">
@@ -311,16 +371,24 @@ export default function PackDetailPage({ params }: PageProps) {
 
                     {/* Actions */}
                     <div className="col-span-1 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center">
+                      <button
+                        onClick={(e) => handleDownload(e, sample)}
+                        className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors text-white/60 hover:text-white"
+                        title="Download"
+                      >
                         <Download className="w-4 h-4" />
                       </button>
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center">
-                        <Heart className="w-4 h-4" />
+                      <button
+                        onClick={(e) => toggleFavorite(e, sample)}
+                        className={`w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors ${isFavorite(sample.id) ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
+                        title="Toogle Favorite"
+                      >
+                        <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />
                       </button>
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center">
+                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
                         <Plus className="w-4 h-4" />
                       </button>
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center">
+                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>

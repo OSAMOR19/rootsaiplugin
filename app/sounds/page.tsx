@@ -18,6 +18,7 @@ export default function SoundsPage() {
     const [selectedKey, setSelectedKey] = useState(searchParams.get('key') || "")
     const [selectedDrumType, setSelectedDrumType] = useState(searchParams.get('drumType') || "")
     const [selectedKeyword, setSelectedKeyword] = useState(searchParams.get('keyword') || "")
+    const [selectedTimeSignature, setSelectedTimeSignature] = useState(searchParams.get('timeSignature') || "")
 
     // Fetch Data
     const { samples, loading } = useSamples({ autoFetch: true })
@@ -25,13 +26,14 @@ export default function SoundsPage() {
     const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
 
     // Derived Filters Options
-    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean)
-    const instruments = [...new Set(samples.flatMap(s => s.instruments || []))].filter(Boolean)
-    const keys = [...new Set(samples.map(s => s.key).filter(Boolean))]
-    const drumTypes = [...new Set(samples.map(s => s.drumType).filter(Boolean))]
+    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
+    const instruments = [...new Set(samples.flatMap(s => s.instruments || []))].filter(Boolean) as string[]
+    const keys = [...new Set(samples.map(s => s.key).filter(Boolean))] as string[]
+    const drumTypes = [...new Set(samples.map(s => s.drumType).filter(Boolean))] as string[]
     // Keywords often stored as array in s.keywords or s.tags
     // Assuming keywords is string[]
-    const keywords = [...new Set(samples.flatMap(s => s.keywords || []))].filter(Boolean)
+    const keywords = [...new Set(samples.flatMap(s => s.keywords || []))].filter(Boolean) as string[]
+    const timeSignatures = [...new Set(samples.map(s => s.timeSignature).filter(Boolean))] as string[]
 
     // Filter Logic
     const filteredSamples = useMemo(() => {
@@ -59,9 +61,12 @@ export default function SoundsPage() {
             // Keyword/Style Filter
             if (selectedKeyword && !sample.keywords?.includes(selectedKeyword)) return false
 
+            // Time Signature Filter
+            if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
+
             return true
         })
-    }, [samples, searchQuery, selectedGenre, selectedInstrument, selectedKey, selectedDrumType, selectedKeyword])
+    }, [samples, searchQuery, selectedGenre, selectedInstrument, selectedKey, selectedDrumType, selectedKeyword, selectedTimeSignature])
 
     const handlePlay = (sample: any) => {
         if (currentTrack?.id === sample.id && isPlaying) {
@@ -148,14 +153,20 @@ export default function SoundsPage() {
                         options={drumTypes}
                     />
                     <FilterSelect
-                        label="Styles"
+                        label="Keywords"
                         value={selectedKeyword}
                         onChange={setSelectedKeyword}
                         options={keywords}
                     />
+                    <FilterSelect
+                        label="Time Sig"
+                        value={selectedTimeSignature}
+                        onChange={setSelectedTimeSignature}
+                        options={timeSignatures}
+                    />
 
                     {/* Reset Button */}
-                    {(selectedGenre || selectedInstrument || selectedKey || selectedDrumType || selectedKeyword || searchQuery) && (
+                    {(selectedGenre || selectedInstrument || selectedKey || selectedDrumType || selectedKeyword || selectedTimeSignature || searchQuery) && (
                         <button
                             onClick={() => {
                                 setSearchQuery("")
@@ -164,6 +175,7 @@ export default function SoundsPage() {
                                 setSelectedKey("")
                                 setSelectedDrumType("")
                                 setSelectedKeyword("")
+                                setSelectedTimeSignature("")
                             }}
                             className="px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
                         >
@@ -179,7 +191,8 @@ export default function SoundsPage() {
             {/* Sounds List */}
             <div className="bg-black/20 rounded-xl overflow-hidden border border-white/5">
                 {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-medium text-white/40 uppercase tracking-wider sticky top-[160px] bg-black z-20">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-medium text-white/40 uppercase tracking-wider relative z-20">
                     <div className="col-span-1"></div>
                     <div className="col-span-1">Pack</div>
                     <div className="col-span-4">Filename</div>

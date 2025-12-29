@@ -89,7 +89,7 @@ export default function WhatsNewSection() {
                     return (
                         <motion.div
                             key={pack.id}
-                            className="flex-shrink-0 w-64 group cursor-pointer"
+                            className="flex-shrink-0 w-64 group cursor-pointer p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all"
                             whileHover={{ y: -4 }}
                             onClick={() => handlePackClick(pack.title)}
                         >

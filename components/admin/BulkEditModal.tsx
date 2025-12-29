@@ -14,10 +14,7 @@ interface BulkEditModalProps {
     count: number
 }
 
-// Define lists here to be self-contained
-const genresList = ["Afrobeats", "Amapiano", "Afrohouse", "World"]
-const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings", "Brass", "Woodwinds", "Vocals", "Percussion", "FX"]
-const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
+import { GENRE_OPTIONS, INSTRUMENT_OPTIONS, DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
 // Pricing and License were requested to be removed from here or replaced, but usually Pricing/License are bulk editable. 
 // The user updated the Dropdown in EditSamplesStep, but passing them here is useful.
 
@@ -99,9 +96,10 @@ export default function BulkEditModal({ isOpen, onClose, onSave, initialField, c
 
     // Helper to get current options
     const getOptions = (field: string) => {
-        if (field === 'genres') return genresList
-        if (field === 'instruments') return instrumentsList
-        if (field === 'drumType') return drumTypes
+        if (field === 'genres') return GENRE_OPTIONS
+        if (field === 'instruments') return INSTRUMENT_OPTIONS
+        if (field === 'drumType') return DRUM_TYPE_OPTIONS
+        if (field === 'keywords') return KEYWORD_OPTIONS
         return []
     }
 
@@ -161,10 +159,15 @@ export default function BulkEditModal({ isOpen, onClose, onSave, initialField, c
                 )
             case 'keywords':
                 return (
-                    <KeywordsInput
-                        value={value || []}
-                        onChange={(val: string[]) => handleUpdateValue('keywords', val)}
-                    />
+                    <div>
+                        <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Keywords</label>
+                        <MultiSelectDropdown
+                            options={getOptions('keywords')}
+                            selected={value || []}
+                            onChange={(val: string[]) => handleUpdateValue('keywords', val)}
+                            placeholder="Select keywords"
+                        />
+                    </div>
                 )
             default:
                 return null
@@ -286,42 +289,4 @@ export default function BulkEditModal({ isOpen, onClose, onSave, initialField, c
 
 // Sub-components for cleaner file
 
-function KeywordsInput({ value, onChange }: { value: string[], onChange: (val: string[]) => void }) {
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault()
-            const input = e.currentTarget
-            const text = input.value.trim()
-            if (text && !value.includes(text)) {
-                onChange([...value, text])
-                input.value = ''
-            }
-        }
-    }
 
-    const remove = (k: string) => {
-        onChange(value.filter((i: string) => i !== k))
-    }
-
-    return (
-        <div>
-            <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Keywords</label>
-            <div className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white focus-within:border-white/30 transition-colors flex flex-wrap gap-2 items-center min-h-[50px]">
-                {value.map((keyword: string, i: number) => (
-                    <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm flex items-center gap-1">
-                        {keyword}
-                        <button onClick={() => remove(keyword)} className="hover:text-red-400">
-                            <X className="w-3 h-3" />
-                        </button>
-                    </span>
-                ))}
-                <input
-                    type="text"
-                    onKeyDown={handleKeyDown}
-                    placeholder={value.length === 0 ? "Add keywords (Enter)..." : ""}
-                    className="bg-transparent border-none focus:outline-none flex-1 min-w-[100px] text-white placeholder-white/20 h-full"
-                />
-            </div>
-        </div>
-    )
-}

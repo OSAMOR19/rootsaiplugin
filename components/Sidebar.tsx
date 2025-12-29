@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, Library, Settings, Heart } from "lucide-react"
+import { Home, Search, Music2, Compass, Settings, Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import SearchModal from "./SearchModal"
 
@@ -13,8 +13,8 @@ export default function Sidebar() {
 
   const navItems = [
     { icon: Home, href: "/", label: "Home" },
-    { icon: Search, href: "/browse", label: "Explore" },
-    { icon: Library, href: "/sounds", label: "Sounds" },
+    { icon: Compass, href: "/browse", label: "Explore" },
+    { icon: Music2, href: "/sounds", label: "Sounds" },
     { icon: Heart, href: "/favourite", label: "Favourite" },
   ]
 
@@ -37,15 +37,13 @@ export default function Sidebar() {
               className={cn(
                 "p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center",
                 isActive
-                  ? "text-white"
+                  ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
                   : "text-white/40 hover:text-white"
               )}
               title={item.label}
             >
               <item.icon className={cn("w-6 h-6", isActive && "fill-current")} />
-              {isActive && (
-                <div className="absolute inset-0 bg-white/10 blur-xl rounded-full -z-10" />
-              )}
+              {/* Removed blur background as requested */}
             </Link>
           )
         })}

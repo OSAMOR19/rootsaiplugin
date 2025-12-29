@@ -12,7 +12,7 @@ const EXPLORE_CATEGORIES = [
         id: "genres",
         label: "GENRES",
         gradient: "bg-gradient-to-br from-purple-900/80 to-indigo-950 border border-purple-800/30",
-        subItems: ["Afrobeats", "Amapiano", "Afro-house", "World", "Hip Hop", "RnB", "Pop", "Jazz"]
+        subItems: ["Afrobeats", "Amapiano", "Afro-house", "World"]
     },
     {
         id: "drum-type",
@@ -30,7 +30,7 @@ const EXPLORE_CATEGORIES = [
         id: "styles",
         label: "STYLES",
         gradient: "bg-gradient-to-br from-emerald-900/80 to-teal-950 border border-emerald-800/30",
-        subItems: ["Acoustic", "Epic", "Energetic", "Experimental", "Bouncy", "Rhythmic", "Percussive", "Groovy", "Mellow"]
+        subItems: ["Acoustic", "Chill", "Epic", "Energetic", "Experimental", "Groovy", "Mellow", "Percussive"]
     }
 ]
 

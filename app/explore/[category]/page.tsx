@@ -13,14 +13,6 @@ const EXPLORE_DATA: Record<string, { label: string, description: string, groups:
             {
                 title: "Afro & World",
                 items: ["Afrobeats", "Amapiano", "Afro-house", "World"]
-            },
-            {
-                title: "Hip Hop & R&B",
-                items: ["Hip Hop", "RnB", "Trap", "Drill", "Soul"]
-            },
-            {
-                title: "Pop & Other",
-                items: ["Pop", "Jazz", "Reggaeton", "Dancehall"]
             }
         ]
     },
@@ -57,12 +49,8 @@ const EXPLORE_DATA: Record<string, { label: string, description: string, groups:
         description: "Browse by mood and characteristic",
         groups: [
             {
-                title: "Mood & Vibe",
-                items: ["Acoustic", "Epic", "Energetic", "Experimental", "Bouncy"]
-            },
-            {
-                title: "Character",
-                items: ["Rhythmic", "Percussive", "Groovy", "Mellow", "Dark"]
+                title: "Keywords",
+                items: ["Acoustic", "Chill", "Epic", "Energetic", "Experimental", "Groovy", "Mellow", "Percussive"]
             }
         ]
     }

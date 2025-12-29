@@ -33,10 +33,9 @@ interface SampleMetadata {
     featured?: boolean
 }
 
+import { GENRE_OPTIONS, INSTRUMENT_OPTIONS, DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
+
 const keys = ['C Major', 'C Minor', 'C# Major', 'C# Minor', 'D Major', 'D Minor', 'Eb Major', 'Eb Minor', 'E Major', 'E Minor', 'F Major', 'F Minor', 'F# Major', 'F# Minor', 'G Major', 'G Minor', 'Ab Major', 'Ab Minor', 'A Major', 'A Minor', 'Bb Major', 'Bb Minor', 'B Major', 'B Minor']
-const genresList = ["Afrobeats", "Amapiano", "Afrohouse", "World"]
-const instrumentsList = ["Drums", "Bass", "Piano", "Guitar", "Synth", "Strings", "Brass", "Woodwinds", "Vocals", "Percussion", "FX"]
-const drumTypes = ["Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop", "Top Loop", "Full Drum Loop", "Drum One-Shot", "Fill"]
 const timeSignatures = ["4/4", "6/8", "3/4"]
 
 export default function EditSamplesStep({ files, initialData, onBack, onSubmit, defaultCategory, onChange }: EditSamplesStepProps) {
@@ -217,25 +216,8 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
         setBulkEditField(null)
     }
 
-    // Keyword Tag Input Handler
-    const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault()
-            const input = e.currentTarget
-            const value = input.value.trim()
-
-            if (value && currentSample && !currentSample.keywords.includes(value)) {
-                handleUpdate('keywords', [...currentSample.keywords, value])
-                input.value = ''
-            }
-        }
-    }
-
-    const removeKeyword = (keyword: string) => {
-        if (currentSample) {
-            handleUpdate('keywords', currentSample.keywords.filter(k => k !== keyword))
-        }
-    }
+    // Keyword tag removal can be handled by MultiSelectDropdown's internal logic or via handleUpdate directly
+    // Removing the manual keydown handler and removeKeyword function since we use MultiSelectDropdown now
 
     // Sync local state changes to parent (for persistence across steps)
     useEffect(() => {
@@ -393,7 +375,7 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                             <div className="col-span-2">
                                 <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Drum Type</label>
                                 <CustomDropdown
-                                    options={drumTypes}
+                                    options={DRUM_TYPE_OPTIONS}
                                     value={currentSample.drumType}
                                     onChange={(val) => handleUpdate('drumType', val)}
                                     placeholder="Select drum type (e.g. Kick Loop)"
@@ -404,7 +386,7 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                         <div>
                             <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Genres</label>
                             <MultiSelectDropdown
-                                options={genresList}
+                                options={GENRE_OPTIONS}
                                 selected={currentSample.genres}
                                 onChange={(val) => handleUpdate('genres', val)}
                                 placeholder="Select genres"
@@ -414,7 +396,7 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                         <div>
                             <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Instruments</label>
                             <MultiSelectDropdown
-                                options={instrumentsList}
+                                options={INSTRUMENT_OPTIONS}
                                 selected={currentSample.instruments}
                                 onChange={(val) => handleUpdate('instruments', val)}
                                 placeholder="Select instruments"
@@ -422,24 +404,17 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Keywords</label>
-                            <div className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white focus-within:border-white/30 transition-colors flex flex-wrap gap-2 items-center min-h-[50px]">
-                                {currentSample.keywords.map((keyword, i) => (
-                                    <span key={i} className="px-2 py-1 bg-white/10 rounded text-sm flex items-center gap-1">
-                                        {keyword}
-                                        <button onClick={() => removeKeyword(keyword)} className="hover:text-red-400">
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </span>
-                                ))}
-                                <input
-                                    type="text"
-                                    onKeyDown={handleKeywordKeyDown}
-                                    placeholder={currentSample.keywords.length === 0 ? "Type and press Enter..." : ""}
-                                    className="bg-transparent border-none focus:outline-none flex-1 min-w-[100px] text-white placeholder-white/20 h-full"
-                                />
-                            </div>
-                            <p className="text-[10px] text-white/20 mt-1">Press Enter or Comma to add tags</p>
+                            <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Keywords (Max 3)</label>
+                            <MultiSelectDropdown
+                                options={KEYWORD_OPTIONS}
+                                selected={currentSample.keywords}
+                                onChange={(val) => {
+                                    if (val.length <= 3) {
+                                        handleUpdate('keywords', val)
+                                    }
+                                }}
+                                placeholder="Select keywords"
+                            />
                         </div>
                     </div>
                 ) : (

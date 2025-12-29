@@ -4,14 +4,20 @@ import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
 import { motion } from "framer-motion"
-import { useSamples } from "@/hooks/useSamples"
+import { useSamples, Sample } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
-
 import { SAMPLE_IMAGES } from "@/constants/images"
 
 const sampleImages = SAMPLE_IMAGES
 
-export default function RecommendedSection() {
+interface SampleGroupSectionProps {
+    title: string
+    subTitle: string
+    // Filter function to select relevant samples
+    filterFn: (sample: Sample) => boolean
+}
+
+export default function SampleGroupSection({ title, subTitle, filterFn }: SampleGroupSectionProps) {
     const router = useRouter()
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -19,11 +25,13 @@ export default function RecommendedSection() {
     const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
     const { samples, loading } = useSamples({ autoFetch: true })
 
-    // Group samples by category and get featured or first from each
-    // Also track the best available image for the category (Featured > Any > Fallback)
-    const categoryMap = new Map<string, { sample: any, bestImageUrl?: string, isImageFromFeatured?: boolean }>()
+    // Group samples by category
+    const categoryMap = new Map<string, { sample: Sample, bestImageUrl?: string, isImageFromFeatured?: boolean, count: number }>()
 
-    samples.forEach(sample => {
+    // Apply Filter First
+    const filteredSamples = samples.filter(filterFn)
+
+    filteredSamples.forEach(sample => {
         if (sample.category) {
             const existing = categoryMap.get(sample.category)
             const hasImage = sample.imageUrl && sample.imageUrl !== '/placeholder.jpg'
@@ -31,6 +39,7 @@ export default function RecommendedSection() {
             let representativeSample = existing?.sample
             let bestImageUrl = existing?.bestImageUrl
             let isImageFromFeatured = existing?.isImageFromFeatured || false
+            let count = (existing?.count || 0) + 1
 
             // 1. Determine Representative Sample (Featured > First encountered)
             if (!representativeSample || (sample.featured && !representativeSample.featured)) {
@@ -49,14 +58,14 @@ export default function RecommendedSection() {
                     bestImageUrl = sample.imageUrl
                     isImageFromFeatured = true
                 }
-                // If we already have a featured image, we keep the first one we found (don't overwrite)
             }
 
-            categoryMap.set(sample.category, { sample: representativeSample, bestImageUrl, isImageFromFeatured })
+            // @ts-ignore
+            categoryMap.set(sample.category, { sample: representativeSample, bestImageUrl, isImageFromFeatured, count })
         }
     })
 
-    const recommendedSamples = Array.from(categoryMap.values()).slice(0, 10)
+    const displayItems = Array.from(categoryMap.values())
 
     const checkScroll = () => {
         if (scrollContainerRef.current) {
@@ -85,8 +94,8 @@ export default function RecommendedSection() {
                 id: sample.id,
                 title: sample.name,
                 artist: sample.artist || sample.category,
-                audioUrl: sample.audioUrl || sample.url, // Support both R2 and local URLs
-                imageUrl: sample.imageUrl || imageUrl, // Use uploaded image or fallback
+                audioUrl: sample.audioUrl || sample.url,
+                imageUrl: sample.imageUrl || imageUrl,
                 duration: sample.duration || '0:00'
             })
         }
@@ -96,12 +105,17 @@ export default function RecommendedSection() {
         router.push(`/pack/${encodeURIComponent(category)}`)
     }
 
+    // Hide section entirely if no items found
+    if (!loading && displayItems.length === 0) {
+        return null
+    }
+
     return (
         <div className="mb-12">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h2 className="text-xl font-bold text-white">Curated for You</h2>
-                    <p className="text-sm text-white/60 mt-1">Packs selected just for you, based on your recent purchases. Updated daily.</p>
+                    <h2 className="text-xl font-bold text-white uppercase">{title}</h2>
+                    <p className="text-sm text-white/60 mt-1">{subTitle}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -128,13 +142,16 @@ export default function RecommendedSection() {
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 {loading ? (
-                    <div className="text-white/40">Loading samples...</div>
-                ) : recommendedSamples.length === 0 ? (
-                    <div className="text-white/40">No samples available</div>
-                ) : recommendedSamples.map(({ sample, bestImageUrl }, index) => {
+                    <div className="flex gap-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="flex-shrink-0 w-48 h-48 bg-white/5 rounded-lg animate-pulse" />
+                        ))}
+                    </div>
+                ) : displayItems.map(({ sample, bestImageUrl, count }, index) => {
                     const isCurrent = currentTrack?.id === sample.id
                     const isCurrentPlaying = isCurrent && isPlaying
-                    const fallbackIndex = sample.category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
+                    // Fallback image using deterministic hash of category name
+                    const fallbackIndex = sample.category?.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) || 0
                     const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
 
                     const imageUrl = bestImageUrl || fallbackImage
@@ -144,7 +161,7 @@ export default function RecommendedSection() {
                             key={sample.id}
                             className="flex-shrink-0 w-52 group cursor-pointer p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all"
                             whileHover={{ y: -4 }}
-                            onClick={() => handleCardClick(sample.category)}
+                            onClick={() => handleCardClick(sample.category || "")}
                         >
                             <div className={`w-full aspect-square rounded-lg mb-3 bg-gray-900 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
                                 {/* Image */}
@@ -153,6 +170,10 @@ export default function RecommendedSection() {
                                     src={imageUrl}
                                     alt={sample.name}
                                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.src = '/placeholder.jpg'
+                                    }}
                                 />
 
                                 {/* Gradient Overlay */}
