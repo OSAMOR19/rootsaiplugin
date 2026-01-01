@@ -103,6 +103,13 @@ export default function DraggableSample({
     }
   }, [audioUrl])
 
+  // Update WaveSurfer volume when volume prop changes
+  useEffect(() => {
+    if (waveSurfer) {
+      waveSurfer.setVolume(volume)
+    }
+  }, [volume, waveSurfer])
+
   // Initialize WaveSurfer
   useEffect(() => {
     // Clear any existing timeout

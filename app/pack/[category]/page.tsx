@@ -9,6 +9,7 @@ import { useSamples } from "@/hooks/useSamples"
 import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
 import { useFavorites } from "@/hooks/useFavorites"
+import WaveformCell from "@/components/WaveformCell"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
 
@@ -313,13 +314,25 @@ export default function PackDetailPage({ params }: PageProps) {
                     </div>
 
                     {/* Filename */}
-                    <div className="col-span-5 flex flex-col justify-center">
-                      <p className={`text-sm font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
-                        {sample.name}
-                      </p>
-                      <p className="text-xs text-white/40 truncate">
-                        {sample.category}
-                      </p>
+                    {/* Filename & Waveform */}
+                    <div className="col-span-5 flex flex-col justify-center gap-1 min-w-0">
+                      <div className="flex items-baseline justify-between">
+                        <p className={`text-sm font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
+                          {sample.name}
+                        </p>
+                        <p className="text-xs text-white/40 truncate ml-2">
+                          {sample.category}
+                        </p>
+                      </div>
+                      <div className="h-8 w-full mt-1">
+                        <WaveformCell
+                          audioUrl={sample.audioUrl || sample.url || ""}
+                          sampleId={sample.id}
+                          height={32}
+                          waveColor={isCurrentPlaying ? 'rgb(74, 222, 128)' : 'rgb(107, 114, 128)'}
+                          progressColor="rgb(34, 197, 94)"
+                        />
+                      </div>
                     </div>
 
                     {/* Time */}

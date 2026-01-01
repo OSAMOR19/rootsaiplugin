@@ -50,21 +50,26 @@ function ResultsContent() {
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
-  // ✅ NEW: Load initial compatible sounds from local library (Now verified Supabase)
-  const loadInitialCompatibleSounds = async (bpm: number | null, key: string, limit: number = 10) => {
-    console.log('🔍 loadInitialCompatibleSounds CALLED:', { bpm, key, limit })
+  // ✅ NEW: Load sounds from Supabase with Search Support
+  const loadInitialCompatibleSounds = async (bpm: number | null, key: string, limit: number = 10, searchQuery: string = "") => {
+    console.log('🔍 loadInitialCompatibleSounds CALLED:', { bpm, key, limit, searchQuery })
 
-    if (!bpm) {
-      console.error('❌ NO BPM - returning empty array')
+    // Allow if BPM exists OR if we are searching (text query)
+    if (!bpm && !searchQuery) {
+      console.error('❌ NO BPM and NO Query - returning empty array')
       return []
     }
 
     try {
-      console.log('📂 Fetching samples from Supabase...')
+      console.log('📂 Fetching broader sample set (limit 200) from Supabase...')
+
+      // Simply fetch recent samples
+      // We do filtering in memory to avoid complex OR logic issues with the client
       const { data: allLoops, error } = await supabase
         .from('samples')
         .select('*')
         .order('created_at', { ascending: false })
+        .limit(300)
 
       if (error) {
         console.error('❌ Could not load samples from Supabase:', error)
@@ -97,6 +102,38 @@ function ResultsContent() {
         }
 
         let score = 0
+
+        // Text Search Scoring (Keyword based)
+        if (searchQuery) {
+          const lowerName = fileName.toLowerCase() || ''
+          const lowerCat = (loop.category || '').toLowerCase()
+
+          const stopWords = ['i', 'need', 'a', 'want', 'the', 'of', 'for', 'with', 'sound', 'loop', 'sample', 'drums', 'drum', 'beat', 'me', 'get', 'find', 'show', 'please']
+          const keywords = searchQuery.toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(' ')
+            .filter(w => w.length > 2 && !stopWords.includes(w))
+
+          if (keywords.length > 0) {
+            let matchCount = 0
+            keywords.forEach(k => {
+              if (lowerName.includes(k) || lowerCat.includes(k)) {
+                matchCount++
+              }
+            })
+
+            // Boost score significantly for matches
+            if (matchCount > 0) {
+              score += 50 + (matchCount * 10) // Base 50 + 10 per extra keyword
+            }
+          } else {
+            // Fallback exact substring match
+            const lowerQuery = searchQuery.toLowerCase()
+            if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery)) {
+              score += 50
+            }
+          }
+        }
 
         // BPM matching
         const bpmRatio = loopBPM / bpm
@@ -183,12 +220,16 @@ function ResultsContent() {
   useEffect(() => {
     const loadData = async () => {
       console.log('🎬 Results page loading data...')
-      console.log('📦 URL params:', { recommendationsParam: !!recommendationsParam, detectedBPM, detectedKey })
+      console.log('📦 URL params:', { recommendationsParam: !!recommendationsParam, detectedBPM, detectedKey, query })
 
-      // If we have recommendations from audio analysis, use those
-      if (recommendationsParam) {
+      if (query) {
+        setLoading(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+
+      if (recommendationsParam || query) {
         try {
-          const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
+          const recommendations = recommendationsParam ? JSON.parse(decodeURIComponent(recommendationsParam)) : []
 
           // Get the detected BPM to use for all recommendation cards
           // Use edited BPM if available, otherwise fall back to detected BPM
@@ -227,8 +268,8 @@ function ResultsContent() {
           console.log('🎸 Created recentSong card')
 
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
-          console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM)
-          const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10)
+          console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM, 'Query:', query)
+          const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10, query)
 
           console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
           console.log('📋 Setting samples to:', [recentSong, ...initialCompatibleSounds].length, 'total samples')
@@ -978,7 +1019,7 @@ function ResultsContent() {
               recordedAudioBuffer={recordedAudioBuffer}
               recordedBPM={editedBPM ?? recordedBPM}
               originalDetectedBPM={originalDetectedBPM}
-              volume={sampleVolume / 100}
+              volume={(syncPlayingSampleId ? sampleVolume : volume) / 100}
               showCheckbox={false}
             />
           ))}
