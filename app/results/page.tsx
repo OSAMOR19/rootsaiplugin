@@ -682,10 +682,10 @@ function ResultsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
+    <div className="min-h-screen bg-black text-white transition-colors duration-300">
       {/* VST-Style Header */}
       <motion.header
-        className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40"
+        className="bg-black/90 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
@@ -750,17 +750,7 @@ function ResultsContent() {
               )}
             </motion.button>
 
-            {/* Search Filter */}
-            <div className="relative order-1 lg:order-none">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Filter samples..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-full sm:w-48 text-sm"
-              />
-            </div>
+            {/* Search Filter Removed */}
 
             {/* Dual Volume Controls - For Sync Playback */}
             {syncPlayingSampleId && (
@@ -989,6 +979,7 @@ function ResultsContent() {
               recordedBPM={editedBPM ?? recordedBPM}
               originalDetectedBPM={originalDetectedBPM}
               volume={sampleVolume / 100}
+              showCheckbox={false}
             />
           ))}
         </div>

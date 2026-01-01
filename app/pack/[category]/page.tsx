@@ -4,6 +4,7 @@ import { use, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Play, Pause, Heart, Plus, Download, Search, ArrowLeft, MoreVertical } from "lucide-react"
 import { motion } from "framer-motion"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useSamples } from "@/hooks/useSamples"
 import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
@@ -57,18 +58,13 @@ export default function PackDetailPage({ params }: PageProps) {
   const uniqueBPMs = [...new Set(categorySamples.map(s => s.bpm).filter(Boolean))].sort((a, b) => a! - b!)
   const uniqueKeys = [...new Set(categorySamples.map(s => formatKey(s.key)).filter(k => k !== '--'))].sort()
 
-  // Pack image (use pack cover image, or featured sample's image, or fallback)
-  const fallbackIndex = categoryName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  const fallbackImage = sampleImages[fallbackIndex % sampleImages.length]
-
   const featuredSampleWithImage = categorySamples.find(s => s.featured && s.imageUrl && s.imageUrl !== '/placeholder.jpg')
   const firstSampleWithImage = categorySamples.find(s => s.imageUrl && s.imageUrl !== '/placeholder.jpg')
 
-  // Priority: 1. Pack Cover (from metadata) 2. Featured sample 3. First sample 4. Fallback
+  // Priority: 1. Pack Cover (from metadata) 2. Featured sample 3. First sample 4. Placeholder
   const packImage = (currentPack?.coverImage && currentPack.coverImage !== '/placeholder.jpg' ? currentPack.coverImage : null) ||
     (featuredSampleWithImage?.imageUrl) ||
     (firstSampleWithImage?.imageUrl) ||
-    fallbackImage ||
     '/placeholder.jpg'
 
   const handlePlayClick = (sample: any) => {
@@ -149,17 +145,23 @@ export default function PackDetailPage({ params }: PageProps) {
         {/* Pack Info Header */}
         <div className="flex items-start gap-6 mb-8">
           {/* Pack Image */}
-          <div className="w-64 h-64 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 bg-gradient-to-br from-green-900/50 to-emerald-950/50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={packImage}
-              alt={categoryName}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = '/placeholder.jpg'
-              }}
-            />
+          <div className="w-64 h-64 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 bg-gradient-to-br from-green-900/50 to-emerald-950/50 relative">
+            {loading ? (
+              <Skeleton className="w-full h-full bg-white/10" />
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={packImage}
+                  alt={categoryName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = '/placeholder.jpg'
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* Pack Details */}
@@ -199,38 +201,7 @@ export default function PackDetailPage({ params }: PageProps) {
           <h2 className="text-3xl font-bold mb-6">Samples</h2>
 
           {/* Filters */}
-          <div className="flex items-center gap-3 mb-6 overflow-x-auto pb-2">
-            <button className="px-4 py-2 bg-white/10 rounded-full text-sm font-medium whitespace-nowrap">
-              Your Library
-            </button>
-            {/* <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors">
-              Rare Finds
-            </button> */}
-
-            {/* BPM Filter */}
-            <select
-              value={selectedBPM}
-              onChange={(e) => setSelectedBPM(e.target.value)}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors border-none outline-none cursor-pointer"
-            >
-              <option value="all">BPM</option>
-              {uniqueBPMs.map(bpm => (
-                <option key={bpm} value={bpm}>{bpm}</option>
-              ))}
-            </select>
-
-            {/* Key Filter */}
-            <select
-              value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full text-sm font-medium whitespace-nowrap transition-colors border-none outline-none cursor-pointer"
-            >
-              <option value="all">Key</option>
-              {uniqueKeys.map(key => (
-                <option key={key} value={key}>{key}</option>
-              ))}
-            </select>
-          </div>
+          {/* Filters Removed */}
 
           {/* Search and Sort */}
           <div className="flex items-center justify-between mb-4">
@@ -249,17 +220,7 @@ export default function PackDetailPage({ params }: PageProps) {
                 />
               </div>
 
-              {/* Sort */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm outline-none cursor-pointer"
-              >
-                <option value="popular">Most popular</option>
-                <option value="recent">Most recent</option>
-                <option value="name">Name</option>
-                <option value="bpm">BPM</option>
-              </select>
+              {/* Sort Removed */}
             </div>
           </div>
 
