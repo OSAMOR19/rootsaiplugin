@@ -249,32 +249,38 @@ function ResultsContent() {
             console.error('❌ NO detectedBPM in URL params!')
           }
 
-          // Add the recently played song as the first card
-          const recentSong = {
-            id: 'recent-song',
-            name: 'YOUR AUDIO',
-            artist: 'Recently Played',
-            category: 'recording',
-            bpm: universalBPM, // Use edited/detected BPM
-            key: detectedKey || 'C',
-            audioUrl: null, // Will use recordedAudioBuffer
-            imageUrl: '/placeholder.jpg', // Placeholder for user recording
-            duration: '4 bars',
-            tags: ['recording', 'recent', 'your-audio'],
-            waveform: Array.from({ length: 50 }, () => Math.random() * 100),
-            isRecentSong: true
-          }
-
-          console.log('🎸 Created recentSong card')
-
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
           console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM, 'Query:', query)
           const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10, query)
 
-          console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
-          console.log('📋 Setting samples to:', [recentSong, ...initialCompatibleSounds].length, 'total samples')
+          let finalSamples = [...initialCompatibleSounds]
 
-          setSamples([recentSong, ...initialCompatibleSounds])
+          // Only add "Your Audio" card if we actually have a detected BPM (audio analysis)
+          if (detectedBPM) {
+            const recentSong = {
+              id: 'recent-song',
+              name: 'YOUR AUDIO',
+              artist: 'Recently Played',
+              category: 'recording',
+              bpm: universalBPM, // Use edited/detected BPM
+              key: detectedKey || 'C',
+              audioUrl: null, // Will use recordedAudioBuffer
+              imageUrl: '/placeholder.jpg', // Placeholder for user recording
+              duration: '4 bars',
+              tags: ['recording', 'recent', 'your-audio'],
+              waveform: Array.from({ length: 50 }, () => Math.random() * 100),
+              isRecentSong: true,
+              originalBpm: universalBPM,
+              compatibilityScore: 100
+            }
+            finalSamples = [recentSong, ...finalSamples]
+            console.log('🎸 Added Your Audio card (Audio Mode)')
+          }
+
+          console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
+          console.log('📋 Setting samples to:', finalSamples.length, 'total samples')
+
+          setSamples(finalSamples)
 
           // ✅ NEW: Load audio buffer from React Context (NOT localStorage!)
           try {

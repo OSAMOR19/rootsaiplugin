@@ -68,12 +68,35 @@ export default function DraggableSample({
     }
   }, [sample.id])
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
+  const [cachedBlob, setCachedBlob] = useState<Blob | null>(null) // NEW: Cache blob for sync drag
   const [audioProgress, setAudioProgress] = useState(0) // Real audio progress from 0-100
   const [audioDuration, setAudioDuration] = useState(0) // Audio duration in seconds
   const [waveSurfer, setWaveSurfer] = useState<WaveSurfer | null>(null)
   const waveformRef = useRef<HTMLDivElement>(null)
   const isInitializingRef = useRef(false)
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Pre-fetch audio on hover to ensure it's ready for synchronous drag
+  const prefetchAudio = async () => {
+    if (cachedBlob) return
+
+    // Get real URL
+    let url = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+    if (url && !url.startsWith('http')) {
+      url = `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
+    }
+
+    if (url) {
+      try {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        setCachedBlob(blob)
+        console.log('📦 Sample pre-fetched for drag:', sample.name)
+      } catch (e) {
+        console.warn('Failed to pre-fetch sample:', e)
+      }
+    }
+  }
 
   // Load audio buffer when component mounts
   useEffect(() => {
@@ -492,55 +515,54 @@ export default function DraggableSample({
     }
   }
 
-  const handleDragStart = async (e: React.DragEvent) => {
+  const handleDragStart = (e: React.DragEvent) => {
     setIsDragging(true)
 
     // Get the real audio URL from the sample
-    const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+    let realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+
+    // Ensure absolute URL
+    if (realAudioUrl && !realAudioUrl.startsWith('http')) {
+      realAudioUrl = `${window.location.origin}${realAudioUrl.startsWith('/') ? '' : '/'}${realAudioUrl}`
+    }
+
+    console.log('🖱️ Dragging sample:', sample.name, 'URL:', realAudioUrl)
+
+    // Prepare filename
+    const rawName = sample.name || sample.filename || 'sample'
+    const cleanName = rawName.replace(/\.(wav|mp3|ogg|m4a)$/i, '')
+    const finalFileName = `${cleanName}.wav`
 
     // Create drag data for DAW integration
     const dragData = {
       type: "audio/sample",
-      name: sample.name || sample.filename,
-      artist: sample.artist || "Roots AI",
-      category: sample.category,
-      bpm: sample.bpm ?? inferredBpmFromName ?? recordedBPM ?? undefined,
-      duration: sample.duration,
-      url: realAudioUrl, // Real audio URL
-      metadata: {
-        genre: "Afrobeat",
-        tags: ["afrobeat", "percussion", "loop", sample.category],
-        tempo: sample.bpm,
-        category: sample.category,
-      },
+      name: finalFileName,
+      url: realAudioUrl,
+      bpm: sample.bpm
     }
 
-    // Set drag data for different formats
-    e.dataTransfer.setData("text/plain", sample.name || sample.filename)
+    // 1. Text/URI (Standard DAW Support)
+    e.dataTransfer.setData("text/plain", realAudioUrl)
+    e.dataTransfer.setData("text/uri-list", realAudioUrl)
+    e.dataTransfer.setData("text/html", `<a href="${realAudioUrl}">${finalFileName}</a>`)
     e.dataTransfer.setData("application/json", JSON.stringify(dragData))
     e.dataTransfer.setData("audio/wav", realAudioUrl)
 
-    // Add file data for both DAW and desktop/folder dropping
-    try {
-      // Fetch the actual audio file
-      const response = await fetch(realAudioUrl)
-      const audioBlob = await response.blob()
-
-      // Create a File object for proper drag and drop
-      const audioFile = new File([audioBlob], sample.name || sample.filename, {
-        type: audioBlob.type || 'audio/wav'
-      })
-
-      // Use DataTransferItemList for file dragging
-      const dataTransferItemList = e.dataTransfer.items
-      dataTransferItemList.add(audioFile)
-
-      // Also set as download URL for desktop dropping
-      e.dataTransfer.setData("DownloadURL", `audio/wav:${sample.name || sample.filename}:${realAudioUrl}`)
-
-    } catch (error) {
-      console.warn('Could not fetch audio file for drag:', error)
-      // Fallback to URL-based dragging
+    // 2. File Object (Standard File Drop) - SYNC ONLY!
+    // We rely on 'cachedBlob' being ready from onMouseEnter
+    if (cachedBlob) {
+      try {
+        const audioFile = new File([cachedBlob], finalFileName, {
+          type: cachedBlob.type || 'audio/wav',
+          lastModified: Date.now()
+        })
+        e.dataTransfer.items.add(audioFile)
+        console.log('✅ Synchronously added cached File object to drag payload')
+      } catch (error) {
+        console.warn('Error adding cached file:', error)
+      }
+    } else {
+      console.warn('⚠️ No cached blob available for file drag. URL drag only.')
     }
 
     // Create custom drag image
@@ -628,6 +650,7 @@ export default function DraggableSample({
       transition={{ delay: index * 0.05 }}
       whileHover={{ scale: 1.01, y: -1 }}
       draggable
+      onMouseEnter={prefetchAudio}
       onDragStart={(e) => handleDragStart(e as any)}
       onDragEnd={handleDragEnd}
     >

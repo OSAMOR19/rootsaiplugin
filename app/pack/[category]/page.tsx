@@ -320,9 +320,6 @@ export default function PackDetailPage({ params }: PageProps) {
                         <p className={`text-sm font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
                           {sample.name}
                         </p>
-                        <p className="text-xs text-white/40 truncate ml-2">
-                          {sample.category}
-                        </p>
                       </div>
                       <div className="h-8 w-full mt-1">
                         <WaveformCell
