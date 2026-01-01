@@ -27,18 +27,18 @@ export default function CapturePage() {
     const length = audioBuffer.length
     const sampleRate = audioBuffer.sampleRate
     const numberOfChannels = audioBuffer.numberOfChannels
-    
+
     // Create a WAV file header
     const header = new ArrayBuffer(44)
     const view = new DataView(header)
-    
+
     // WAV file header
     const writeString = (offset: number, string: string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i))
       }
     }
-    
+
     writeString(0, 'RIFF')
     view.setUint32(4, 36 + length * numberOfChannels * 2, true)
     writeString(8, 'WAVE')
@@ -52,11 +52,11 @@ export default function CapturePage() {
     view.setUint16(34, 16, true)
     writeString(36, 'data')
     view.setUint32(40, length * numberOfChannels * 2, true)
-    
+
     // Convert channels to interleaved audio
     const audioData = new ArrayBuffer(length * numberOfChannels * 2)
     const audioView = new Int16Array(audioData)
-    
+
     for (let channel = 0; channel < numberOfChannels; channel++) {
       const channelData = audioBuffer.getChannelData(channel)
       for (let i = 0; i < length; i++) {
@@ -64,7 +64,7 @@ export default function CapturePage() {
         audioView[i * numberOfChannels + channel] = sample * 32767
       }
     }
-    
+
     return new Blob([header, audioData], { type: 'audio/wav' })
   }
 
@@ -90,7 +90,7 @@ export default function CapturePage() {
         hasAudioBuffer: !!analysisData.recordedAudioBuffer,
         duration: analysisData.recordedAudioBuffer?.duration
       })
-      
+
       // Audio data is already in analysisData state, results page will access it
       router.push(
         `/results?query=${encodeURIComponent(searchQuery || "audio analysis")}&key=${encodeURIComponent(sessionKey)}&bpm=${analysisData.detectedBPM}&detectedKey=${analysisData.detectedKey}&recommendations=${encodeURIComponent(JSON.stringify(analysisData.recommendations))}`
@@ -101,22 +101,22 @@ export default function CapturePage() {
   const handleSearch = () => {
     // Check if user has either recorded audio OR entered a search query
     const hasSearchQuery = searchQuery.trim().length > 0;
-    
+
     if (!hasListened && !hasSearchQuery) {
       // Show warning modal if they haven't done either
       setShowWarningModal(true);
       return;
     }
-    
+
     // Allow search with text description
     const query = searchQuery.trim() || "afrobeat drums";
-    
+
     console.log('🔍 Text-based search:', {
       query,
       sessionKey,
       hasAudio: hasListened
     });
-    
+
     // Navigate to results with text query
     router.push(
       `/results?query=${encodeURIComponent(query)}&key=${encodeURIComponent(sessionKey)}`,
@@ -186,13 +186,13 @@ export default function CapturePage() {
             animate={
               isListening
                 ? {
-                    scale: [1, 1.1, 1],
-                    boxShadow: [
-                      "0 0 0 0 rgba(57, 160, 19, 0)",
-                      "0 0 0 10px rgba(57, 160, 19, 0.1)",
-                      "0 0 0 0 rgba(57, 160, 19, 0)",
-                    ],
-                  }
+                  scale: [1, 1.1, 1],
+                  boxShadow: [
+                    "0 0 0 0 rgba(57, 160, 19, 0)",
+                    "0 0 0 10px rgba(57, 160, 19, 0.1)",
+                    "0 0 0 0 rgba(57, 160, 19, 0)",
+                  ],
+                }
                 : {}
             }
             transition={{
@@ -210,7 +210,7 @@ export default function CapturePage() {
 
         <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
           <ThemeToggle />
-          <SessionKeyButton value={sessionKey} onClick={() => setIsKeyModalOpen(true)} />
+          {/* <SessionKeyButton value={sessionKey} onClick={() => setIsKeyModalOpen(true)} /> */}
           <motion.button
             onClick={handleSettings}
             className="p-1.5 sm:p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
@@ -272,14 +272,14 @@ export default function CapturePage() {
           transition={{ duration: 0.8, delay: 0.6 }}
         >
           <div className="space-y-4">
-            <GradientButton 
-              onClick={hasListened ? handleGoToResults : handleSearch} 
-              disabled={isListening} 
+            <GradientButton
+              onClick={hasListened ? handleGoToResults : handleSearch}
+              disabled={isListening}
               className="w-full"
             >
               {isListening ? "LISTENING..." : hasListened ? "VIEW RESULTS" : "FIND SAMPLES"}
             </GradientButton>
-            
+
             <motion.button
               onClick={handleBrowse}
               disabled={isListening}
@@ -322,27 +322,27 @@ export default function CapturePage() {
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 rounded-full flex items-center justify-center">
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.1, 1],
                     rotate: [0, 5, -5, 0]
                   }}
-                  transition={{ 
+                  transition={{
                     duration: 2,
                     repeat: Infinity,
                     repeatType: "reverse"
                   }}
                 >
-                  <svg 
-                    className="w-10 h-10 text-green-600 dark:text-green-400" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
+                  <svg
+                    className="w-10 h-10 text-green-600 dark:text-green-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" 
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
                     />
                   </svg>
                 </motion.div>
@@ -363,7 +363,7 @@ export default function CapturePage() {
             <div className="space-y-3 mb-8">
               <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  
+
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800 dark:text-gray-200">Record or Upload Audio</p>
@@ -377,7 +377,7 @@ export default function CapturePage() {
 
               <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                  
+
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800 dark:text-gray-200">Describe What You Want</p>
@@ -391,7 +391,7 @@ export default function CapturePage() {
               onClick={() => setShowWarningModal(false)}
               className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
             >
-              Got It! 
+              Got It!
             </button>
           </motion.div>
         </motion.div>

@@ -1,11 +1,27 @@
 "use client"
 
-import { Play, Pause, SkipBack, SkipForward, Volume2, Heart, Repeat, Shuffle } from "lucide-react"
+import { Play, Pause, SkipBack, SkipForward, Volume2, Heart, Repeat, Shuffle, X } from "lucide-react"
 import { useAudio } from "@/contexts/AudioContext"
 import { cn } from "@/lib/utils"
 
 export default function PlayerBar() {
-    const { currentTrack, isPlaying, togglePlay, currentTime, duration, seekTo } = useAudio()
+    const {
+        currentTrack,
+        isPlaying,
+        togglePlay,
+        currentTime,
+        duration,
+        seekTo,
+        playNext,
+        playPrevious,
+        toggleShuffle,
+        isShuffle,
+        toggleRepeat,
+        repeatMode,
+        closePlayer,
+        volume,
+        setVolume
+    } = useAudio()
 
     const formatTime = (time: number) => {
         if (!time) return "0:00"
@@ -45,10 +61,16 @@ export default function PlayerBar() {
             {/* Player Controls */}
             <div className="flex flex-col items-center gap-2 w-[40%]">
                 <div className="flex items-center gap-6">
-                    <button className="text-white/40 hover:text-white transition-colors">
+                    <button
+                        onClick={toggleShuffle}
+                        className={`transition-colors ${isShuffle ? 'text-green-500' : 'text-white/40 hover:text-white'}`}
+                    >
                         <Shuffle className="w-4 h-4" />
                     </button>
-                    <button className="text-white/60 hover:text-white transition-colors">
+                    <button
+                        onClick={playPrevious}
+                        className="text-white/60 hover:text-white transition-colors"
+                    >
                         <SkipBack className="w-5 h-5 fill-current" />
                     </button>
                     <button
@@ -61,11 +83,19 @@ export default function PlayerBar() {
                             <Play className="w-5 h-5 text-black fill-current ml-1" />
                         )}
                     </button>
-                    <button className="text-white/60 hover:text-white transition-colors">
+                    <button
+                        onClick={playNext}
+                        className="text-white/60 hover:text-white transition-colors"
+                    >
                         <SkipForward className="w-5 h-5 fill-current" />
                     </button>
-                    <button className="text-white/40 hover:text-white transition-colors">
+                    <button
+                        onClick={toggleRepeat}
+                        className={`transition-colors ${repeatMode !== 'off' ? 'text-green-500' : 'text-white/40 hover:text-white'}`}
+                        title={`Repeat: ${repeatMode}`}
+                    >
                         <Repeat className="w-4 h-4" />
+                        {repeatMode === 'one' && <span className="text-[8px] absolute ml-2.5 mt-[-8px]">1</span>}
                     </button>
                 </div>
 
@@ -91,10 +121,30 @@ export default function PlayerBar() {
 
             {/* Volume & Options */}
             <div className="flex items-center justify-end gap-4 w-[30%]">
-                <Volume2 className="w-5 h-5 text-white/60" />
-                <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div className="w-2/3 h-full bg-white/60 hover:bg-green-500 transition-colors" />
+                <div className="flex items-center gap-2 group">
+                    <Volume2 className="w-5 h-5 text-white/60 group-hover:text-white transition-colors" />
+                    <div className="w-24 h-1 bg-white/10 rounded-full relative group/vol">
+                        <div
+                            className="absolute top-0 left-0 h-full bg-white/60 group-hover/vol:bg-green-500 transition-colors rounded-full"
+                            style={{ width: `${volume * 100}%` }}
+                        />
+                        <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={volume}
+                            onChange={(e) => setVolume(Number(e.target.value))}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                    </div>
                 </div>
+                <button
+                    onClick={closePlayer}
+                    className="text-white/40 hover:text-white transition-colors ml-4"
+                >
+                    <X className="w-5 h-5" />
+                </button>
             </div>
         </div>
     )

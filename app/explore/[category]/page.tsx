@@ -22,11 +22,11 @@ const EXPLORE_DATA: Record<string, { label: string, description: string, groups:
         groups: [
             {
                 title: "Loops",
-                items: ["Full Loops", "Top Loops", "Kick Loops", "Rim Loops", "Hi-hat Loops"]
+                items: ["Full Drum Loop", "Top Loop", "Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop", "Shaker Loop"]
             },
             {
                 title: "One Shots & Fills",
-                items: ["Drum Fills", "Kicks", "Snares", "Hats"]
+                items: ["Drum One-Shot", "Fill"]
             }
         ]
     },

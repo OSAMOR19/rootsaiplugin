@@ -25,11 +25,22 @@ interface AudioContextType {
   isPlaying: boolean
   currentTime: number
   duration: number
-  playTrack: (track: Track) => void
+  playTrack: (track: Track, newQueue?: Track[]) => void
   pauseTrack: () => void
   resumeTrack: () => void
   togglePlay: () => void
   seekTo: (time: number) => void
+  queue: Track[]
+  setQueue: (tracks: Track[]) => void
+  playNext: () => void
+  playPrevious: () => void
+  isShuffle: boolean
+  toggleShuffle: () => void
+  repeatMode: 'off' | 'all' | 'one'
+  toggleRepeat: () => void
+  closePlayer: () => void
+  volume: number
+  setVolume: (volume: number) => void
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
@@ -40,13 +51,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [queue, setQueue] = useState<Track[]>([])
+  const [isShuffle, setIsShuffle] = useState(false)
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off')
+  const [volume, setVolume] = useState(1)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
 
-      audioRef.current.onended = () => setIsPlaying(false)
+      audioRef.current.onended = () => {
+        if (repeatMode === 'one') {
+          audioRef.current?.play()
+        } else {
+          playNext()
+        }
+      }
 
       audioRef.current.ontimeupdate = () => {
         setCurrentTime(audioRef.current?.currentTime || 0)
@@ -56,9 +77,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setDuration(audioRef.current?.duration || 0)
       }
     }
-  }, [])
+    // Update volume whenever it changes
+    if (audioRef.current) {
+      audioRef.current.volume = volume
+    }
+  }, [queue, currentTrack, repeatMode, isShuffle, volume]) // Dependencies for onended and volume
 
-  const playTrack = async (track: Track) => {
+  const playTrack = async (track: Track, newQueue?: Track[]) => {
+    if (newQueue) {
+      setQueue(newQueue)
+    }
+
     if (audioRef.current) {
       if (currentTrack?.id === track.id) {
         togglePlay()
@@ -67,6 +96,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
       try {
         audioRef.current.src = track.audioUrl
+        audioRef.current.volume = volume // Ensure volume is set
         audioRef.current.load() // Ensure new source is loaded
 
         const playPromise = audioRef.current.play()
@@ -79,7 +109,6 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Playback failed:", error)
         setIsPlaying(false)
-        // Verify if URL is valid or empty
         if (!track.audioUrl) {
           console.error("Track has no audio URL")
         }
@@ -124,6 +153,74 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const playNext = () => {
+    if (queue.length === 0 || !currentTrack) return
+
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id)
+    let nextIndex = -1
+
+    if (isShuffle) {
+      nextIndex = Math.floor(Math.random() * queue.length)
+    } else {
+      nextIndex = currentIndex + 1
+      if (nextIndex >= queue.length) {
+        if (repeatMode === 'all') {
+          nextIndex = 0
+        } else {
+          setIsPlaying(false)
+          return
+        }
+      }
+    }
+
+    if (nextIndex >= 0 && nextIndex < queue.length) {
+      playTrack(queue[nextIndex])
+    }
+  }
+
+  const playPrevious = () => {
+    if (queue.length === 0 || !currentTrack) return
+
+    const currentIndex = queue.findIndex(t => t.id === currentTrack.id)
+    let prevIndex = -1
+
+    if (isShuffle) {
+      prevIndex = Math.floor(Math.random() * queue.length)
+    } else {
+      prevIndex = currentIndex - 1
+      if (prevIndex < 0) {
+        if (repeatMode === 'all') {
+          prevIndex = queue.length - 1
+        } else {
+          prevIndex = 0 // Or stop/restart current? Usually restart current if > 3s, else prev. Simplified here.
+        }
+      }
+    }
+
+    if (prevIndex >= 0 && prevIndex < queue.length) {
+      playTrack(queue[prevIndex])
+    }
+  }
+
+  const toggleShuffle = () => setIsShuffle(!isShuffle)
+
+  const toggleRepeat = () => {
+    setRepeatMode(prev => {
+      if (prev === 'off') return 'all'
+      if (prev === 'all') return 'one'
+      return 'off'
+    })
+  }
+
+  const closePlayer = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+    setIsPlaying(false)
+    setCurrentTrack(null)
+  }
+
   return (
     <AudioContext.Provider value={{
       analysisData,
@@ -136,7 +233,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       pauseTrack,
       resumeTrack,
       togglePlay,
-      seekTo
+      seekTo,
+      queue,
+      setQueue,
+      playNext,
+      playPrevious,
+      isShuffle,
+      toggleShuffle,
+      repeatMode,
+      toggleRepeat,
+      closePlayer,
+      volume,
+      setVolume
     }}>
       {children}
     </AudioContext.Provider>

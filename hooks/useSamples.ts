@@ -20,6 +20,7 @@ export interface Sample {
   instruments?: string[]
   drumType?: string
   keywords?: string[]
+  moodTag?: string
 }
 
 export interface UseSamplesOptions {
@@ -77,6 +78,7 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
           drumType: s.drum_type,
           keywords: s.keywords || [],
           storage: 'supabase', // Mark as supabase source
+          moodTag: s.mood_tag || s.mood, // Try to find mood tag
         }))
         setSamples(mappedSamples)
       }

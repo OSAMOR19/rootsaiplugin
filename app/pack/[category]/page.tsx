@@ -88,7 +88,14 @@ export default function PackDetailPage({ params }: PageProps) {
         audioUrl: audioUrl,
         imageUrl: packImage, // Use the consistent pack image
         duration: sample.duration || '0:00'
-      })
+      }, filteredSamples.map(s => ({
+        id: s.id,
+        title: s.name,
+        artist: s.category || "Unknown Category",
+        audioUrl: s.audioUrl || s.url || "",
+        imageUrl: packImage,
+        duration: s.duration || '0:00'
+      })))
     }
   }
 

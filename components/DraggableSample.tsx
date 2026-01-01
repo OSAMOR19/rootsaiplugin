@@ -31,6 +31,7 @@ interface DraggableSampleProps {
   originalDetectedBPM?: number | null // Original detected BPM for tempo calculations
   isSyncPlaying?: boolean // NEW: Is this sample currently sync playing with recorded audio?
   onSyncPlay?: () => void // NEW: Handler for sync play
+  volume?: number // Add volume prop
 }
 
 export default function DraggableSample({
@@ -43,7 +44,8 @@ export default function DraggableSample({
   recordedBPM,
   originalDetectedBPM,
   isSyncPlaying = false,
-  onSyncPlay
+  onSyncPlay,
+  volume = 1
 }: DraggableSampleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
@@ -132,8 +134,7 @@ export default function DraggableSample({
             minPxPerSec: 1,
           })
 
-          // ✅ FIX: Enable pitch-preserving time stretching (tempo changes without pitch changes)
-          // This ensures that when BPM changes, only the tempo changes, NOT the key/pitch
+          // ✅ FIX: Enable pitch-preserving time stretching AND looping
           // Wait a tiny bit for the media element to be created
           setTimeout(() => {
             const mediaElement = ws.getMediaElement() as any
@@ -141,9 +142,11 @@ export default function DraggableSample({
               mediaElement.preservesPitch = true
               mediaElement.mozPreservesPitch = true // Firefox
               mediaElement.webkitPreservesPitch = true // Safari
-              console.log('✅ Pitch-preserving time stretch ENABLED - tempo changes won\'t affect key/pitch!')
+              mediaElement.loop = true // ✅ Enable looping
+              mediaElement.volume = volume // ✅ Set volume
+              console.log('✅ Pitch-preserving time stretch and LOOPING enabled!')
             } else {
-              console.warn('⚠️ Could not enable pitch preservation - media element not found')
+              console.warn('⚠️ Could not enable pitch preservation/looping - media element not found')
             }
           }, 100)
 
@@ -338,6 +341,13 @@ export default function DraggableSample({
     }
   }, [recordedBPM, originalDetectedBPM, waveSurfer, sample, audioUrl])
 
+  // Update volume when prop changes
+  useEffect(() => {
+    if (waveSurfer) {
+      waveSurfer.setVolume(volume)
+    }
+  }, [volume, waveSurfer])
+
   // Handle WaveSurfer play/pause 
   useEffect(() => {
     if (waveSurfer && !isInitializingRef.current) {
@@ -360,6 +370,42 @@ export default function DraggableSample({
       }
     }
   }, [isPlaying, waveSurfer, hasStarted, audioUrl])
+
+  // ✅ NEW: Handle Sync Play Visualization
+  // When sync playing, WaveSurfer is idle (playback managed by SyncEngine), so we manually animate the cursor/progress
+  useEffect(() => {
+    let animationFrameId: number
+    let startTime: number
+
+    if (isSyncPlaying && waveSurfer && audioDuration > 0) {
+      console.log('Starting sync visualization...')
+      startTime = Date.now()
+
+      const animate = () => {
+        const elapsed = (Date.now() - startTime) / 1000 // Seconds
+        // Handle looping based on duration (assuming SyncEngine loops)
+        const currentLoopTime = elapsed % audioDuration
+        const progressPercent = currentLoopTime / audioDuration
+
+        // Update WaveSurfer cursor
+        waveSurfer.seekTo(progressPercent)
+
+        // Update state progress
+        setAudioProgress(progressPercent * 100)
+
+        animationFrameId = requestAnimationFrame(animate)
+      }
+
+      animate()
+    } else if (!isSyncPlaying && waveSurfer && !isPlaying) {
+      // Reset if stopped and not normally playing
+      // waveSurfer.seekTo(0) // Optional: reset to start
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
+  }, [isSyncPlaying, waveSurfer, audioDuration, isPlaying])
 
   // Component unmount cleanup
   useEffect(() => {
@@ -564,8 +610,8 @@ export default function DraggableSample({
   return (
     <motion.div
       className={`backdrop-blur-sm rounded-xl border overflow-hidden transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${sample.isRecentSong
-          ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400"
-          : "bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-green-500/50"
+        ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400"
+        : "bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-green-500/50"
         } ${isDragging ? "opacity-50 scale-95" : ""
         }`}
       initial={{ opacity: 0, x: -20 }}
@@ -588,8 +634,8 @@ export default function DraggableSample({
 
         {/* Artwork (square) - Responsive sizing */}
         <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 relative overflow-hidden border ${sample.isRecentSong
-            ? "bg-gradient-to-br from-blue-500/30 to-purple-500/30 border-blue-400/50 dark:border-blue-500/50"
-            : "bg-gradient-to-br from-green-500/20 to-green-600/20 border-gray-200 dark:border-gray-700"
+          ? "bg-gradient-to-br from-blue-500/30 to-purple-500/30 border-blue-400/50 dark:border-blue-500/50"
+          : "bg-gradient-to-br from-green-500/20 to-green-600/20 border-gray-200 dark:border-gray-700"
           }`}>
           {sample.isRecentSong ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -601,11 +647,21 @@ export default function DraggableSample({
             </div>
           ) : (
             <>
+              {/* Use sample.imageUrl if available, otherwise fallback to category-based drum image */}
               <Image
-                src={getDrumImage(sample.category)}
+                src={sample.imageUrl && sample.imageUrl !== '/placeholder.jpg' ? sample.imageUrl : getDrumImage(sample.category)}
                 alt={sample.category || "Drum"}
                 fill
                 className="object-cover"
+                unoptimized={!!(sample.imageUrl && sample.imageUrl.startsWith('http'))} // Bypass optimization for remote URLs to avoid config issues
+                onError={(e) => {
+                  // Fallback to drum image on error
+                  const target = e.target as HTMLImageElement;
+                  // Changing src on Next/Image might be tricky directly on error, but we can try manual handling or assume it works if valid.
+                  // Actually Next/Image onError is on the wrapper? 
+                  // If src fails, it shows broken image.
+                  // For now, let's rely on valid URLs.
+                }}
               />
               <div className="absolute inset-0 bg-black/10" />
             </>
@@ -617,8 +673,8 @@ export default function DraggableSample({
           <motion.button
             onClick={onPlayPause}
             className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${isPlaying
-                ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 hover:shadow-md"
+              ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
+              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 hover:shadow-md"
               }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -631,14 +687,14 @@ export default function DraggableSample({
             <motion.button
               onClick={onSyncPlay}
               className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${isSyncPlaying
-                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-md"
+                ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-md"
                 }`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               title="Sync play with your audio"
             >
-              <Layers className="w-3 h-3 sm:w-4 sm:h-4" />
+              {isSyncPlaying ? <Pause className="w-3 h-3 sm:w-4 sm:h-4" /> : <Layers className="w-3 h-3 sm:w-4 sm:h-4" />}
             </motion.button>
           )}
         </div>
@@ -646,8 +702,8 @@ export default function DraggableSample({
         {/* Filename and Tags - Responsive */}
         <div className="flex-shrink-0 min-w-0 hidden sm:block" style={{ width: '150px' }}>
           <h3 className={`font-semibold truncate text-xs sm:text-sm mb-1 ${sample.isRecentSong
-              ? "text-blue-700 dark:text-blue-300"
-              : "text-gray-800 dark:text-gray-200"
+            ? "text-blue-700 dark:text-blue-300"
+            : "text-gray-800 dark:text-gray-200"
             }`}>
             {sample.name}
           </h3>
@@ -669,8 +725,8 @@ export default function DraggableSample({
         {/* Mobile filename - shown only on mobile */}
         <div className="flex-shrink-0 min-w-0 sm:hidden">
           <h3 className={`font-semibold truncate text-xs ${sample.isRecentSong
-              ? "text-blue-700 dark:text-blue-300"
-              : "text-gray-800 dark:text-gray-200"
+            ? "text-blue-700 dark:text-blue-300"
+            : "text-gray-800 dark:text-gray-200"
             }`}>
             {sample.name}
           </h3>
@@ -713,8 +769,8 @@ export default function DraggableSample({
               setIsLiked(newLikedState)
             }}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isLiked
-                ? "text-red-500 bg-red-50 dark:bg-red-900/20"
-                : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              ? "text-red-500 bg-red-50 dark:bg-red-900/20"
+              : "text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
               }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -723,7 +779,7 @@ export default function DraggableSample({
             <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${isLiked ? "fill-current" : ""}`} />
           </motion.button>
 
-          {/* Checkmark (Download/Select) - Hidden on mobile */}
+          {/* Download Button (formerly checkmark) - Hidden on mobile */}
           <motion.button
             onClick={handleDownload}
             className="hidden sm:flex w-7 h-7 sm:w-8 sm:h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors items-center justify-center"
@@ -731,9 +787,7 @@ export default function DraggableSample({
             whileTap={{ scale: 0.95 }}
             title="Download audio file"
           >
-            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            <Download className="w-3 h-3 sm:w-4 sm:h-4" />
           </motion.button>
 
           {/* Three Dots (More Options) */}

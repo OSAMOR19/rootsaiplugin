@@ -16,6 +16,8 @@ import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { supabase } from "@/lib/supabase"
+import PlayerBar from "@/components/PlayerBar"
 
 function ResultsContent() {
   const { toast } = useToast()
@@ -48,41 +50,44 @@ function ResultsContent() {
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
-  // ✅ NEW: Load initial compatible sounds from local library
+  // ✅ NEW: Load initial compatible sounds from local library (Now verified Supabase)
   const loadInitialCompatibleSounds = async (bpm: number | null, key: string, limit: number = 10) => {
     console.log('🔍 loadInitialCompatibleSounds CALLED:', { bpm, key, limit })
-    
+
     if (!bpm) {
       console.error('❌ NO BPM - returning empty array')
       return []
     }
-    
+
     try {
-      console.log('📂 Fetching metadata.json...')
-      const metadataResponse = await fetch('/audio/metadata.json')
-      if (!metadataResponse.ok) {
-        console.error('❌ Could not load metadata.json, status:', metadataResponse.status)
+      console.log('📂 Fetching samples from Supabase...')
+      const { data: allLoops, error } = await supabase
+        .from('samples')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('❌ Could not load samples from Supabase:', error)
         return []
       }
-      
-      const allLoops: any[] = await metadataResponse.json()
-      console.log('✅ Loaded metadata.json:', allLoops.length, 'loops')
-      
+
+      console.log('✅ Loaded samples from DB:', allLoops?.length, 'loops')
+
       // ✅ Filter out invalid entries (no filename/fileName and no url/audioUrl)
-      const validLoops = allLoops.filter(loop => {
-        const hasFileName = !!(loop.filename || loop.fileName || loop.name)
-        const hasAudioUrl = !!(loop.url || loop.audioUrl)
+      const validLoops = (allLoops || []).filter(loop => {
+        const hasFileName = !!(loop.filename || loop.name)
+        const hasAudioUrl = !!(loop.url || loop.audio_url)
         return hasFileName && hasAudioUrl
       })
-      
+
       console.log('✅ Valid loops (with filename & URL):', validLoops.length)
-      
+
       // Calculate compatibility scores (same algorithm as handleViewMore)
       const scoredLoops = validLoops.map((loop: any) => {
         // ✅ Handle both 'filename' and 'fileName' fields
-        const fileName = loop.filename || loop.fileName || loop.name || ''
+        const fileName = loop.filename || loop.name || ''
         const loopBPM = loop.bpm ?? extractBPMFromString(fileName) ?? 120
-        
+
         // ✅ Handle both string keys ("C", "Am") and object keys ({ tonic: "C", scale: "major" })
         let loopKey = 'C'
         if (typeof loop.key === 'string') {
@@ -90,9 +95,9 @@ function ResultsContent() {
         } else if (loop.key?.tonic) {
           loopKey = loop.key.tonic
         }
-        
+
         let score = 0
-        
+
         // BPM matching
         const bpmRatio = loopBPM / bpm
         if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
@@ -102,12 +107,12 @@ function ResultsContent() {
         } else if (Math.abs(bpm - loopBPM) <= 10) {
           score += 20
         }
-        
+
         // Key matching
         if (key === loopKey) {
           score += 25
         }
-        
+
         // Rhythmic complexity
         const fileNameLower = fileName.toLowerCase()
         if (fileNameLower.includes('kick') || fileNameLower.includes('bass')) {
@@ -115,33 +120,33 @@ function ResultsContent() {
         } else if (fileNameLower.includes('perc') || fileNameLower.includes('shaker')) {
           score += 20
         }
-        
+
         return { loop, score }
       })
-      
+
       // Log scoring results
       const sortedScores = [...scoredLoops].sort((a, b) => b.score - a.score)
       console.log('🎯 Scoring results:', {
         totalLoops: validLoops.length,
         scoredLoops: scoredLoops.length,
         topScores: sortedScores.slice(0, 10).map(l => {
-          const fileName = l.loop.filename || l.loop.fileName || l.loop.name
+          const fileName = l.loop.filename || l.loop.name
           return { name: fileName, score: l.score, bpm: l.loop.bpm, key: l.loop.key }
         }),
         lowestScore: sortedScores[sortedScores.length - 1]?.score || 0,
         highestScore: sortedScores[0]?.score || 0
       })
-      
+
       // Sort by compatibility score and take top N
       const topLoops = scoredLoops
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
         .map((item: any, index: number) => {
           // ✅ Handle both 'filename' and 'fileName' fields
-          const fileName = item.loop.filename || item.loop.fileName || item.loop.name || 'Unknown'
+          const fileName = item.loop.filename || item.loop.name || 'Unknown'
           const originalBpm = item.loop.bpm ?? extractBPMFromString(fileName)
-          const audioUrl = item.loop.url || item.loop.audioUrl
-          
+          const audioUrl = item.loop.url || item.loop.audio_url
+
           // ✅ Handle both string keys and object keys
           let loopKey = key
           if (typeof item.loop.key === 'string') {
@@ -149,24 +154,24 @@ function ResultsContent() {
           } else if (item.loop.key?.tonic) {
             loopKey = item.loop.key.tonic
           }
-          
+
           return {
-            id: `compatible-${index}`,
+            id: item.loop.id || `compatible-${index}`,
             name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
-            artist: 'Compatible Match',
+            artist: item.loop.category || 'Compatible Match', // Use category if no artist
             category: item.loop.category || 'audio-analysis',
             bpm: bpm,
             originalBpm: originalBpm,
             key: loopKey,
             audioUrl: audioUrl,
-            imageUrl: '/placeholder.jpg',
-            duration: '4 bars',
+            imageUrl: item.loop.image_url || item.loop.imageUrl || '/placeholder.jpg', // Try both snake_case and camelCase
+            duration: '4 bars', // This might need update if we have duration
             tags: ['compatible', 'matching-bpm'],
             waveform: Array.from({ length: 50 }, () => Math.random() * 100),
             compatibilityScore: item.score
           }
         })
-      
+
       console.log(`✅ Loaded ${topLoops.length} initial compatible sounds`)
       return topLoops
     } catch (error) {
@@ -179,18 +184,18 @@ function ResultsContent() {
     const loadData = async () => {
       console.log('🎬 Results page loading data...')
       console.log('📦 URL params:', { recommendationsParam: !!recommendationsParam, detectedBPM, detectedKey })
-      
+
       // If we have recommendations from audio analysis, use those
       if (recommendationsParam) {
         try {
           const recommendations = JSON.parse(decodeURIComponent(recommendationsParam))
-          
+
           // Get the detected BPM to use for all recommendation cards
           // Use edited BPM if available, otherwise fall back to detected BPM
           const universalBPM = editedBPM ?? (detectedBPM ? parseInt(detectedBPM) : null)
-          
+
           console.log('🎵 Calculated universalBPM:', universalBPM, 'from editedBPM:', editedBPM, 'detectedBPM:', detectedBPM)
-          
+
           // Set recorded BPM from URL params (for DraggableSample to use)
           if (detectedBPM) {
             const initialBPM = parseInt(detectedBPM)
@@ -202,7 +207,7 @@ function ResultsContent() {
           } else {
             console.error('❌ NO detectedBPM in URL params!')
           }
-          
+
           // Add the recently played song as the first card
           const recentSong = {
             id: 'recent-song',
@@ -212,24 +217,24 @@ function ResultsContent() {
             bpm: universalBPM, // Use edited/detected BPM
             key: detectedKey || 'C',
             audioUrl: null, // Will use recordedAudioBuffer
-            imageUrl: '/placeholder.jpg',
+            imageUrl: '/placeholder.jpg', // Placeholder for user recording
             duration: '4 bars',
             tags: ['recording', 'recent', 'your-audio'],
             waveform: Array.from({ length: 50 }, () => Math.random() * 100),
             isRecentSong: true
           }
-          
+
           console.log('🎸 Created recentSong card')
-          
+
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
           console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM)
           const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10)
-          
+
           console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
           console.log('📋 Setting samples to:', [recentSong, ...initialCompatibleSounds].length, 'total samples')
-          
+
           setSamples([recentSong, ...initialCompatibleSounds])
-          
+
           // ✅ NEW: Load audio buffer from React Context (NOT localStorage!)
           try {
             if (analysisData?.recordedAudioBuffer) {
@@ -259,17 +264,17 @@ function ResultsContent() {
 
     // ✅ FIX: Load compatible sounds IMMEDIATELY (no delay!)
     loadData()
-    }, [query, recommendationsParam, detectedBPM, analysisData])
+  }, [query, recommendationsParam, detectedBPM, analysisData])
 
   // Load favorites count and listen for updates
   useEffect(() => {
     const updateFavoritesCount = () => {
       setFavoritesCount(getFavoritesCount())
     }
-    
+
     updateFavoritesCount()
     window.addEventListener('favoritesUpdated', updateFavoritesCount)
-    
+
     return () => {
       window.removeEventListener('favoritesUpdated', updateFavoritesCount)
     }
@@ -283,13 +288,13 @@ function ResultsContent() {
         // Only update if BPM actually changed to avoid unnecessary re-renders
         const needsUpdate = prevSamples.some(s => s.bpm !== editedBPM)
         if (!needsUpdate) return prevSamples
-        
+
         return prevSamples.map(sample => ({
           ...sample,
           bpm: editedBPM
         }))
       })
-      
+
       // Also update recordedBPM so playback uses the new BPM
       setRecordedBPM(editedBPM)
     }
@@ -315,7 +320,7 @@ function ResultsContent() {
       syncEngine.stopAll()
       setSyncPlayingSampleId(null)
       setCurrentlyPlaying(null)
-      
+
       toast({
         title: "Sync Stopped",
         description: "Playback has been stopped.",
@@ -332,7 +337,7 @@ function ResultsContent() {
         })
         return
       }
-      
+
       // Start sync playback
       if (!recordedAudioBuffer || !recordedBPM) {
         console.warn('No recorded audio or BPM for sync playback')
@@ -349,10 +354,10 @@ function ResultsContent() {
         // Stop any currently playing audio
         syncEngine.stopAll()
         setCurrentlyPlaying(null)
-        
+
         // Load sample audio
         const sampleBuffer = await loadAudioBuffer(sampleUrl)
-        
+
         // Start sync playback
         await syncEngine.syncPlay(
           recordedAudioBuffer,
@@ -364,10 +369,10 @@ function ResultsContent() {
             sampleVolume: sampleVolume / 100 // Convert 0-100 to 0-1
           }
         )
-        
+
         setSyncPlayingSampleId(sampleId)
         console.log(`✅ Sync playing: Your audio + ${sampleId}`)
-        
+
         toast({
           title: "Synced! 🎧",
           description: "Your audio is now playing with the drum sample.",
@@ -388,21 +393,21 @@ function ResultsContent() {
   const handleViewMore = async () => {
     const bpmToUse = editedBPM ?? recordedBPM
     if (!recordedAudioBuffer || isLoadingMore || !bpmToUse || !detectedKey) return
-    
+
     setIsLoadingMore(true)
-    
+
     try {
       // Load real metadata from local library
       const metadataResponse = await fetch('/audio/metadata.json')
       if (!metadataResponse.ok) {
         throw new Error('Failed to load audio metadata')
       }
-      
+
       const allLoops: any[] = await metadataResponse.json()
-      
+
       // Get already displayed sample URLs to exclude them
       const existingUrls = new Set(samples.map((s: any) => s.audioUrl).filter(Boolean))
-      
+
       // Calculate compatibility scores for all loops (same algorithm as API)
       const calculateCompatibilityScore = (
         detectedBPM: number,
@@ -412,7 +417,7 @@ function ResultsContent() {
         loopFilename: string
       ): number => {
         let totalScore = 0
-        
+
         // 1. Musical Compatibility
         let musicalScore = 0
         if (detectedKey === loopKey) {
@@ -428,7 +433,7 @@ function ResultsContent() {
           }
           musicalScore += harmonicRelationships[detectedKey]?.[loopKey] || 10
         }
-        
+
         const bpmRatio = loopBPM / detectedBPM
         if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
           musicalScore += 15
@@ -441,9 +446,9 @@ function ResultsContent() {
         } else {
           musicalScore += Math.max(0, 15 - Math.abs(detectedBPM - loopBPM) / 2)
         }
-        
+
         totalScore += musicalScore
-        
+
         // 2. Rhythmic Complexity
         const filename = loopFilename.toLowerCase()
         let rhythmScore = 0
@@ -459,7 +464,7 @@ function ResultsContent() {
           rhythmScore += 22
         }
         totalScore += rhythmScore
-        
+
         // 3. Timbral Compatibility
         let timbreScore = 0
         if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
@@ -473,20 +478,20 @@ function ResultsContent() {
           timbreScore += 8
         }
         totalScore += timbreScore
-        
+
         // 4. Cultural/Stylistic Coherence
         let styleScore = 15
         if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
-            (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
-            (filename.includes('shekere') && filename.includes('perc'))) {
+          (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
+          (filename.includes('shekere') && filename.includes('perc'))) {
           styleScore += 10
         }
         totalScore += styleScore
-        
+
         const finalScore = Math.min(100, totalScore)
         return finalScore >= 75 ? finalScore : 0
       }
-      
+
       // Score all loops and filter out already shown ones
       const scoredLoops = allLoops
         .filter(loop => {
@@ -496,7 +501,7 @@ function ResultsContent() {
         .map(loop => {
           // ✅ Handle both 'filename' and 'fileName' fields
           const fileName = loop.filename || loop.fileName || loop.name || ''
-          
+
           // ✅ Handle both string keys and object keys
           let loopKey = 'C'
           if (typeof loop.key === 'string') {
@@ -504,7 +509,7 @@ function ResultsContent() {
           } else if (loop.key?.tonic) {
             loopKey = loop.key.tonic
           }
-          
+
           return {
             ...loop,
             score: calculateCompatibilityScore(
@@ -518,10 +523,10 @@ function ResultsContent() {
         })
         .filter(loop => loop.score > 0) // Only compatible matches
         .sort((a, b) => b.score - a.score) // Sort by compatibility
-      
+
       // Get top 5-10 additional matches
       const topMatches = scoredLoops.slice(0, 10)
-      
+
       // Convert to sample format
       const universalBPMForAdditional = bpmToUse
       const additionalSamples = topMatches.map((loop, index) => {
@@ -529,7 +534,7 @@ function ResultsContent() {
         const fileName = loop.filename || loop.fileName || loop.name || 'Unknown'
         const audioUrl = loop.url || loop.audioUrl
         const originalBpm = loop.bpm
-        
+
         // ✅ Handle both string keys and object keys
         let loopKey = detectedKey
         if (typeof loop.key === 'string') {
@@ -537,7 +542,7 @@ function ResultsContent() {
         } else if (loop.key?.tonic) {
           loopKey = loop.key.tonic
         }
-        
+
         return {
           id: `additional-${Date.now()}-${index}`,
           name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
@@ -553,17 +558,17 @@ function ResultsContent() {
           waveform: Array.from({ length: 50 }, () => Math.random() * 100)
         }
       })
-      
+
       if (additionalSamples.length === 0) {
         console.warn('No additional compatible samples found')
         // Could show a message to user here
       }
-      
+
       // Add new samples to existing ones
       setSamples(prevSamples => [...prevSamples, ...additionalSamples])
-      
+
       console.log(`Loaded ${additionalSamples.length} additional compatible samples from local library`)
-      
+
     } catch (error) {
       console.error('Error loading more samples from local library:', error)
     } finally {
@@ -577,18 +582,18 @@ function ResultsContent() {
 
   const filteredSamples = samples.filter((sample) => {
     // First filter by search query
-    const matchesSearch = 
+    const matchesSearch =
       sample.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
       sample.artist.toLowerCase().includes(searchFilter.toLowerCase())
-    
+
     // Then filter by selected category
     if (selectedCategory === "all") {
       return matchesSearch
     }
-    
+
     // Check if sample category matches selected category
     const matchesCategory = sample.category === selectedCategory
-    
+
     return matchesSearch && matchesCategory
   })
 
@@ -744,7 +749,7 @@ function ResultsContent() {
                 <Moon className="w-5 h-5 text-blue-600" />
               )}
             </motion.button>
-            
+
             {/* Search Filter */}
             <div className="relative order-1 lg:order-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -784,10 +789,10 @@ function ResultsContent() {
                   />
                   <span className="text-xs text-blue-600 dark:text-blue-400 w-7 font-semibold">{recordedVolume}</span>
                 </div>
-                
+
                 {/* Divider */}
                 <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-                
+
                 {/* Sample Volume */}
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
@@ -814,7 +819,7 @@ function ResultsContent() {
                 </div>
               </div>
             )}
-            
+
             {/* Regular Volume Control - When not sync playing */}
             {!syncPlayingSampleId && (
               <div className="hidden md:flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 border border-gray-200 dark:border-gray-600">
@@ -896,10 +901,11 @@ function ResultsContent() {
             )}
 
             {/* Session Info - Responsive sizing */}
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-2 sm:px-3 py-2 border border-gray-200 dark:border-gray-600">
+            {/* Session Info - Responsive sizing */}
+            {/* <div className="bg-gray-100 dark:bg-gray-800 rounded-lg px-2 sm:px-3 py-2 border border-gray-200 dark:border-gray-600">
               <div className="text-xs text-gray-600 dark:text-gray-400">SESSION KEY</div>
               <div className="font-semibold text-green-600 dark:text-green-400 text-sm">{sessionKey}</div>
-            </div>
+            </div> */}
 
           </div>
         </div>
@@ -908,7 +914,7 @@ function ResultsContent() {
 
       {/* Mobile Volume Controls - Show only when sync playing */}
       {syncPlayingSampleId && (
-        <motion.div 
+        <motion.div
           className="lg:hidden bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border-b-2 border-blue-200 dark:border-blue-700 p-4"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -937,7 +943,7 @@ function ResultsContent() {
               />
               <span className="text-sm text-blue-600 dark:text-blue-400 w-10 font-semibold text-right">{recordedVolume}%</span>
             </div>
-            
+
             {/* Sample Volume */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 min-w-[80px]">
@@ -982,6 +988,7 @@ function ResultsContent() {
               recordedAudioBuffer={recordedAudioBuffer}
               recordedBPM={editedBPM ?? recordedBPM}
               originalDetectedBPM={originalDetectedBPM}
+              volume={sampleVolume / 100}
             />
           ))}
         </div>
@@ -998,7 +1005,7 @@ function ResultsContent() {
 
         {/* View More Button - Only show for AI-matched results */}
         {recommendationsParam && filteredSamples.length > 0 && (
-          <motion.div 
+          <motion.div
             className="flex justify-center mt-8 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1007,11 +1014,10 @@ function ResultsContent() {
             <motion.button
               onClick={handleViewMore}
               disabled={isLoadingMore || !recordedAudioBuffer}
-              className={`px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${
-                isLoadingMore || !recordedAudioBuffer
-                  ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                  : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-              }`}
+              className={`px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${isLoadingMore || !recordedAudioBuffer
+                ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                }`}
               whileHover={!isLoadingMore && recordedAudioBuffer ? { scale: 1.05 } : {}}
               whileTap={!isLoadingMore && recordedAudioBuffer ? { scale: 0.95 } : {}}
             >
@@ -1033,7 +1039,7 @@ function ResultsContent() {
 
       {/* Drag Drop Instructions */}
       <DragDropZone />
-      
+
       {/* Toast Notifications */}
       <Toaster />
     </div>
@@ -1074,7 +1080,10 @@ export default function ResultsPage() {
         </div>
       }
     >
-      <ResultsContent />
+      <div className="relative pb-24">
+        <ResultsContent />
+        <PlayerBar />
+      </div>
     </Suspense>
   )
 }

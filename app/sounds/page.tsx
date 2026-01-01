@@ -4,9 +4,12 @@ import { useState, useMemo } from "react"
 import { useSamples } from "@/hooks/useSamples"
 import { useFavorites } from "@/hooks/useFavorites"
 import { useAudio } from "@/contexts/AudioContext"
-import { Play, Pause, Heart, MoreVertical, Filter, Search, ArrowLeft } from "lucide-react"
+import { Play, Pause, Heart, MoreVertical, Filter, Search, ArrowLeft, Download } from "lucide-react"
 import { motion } from "framer-motion"
 import { useSearchParams, useRouter } from "next/navigation"
+import { DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
+import WaveformCell from "@/components/WaveformCell"
+import { formatTimeSeconds } from "@/lib/utils"
 
 export default function SoundsPage() {
     const router = useRouter()
@@ -20,10 +23,12 @@ export default function SoundsPage() {
     const [selectedKeyword, setSelectedKeyword] = useState(searchParams.get('keyword') || "")
     const [selectedTimeSignature, setSelectedTimeSignature] = useState(searchParams.get('timeSignature') || "")
 
+    const [loadedDurations, setLoadedDurations] = useState<Record<string, number>>({})
+
     // Fetch Data
     const { samples, loading } = useSamples({ autoFetch: true })
     const { isFavorite, addFavorite, removeFavorite } = useFavorites()
-    const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+    const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
     // Derived Filters Options
     const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
@@ -33,7 +38,7 @@ export default function SoundsPage() {
     // Keywords often stored as array in s.keywords or s.tags
     // Assuming keywords is string[]
     const keywords = [...new Set(samples.flatMap(s => s.keywords || []))].filter(Boolean) as string[]
-    const timeSignatures = [...new Set(samples.map(s => s.timeSignature).filter(Boolean))] as string[]
+    const timeSignatures = [...new Set([...samples.map(s => s.timeSignature).filter(Boolean), "4/4", "3/4"])].sort() as string[]
 
     // Filter Logic
     const filteredSamples = useMemo(() => {
@@ -56,10 +61,10 @@ export default function SoundsPage() {
             if (selectedKey && sample.key !== selectedKey) return false
 
             // Drum Type Filter
-            if (selectedDrumType && sample.drumType !== selectedDrumType) return false
+            if (selectedDrumType && sample.drumType?.toLowerCase() !== selectedDrumType.toLowerCase()) return false
 
             // Keyword/Style Filter
-            if (selectedKeyword && !sample.keywords?.includes(selectedKeyword)) return false
+            if (selectedKeyword && !sample.keywords?.some((k: string) => k.toLowerCase() === selectedKeyword.toLowerCase())) return false
 
             // Time Signature Filter
             if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
@@ -79,7 +84,14 @@ export default function SoundsPage() {
                 audioUrl: sample.audioUrl,
                 imageUrl: sample.imageUrl,
                 duration: sample.duration
-            })
+            }, filteredSamples.map(s => ({
+                id: s.id,
+                title: s.name,
+                artist: s.category || "Unknown Artist",
+                audioUrl: s.audioUrl || "",
+                imageUrl: s.imageUrl,
+                duration: s.duration
+            })))
         }
     }
 
@@ -89,6 +101,29 @@ export default function SoundsPage() {
             removeFavorite(sample.id)
         } else {
             addFavorite(sample)
+        }
+    }
+
+    const handleDownload = async (e: React.MouseEvent, sample: any) => {
+        e.stopPropagation()
+        try {
+            const audioUrl = sample.audioUrl || sample.url
+            if (!audioUrl) return
+
+            const response = await fetch(audioUrl)
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${sample.name || 'sample'}.wav`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Download failed:', error)
+            // Fallback
+            window.open(sample.audioUrl || sample.url, '_blank')
         }
     }
 
@@ -150,13 +185,13 @@ export default function SoundsPage() {
                         label="Drum Type"
                         value={selectedDrumType}
                         onChange={setSelectedDrumType}
-                        options={drumTypes}
+                        options={DRUM_TYPE_OPTIONS}
                     />
                     <FilterSelect
-                        label="Keywords"
+                        label="Styles"
                         value={selectedKeyword}
                         onChange={setSelectedKeyword}
-                        options={keywords}
+                        options={KEYWORD_OPTIONS}
                     />
                     <FilterSelect
                         label="Time Sig"
@@ -195,10 +230,11 @@ export default function SoundsPage() {
                 <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-medium text-white/40 uppercase tracking-wider relative z-20">
                     <div className="col-span-1"></div>
                     <div className="col-span-1">Pack</div>
-                    <div className="col-span-4">Filename</div>
+                    <div className="col-span-3">Filename</div>
+                    <div className="col-span-3">Waveform</div>
                     <div className="col-span-1">Time</div>
-                    <div className="col-span-2">Key</div>
-                    <div className="col-span-2">BPM</div>
+                    <div className="col-span-1">Key</div>
+                    <div className="col-span-1">BPM</div>
                     <div className="col-span-1"></div>
                 </div>
 
@@ -250,7 +286,7 @@ export default function SoundsPage() {
                                     </div>
 
                                     {/* Filename & Tags */}
-                                    <div className="col-span-4 min-w-0">
+                                    <div className="col-span-3 min-w-0">
                                         <div className={`font-medium text-sm truncate ${isCurrent ? 'text-green-400' : 'text-white'}`}>
                                             {sample.name}
                                         </div>
@@ -258,22 +294,45 @@ export default function SoundsPage() {
                                             {sample.genres?.slice(0, 2).map((g: string) => (
                                                 <span key={g} className="truncate hover:text-white/80">{g}</span>
                                             ))}
-                                            {(sample.genres?.length || 0) > 2 && <span>+</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Waveform Status Bar */}
+                                    <div className="col-span-3 flex items-center h-8">
+                                        <div className="w-full h-full cursor-pointer group/wave rounded-lg overflow-hidden relative">
+                                            {/* Pass audioUrl. If unavailable, maybe show placeholder or nothing */}
+                                            {sample.audioUrl || sample.url ? (
+                                                <WaveformCell
+                                                    audioUrl={sample.audioUrl || sample.url || ""}
+                                                    sampleId={sample.id}
+                                                    height={32}
+                                                    onDurationLoaded={(d) => setLoadedDurations(prev => ({ ...prev, [sample.id]: d }))}
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-xs text-white/20">
+                                                    No Audio
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
                                     {/* Time */}
                                     <div className="col-span-1 text-xs text-white/60 font-mono">
-                                        {sample.duration || '0:00'}
+                                        {isCurrent && duration > 0
+                                            ? formatTimeSeconds(duration)
+                                            : loadedDurations[sample.id]
+                                                ? formatTimeSeconds(loadedDurations[sample.id])
+                                                : (sample.duration || '0:00')
+                                        }
                                     </div>
 
                                     {/* Key */}
-                                    <div className="col-span-2 text-sm text-white/80 font-medium">
+                                    <div className="col-span-1 text-sm text-white/80 font-medium">
                                         {sample.key || '-'}
                                     </div>
 
                                     {/* BPM */}
-                                    <div className="col-span-2 text-sm text-white/80 font-mono">
+                                    <div className="col-span-1 text-sm text-white/80 font-mono">
                                         {sample.bpm || '-'}
                                     </div>
 
@@ -282,11 +341,16 @@ export default function SoundsPage() {
                                         <button
                                             onClick={(e) => toggleFav(e, sample)}
                                             className={`p-1.5 rounded-full transition-colors ${isFavorite(sample.id) ? 'text-red-500 bg-red-500/10' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
+                                            title={isFavorite(sample.id) ? "Remove from favorite" : "Add to favorite"}
                                         >
                                             <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />
                                         </button>
-                                        <button className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors">
-                                            <MoreVertical className="w-4 h-4" />
+                                        <button
+                                            onClick={(e) => handleDownload(e, sample)}
+                                            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                                            title="Download"
+                                        >
+                                            <Download className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </motion.div>
