@@ -1,4 +1,4 @@
-
+"use client"
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Play, Pause, CheckCircle, Circle, Music, Star, X } from "lucide-react"
@@ -6,6 +6,7 @@ import CustomDropdown from "@/components/CustomDropdown"
 import EditActionsDropdown from "@/components/admin/EditActionsDropdown"
 import MultiSelectDropdown from "@/components/MultiSelectDropdown"
 import BulkEditModal from "@/components/admin/BulkEditModal"
+import { GENRE_OPTIONS, INSTRUMENT_OPTIONS, DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
 
 interface EditSamplesStepProps {
     files: File[]
@@ -31,9 +32,10 @@ interface SampleMetadata {
     isPlaying?: boolean
     selected?: boolean
     featured?: boolean
+    stemsFiles?: { file: File, name: string, id: string }[]
 }
 
-import { GENRE_OPTIONS, INSTRUMENT_OPTIONS, DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
+
 
 const keys = ['C Major', 'C Minor', 'C# Major', 'C# Minor', 'D Major', 'D Minor', 'Eb Major', 'Eb Minor', 'E Major', 'E Minor', 'F Major', 'F Minor', 'F# Major', 'F# Minor', 'G Major', 'G Minor', 'Ab Major', 'Ab Minor', 'A Major', 'A Minor', 'Bb Major', 'Bb Minor', 'B Major', 'B Minor']
 const timeSignatures = ["4/4", "6/8", "3/4"]
@@ -79,7 +81,8 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                         // Inherit category from existing samples if available, or default
                         category: initialData?.[0]?.category || defaultCategory || "Uncategorized",
                         selected: false,
-                        featured: false
+                        featured: false,
+                        stemsFiles: []
                     }
                 }
             })
@@ -383,6 +386,74 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                             </div>
                         </div>
 
+
+
+
+                        {/* Stems Section */}
+                        <div className="pt-4 border-t border-white/10">
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs font-bold text-white/60 uppercase">Stems / Trackout (Optional)</label>
+                                <label className="cursor-pointer text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-white transition-colors">
+                                    + Add Stem
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        accept="audio/*"
+                                        multiple
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files.length > 0) {
+                                                const newStems = Array.from(e.target.files).map(f => ({
+                                                    file: f,
+                                                    name: f.name.replace(/\.[^/.]+$/, ""),
+                                                    id: Math.random().toString(36).substr(2, 9)
+                                                }))
+                                                const currentStems = currentSample.stemsFiles || []
+                                                handleUpdate('stemsFiles', [...currentStems, ...newStems])
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="space-y-2 mb-6">
+                                {currentSample.stemsFiles && currentSample.stemsFiles.length > 0 ? (
+                                    currentSample.stemsFiles.map((stem, index) => (
+                                        <div key={stem.id} className="flex items-center gap-3 bg-white/5 p-2 rounded-lg group">
+                                            <div className="w-8 h-8 bg-white/10 rounded flex items-center justify-center text-white/40">
+                                                <Music className="w-4 h-4" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <input
+                                                    type="text"
+                                                    value={stem.name}
+                                                    onChange={(e) => {
+                                                        const updatedStems = [...(currentSample.stemsFiles || [])]
+                                                        updatedStems[index] = { ...stem, name: e.target.value }
+                                                        handleUpdate('stemsFiles', updatedStems)
+                                                    }}
+                                                    className="bg-transparent text-sm text-white w-full focus:outline-none border-b border-transparent focus:border-white/20 py-0.5"
+                                                />
+                                                <p className="text-[10px] text-white/40 truncate">{stem.file.name}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const updatedStems = (currentSample.stemsFiles || []).filter(s => s.id !== stem.id)
+                                                    handleUpdate('stemsFiles', updatedStems)
+                                                }}
+                                                className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded text-white/20 transition-colors"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-4 bg-white/5 rounded-lg border border-dashed border-white/10 text-xs text-white/30">
+                                        No stems added yet
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-white/60 mb-2 uppercase">Genres</label>
                             <MultiSelectDropdown
@@ -416,6 +487,8 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                                 placeholder="Select keywords"
                             />
                         </div>
+
+
                     </div>
                 ) : (
                     <div className="h-full flex items-center justify-center text-white/20">
@@ -448,7 +521,7 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                 >
                     Save Changes
                 </button>
-            </div>
+            </div >
         </motion.div >
     )
 }

@@ -33,9 +33,7 @@ const nextConfig = {
     return config;
   },
   // Ensure WASM files are copied to output
-  experimental: {
-    serverComponentsExternalPackages: ['essentia.js'],
-  },
+  serverExternalPackages: ['essentia.js'],
 }
 
 export default nextConfig

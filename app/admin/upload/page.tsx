@@ -49,15 +49,28 @@ export default function AdminUploadPage() {
                 formData.append('files', file)
             })
 
+            // 2b. Append Stem Files
+            finalSamples.forEach(sample => {
+                if (sample.stemsFiles && sample.stemsFiles.length > 0) {
+                    sample.stemsFiles.forEach((stem: any) => {
+                        formData.append('stemFiles', stem.file)
+                    })
+                }
+            })
+
             // 3. Append Pack Details (exclude file objects)
             const { coverArt, coverPreview, ...cleanPackDetails } = packDetails
             formData.append('packDetails', JSON.stringify(cleanPackDetails))
 
             // 4. Append Samples Metadata (exclude file objects)
-            const cleanSamples = finalSamples.map(({ file, ...rest }) => ({
+            const cleanSamples = finalSamples.map(({ file, stemsFiles, ...rest }) => ({
                 ...rest,
                 fileName: file.name, // Ensure we link back to the file
-                category: packDetails.title // Double safety: ensure category matches pack title
+                category: packDetails.title, // Double safety: ensure category matches pack title
+                stems: stemsFiles?.map((s: any) => ({
+                    name: s.name,
+                    fileName: s.file.name
+                })) || []
             }))
             formData.append('samplesMetadata', JSON.stringify(cleanSamples))
 

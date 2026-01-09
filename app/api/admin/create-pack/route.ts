@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
         console.log("Pack created in DB:", packData.id)
 
         // 3. Upload Audio Files & Insert Samples
+        // 3. Upload Audio Files & Insert Samples
         const processedSamples = []
+        const stemFiles = formData.getAll('stemFiles') as File[]
 
         for (const sampleMeta of samplesMetadata) {
             const audioFile = audioFiles.find(f => f.name === sampleMeta.fileName)
@@ -85,8 +87,6 @@ export async function POST(request: NextRequest) {
                 const audioPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/${timestamp}_${safeNameBase}.${audioExt}`
 
                 console.log(`Uploading sample to Supabase: ${audioPath}`)
-
-
 
                 const arrayBuffer = await audioFile.arrayBuffer()
                 const buffer = Buffer.from(arrayBuffer)
@@ -121,6 +121,42 @@ export async function POST(request: NextRequest) {
                     .from('audio')
                     .getPublicUrl(audioPath)
 
+                // Process Stems
+                const processedStems = []
+                if (sampleMeta.stems && Array.isArray(sampleMeta.stems)) {
+                    for (const stem of sampleMeta.stems) {
+                        // Find the stem file
+                        const stemFile = stemFiles.find(f => f.name === stem.fileName)
+
+                        if (stemFile) {
+                            const stemExt = stemFile.name.split('.').pop()
+                            const stemPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
+
+                            const { error: stemUploadError } = await supabaseAdmin
+                                .storage
+                                .from('audio')
+                                .upload(stemPath, stemFile, {
+                                    contentType: stemFile.type || 'audio/wav',
+                                    upsert: true
+                                })
+
+                            if (!stemUploadError) {
+                                const { data: stemUrlData } = supabaseAdmin
+                                    .storage
+                                    .from('audio')
+                                    .getPublicUrl(stemPath)
+
+                                processedStems.push({
+                                    name: stem.name,
+                                    url: stemUrlData.publicUrl,
+                                    size: stemFile.size,
+                                    filename: stemFile.name
+                                })
+                            }
+                        }
+                    }
+                }
+
                 const sampleRecord = {
                     name: sampleMeta.name,
                     filename: sampleMeta.fileName,
@@ -135,7 +171,8 @@ export async function POST(request: NextRequest) {
                     audio_url: publicUrlData.publicUrl,
                     image_url: coverImageUrl,
                     is_featured: sampleMeta.featured || false,
-                    duration: duration
+                    duration: duration,
+                    stems: processedStems
                 }
 
                 processedSamples.push(sampleRecord)

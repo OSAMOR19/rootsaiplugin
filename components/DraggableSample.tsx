@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { Play, Pause, Heart, MoreHorizontal, GripVertical, Volume2, Download, Layers } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -52,6 +52,41 @@ export default function DraggableSample({
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
+
+  const handleDownloadStem = async (stem: any) => {
+    try {
+      const response = await fetch(stem.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = stem.filename || `${stem.name}.wav`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Download failed:', error)
+      window.open(stem.url, '_blank')
+    }
+  }
 
   // Load favorite status from localStorage on mount
   useEffect(() => {
@@ -825,13 +860,54 @@ export default function DraggableSample({
           </motion.button>
 
           {/* Three Dots (More Options) */}
-          <motion.button
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <MoreHorizontal className="w-3 h-3 sm:w-4 sm:h-4" />
-          </motion.button>
+          {/* Three Dots (More Options) */}
+          <div className="relative" ref={menuRef}>
+            <motion.button
+              onClick={() => setShowMenu(!showMenu)}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <MoreHorizontal className="w-3 h-3 sm:w-4 sm:h-4" />
+            </motion.button>
+
+            <AnimatePresence>
+              {showMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  transition={{ duration: 0.1 }}
+                  className="absolute right-0 bottom-full mb-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-1">
+                    {sample.stems && sample.stems.length > 0 ? (
+                      <>
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-900/50">
+                          Download Stems
+                        </div>
+                        {sample.stems.map((stem: any, i: number) => (
+                          <button
+                            key={i}
+                            onClick={() => handleDownloadStem(stem)}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between group"
+                          >
+                            <span className="truncate">{stem.name}</span>
+                            <Download className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center italic">
+                        No stems available
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

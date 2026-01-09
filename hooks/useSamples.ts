@@ -21,6 +21,12 @@ export interface Sample {
   drumType?: string
   keywords?: string[]
   moodTag?: string
+  stems?: {
+    name: string
+    url: string
+    size?: number
+    filename?: string
+  }[]
 }
 
 export interface UseSamplesOptions {
