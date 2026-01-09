@@ -10,58 +10,25 @@ export const config = {
 
 export async function POST(request: NextRequest) {
     try {
-        const formData = await request.formData()
-        const coverImage = formData.get('coverImage') as File
-        const packDetailsStr = formData.get('packDetails') as string
-        const samplesMetadataStr = formData.get('samplesMetadata') as string
-        const audioFiles = formData.getAll('files') as File[]
+        const body = await request.json()
+        const { packDetails, samples } = body
 
-        if (!packDetailsStr || !samplesMetadataStr) {
+        if (!packDetails || !samples) {
             return NextResponse.json(
                 { success: false, error: 'Missing pack details or samples metadata' },
                 { status: 400 }
             )
         }
 
-        const packDetails = JSON.parse(packDetailsStr)
-        const samplesMetadata = JSON.parse(samplesMetadataStr)
-
-        // 1. Upload Cover Image to Supabase Storage
-        let coverImageUrl = '/placeholder.jpg'
-        if (coverImage) {
-            const timestamp = Date.now()
-            const safeNameBase = packDetails.title.replace(/[^a-z0-9]/gi, '_')
-            const imageExt = coverImage.name.split('.').pop()
-            const imagePath = `packs/${timestamp}_${safeNameBase}_cover.${imageExt}`
-
-            console.log(`Uploading cover to Supabase: ${imagePath}`)
-            const { data: uploadData, error: uploadError } = await supabaseAdmin
-                .storage
-                .from('audio')
-                .upload(imagePath, coverImage, {
-                    contentType: coverImage.type || 'image/jpeg',
-                    upsert: true
-                })
-
-            if (uploadError) throw uploadError
-
-            // Get Public URL
-            const { data: publicUrlData } = supabaseAdmin
-                .storage
-                .from('audio')
-                .getPublicUrl(imagePath)
-
-            coverImageUrl = publicUrlData.publicUrl
-        }
-
-        // 2. Insert Pack into DB
+        // 1. Insert Pack into DB
+        // packDetails.cover_image is already a URL from client upload
         const { data: packData, error: packError } = await supabaseAdmin
             .from('packs')
             .insert({
                 title: packDetails.title,
                 genre: packDetails.genre,
                 description: packDetails.description,
-                cover_image: coverImageUrl,
+                cover_image: packDetails.cover_image, // URL from client
                 allow_cash: packDetails.allowCash || false,
                 price: 20
             })
@@ -72,112 +39,25 @@ export async function POST(request: NextRequest) {
 
         console.log("Pack created in DB:", packData.id)
 
-        // 3. Upload Audio Files & Insert Samples
-        // 3. Upload Audio Files & Insert Samples
-        const processedSamples = []
-        const stemFiles = formData.getAll('stemFiles') as File[]
-
-        for (const sampleMeta of samplesMetadata) {
-            const audioFile = audioFiles.find(f => f.name === sampleMeta.fileName)
-
-            if (audioFile) {
-                const timestamp = Date.now()
-                const safeNameBase = sampleMeta.name.replace(/[^a-z0-9]/gi, '_')
-                const audioExt = audioFile.name.split('.').pop()
-                const audioPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/${timestamp}_${safeNameBase}.${audioExt}`
-
-                console.log(`Uploading sample to Supabase: ${audioPath}`)
-
-                const arrayBuffer = await audioFile.arrayBuffer()
-                const buffer = Buffer.from(arrayBuffer)
-
-                let duration = '0:00'
-                try {
-                    const metadata = await parseBuffer(buffer)
-                    if (metadata.format.duration) {
-                        const minutes = Math.floor(metadata.format.duration / 60)
-                        const seconds = Math.floor(metadata.format.duration % 60)
-                        duration = `${minutes}:${seconds.toString().padStart(2, '0')}`
-                    }
-                } catch (e) {
-                    console.error("Failed to parse audio duration", e)
-                }
-
-                const { error: audioUploadError } = await supabaseAdmin
-                    .storage
-                    .from('audio')
-                    .upload(audioPath, audioFile, {
-                        contentType: audioFile.type || 'audio/wav',
-                        upsert: true
-                    })
-
-                if (audioUploadError) {
-                    console.error("Audio upload failed", audioUploadError)
-                    continue
-                }
-
-                const { data: publicUrlData } = supabaseAdmin
-                    .storage
-                    .from('audio')
-                    .getPublicUrl(audioPath)
-
-                // Process Stems
-                const processedStems = []
-                if (sampleMeta.stems && Array.isArray(sampleMeta.stems)) {
-                    for (const stem of sampleMeta.stems) {
-                        // Find the stem file
-                        const stemFile = stemFiles.find(f => f.name === stem.fileName)
-
-                        if (stemFile) {
-                            const stemExt = stemFile.name.split('.').pop()
-                            const stemPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
-
-                            const { error: stemUploadError } = await supabaseAdmin
-                                .storage
-                                .from('audio')
-                                .upload(stemPath, stemFile, {
-                                    contentType: stemFile.type || 'application/octet-stream',
-                                    upsert: true
-                                })
-
-                            if (!stemUploadError) {
-                                const { data: stemUrlData } = supabaseAdmin
-                                    .storage
-                                    .from('audio')
-                                    .getPublicUrl(stemPath)
-
-                                processedStems.push({
-                                    name: stem.name,
-                                    url: stemUrlData.publicUrl,
-                                    size: stemFile.size,
-                                    filename: stemFile.name
-                                })
-                            }
-                        }
-                    }
-                }
-
-                const sampleRecord = {
-                    name: sampleMeta.name,
-                    filename: sampleMeta.fileName,
-                    category: packDetails.title,
-                    bpm: sampleMeta.tempo ? parseInt(sampleMeta.tempo) : 0,
-                    key: sampleMeta.key || '',
-                    time_signature: sampleMeta.timeSignature || '4/4',
-                    genres: sampleMeta.genres || [],
-                    instruments: sampleMeta.instruments || [],
-                    drum_type: sampleMeta.drumType || '',
-                    keywords: sampleMeta.keywords || [],
-                    audio_url: publicUrlData.publicUrl,
-                    image_url: coverImageUrl,
-                    is_featured: sampleMeta.featured || false,
-                    duration: duration,
-                    stems: processedStems
-                }
-
-                processedSamples.push(sampleRecord)
-            }
-        }
+        // 2. Insert Samples into DB
+        // samples array already contains audio_url and stems with urls
+        const processedSamples = samples.map((sample: any) => ({
+            name: sample.name,
+            filename: sample.filename,
+            category: packDetails.title,
+            bpm: sample.bpm,
+            key: sample.key,
+            time_signature: sample.time_signature,
+            genres: sample.genres,
+            instruments: sample.instruments,
+            drum_type: sample.drum_type,
+            keywords: sample.keywords,
+            audio_url: sample.audio_url, // URL from client
+            image_url: packDetails.cover_image,
+            is_featured: sample.is_featured,
+            duration: sample.duration,
+            stems: sample.stems // Array of {name, url, size, filename} from client
+        }))
 
         if (processedSamples.length > 0) {
             const { error: samplesError } = await supabaseAdmin

@@ -35,49 +35,118 @@ export default function AdminUploadPage() {
     const handleFinalSubmit = async (finalSamples: any[]) => {
         setSamples(finalSamples)
         setIsUploading(true)
+        setShowSuccess(false)
 
         try {
-            const formData = new FormData()
-
-            // 1. Append Cover Image
+            // 1. Upload Cover Image
+            let coverImageUrl = null
             if (packDetails?.coverArt) {
-                formData.append('coverImage', packDetails.coverArt)
+                const timestamp = Date.now()
+                const safeNameBase = packDetails.title.replace(/[^a-z0-9]/gi, '_')
+                const imageExt = packDetails.coverArt.name.split('.').pop()
+                const imagePath = `packs/${timestamp}_${safeNameBase}_cover.${imageExt}`
+
+                // Upload util
+                const { uploadFileToSupabase } = await import('@/lib/upload-utils')
+                coverImageUrl = await uploadFileToSupabase(packDetails.coverArt, imagePath)
             }
 
-            // 2. Append Audio Files
-            files.forEach(file => {
-                formData.append('files', file)
-            })
+            // 2. Upload Audio Files & Stems
+            const { uploadFileToSupabase } = await import('@/lib/upload-utils')
 
-            // 2b. Append Stem Files
-            finalSamples.forEach(sample => {
-                if (sample.stemsFiles && sample.stemsFiles.length > 0) {
-                    sample.stemsFiles.forEach((stem: any) => {
-                        formData.append('stemFiles', stem.file)
-                    })
+            const processedSamples = []
+
+            // Loop through all samples (metadata)
+            // match with actual files in `files` state or `stemsFiles`
+            for (const sample of finalSamples) {
+                // Find main file
+                const audioFile = sample.file // EditSamplesStep attaches actual File object
+                let audioUrl = null
+                let duration = sample.duration || '0:00'
+
+                if (audioFile) {
+                    const timestamp = Date.now()
+                    const safeNameBase = sample.name.replace(/[^a-z0-9]/gi, '_')
+                    const audioExt = audioFile.name.split('.').pop()
+                    const audioPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/${timestamp}_${safeNameBase}.${audioExt}`
+
+                    // Upload
+                    audioUrl = await uploadFileToSupabase(audioFile, audioPath)
+
+                    // Helper to get duration? Client-side duration parsing is tricky without reading entire buffer
+                    // For now pass duration if available or let backend handle it? 
+                    // Wait: backend used "music-metadata". We can't use that in browser easily (Node lib).
+                    // We can accept "0:00" for now or use basic Audio element to check duration (async).
+                    // Or just skip duration until future improvement.
+                    // The backend previously calculated duration. Client side can do:
+                    try {
+                        const audioObj = new Audio(URL.createObjectURL(audioFile));
+                        await new Promise((resolve) => {
+                            audioObj.onloadedmetadata = () => {
+                                const m = Math.floor(audioObj.duration / 60);
+                                const s = Math.floor(audioObj.duration % 60);
+                                duration = `${m}:${s.toString().padStart(2, '0')}`;
+                                resolve(true);
+                            };
+                            audioObj.onerror = () => resolve(false);
+                        });
+                    } catch (e) { console.warn("Duration parse failed", e) }
                 }
-            })
 
-            // 3. Append Pack Details (exclude file objects)
-            const { coverArt, coverPreview, ...cleanPackDetails } = packDetails
-            formData.append('packDetails', JSON.stringify(cleanPackDetails))
+                // Process Stems
+                const processedStems = []
+                if (sample.stemsFiles && sample.stemsFiles.length > 0) {
+                    for (const stem of sample.stemsFiles) {
+                        const stemFile = stem.file
+                        if (stemFile) {
+                            const timestamp = Date.now()
+                            const safeNameBase = sample.name.replace(/[^a-z0-9]/gi, '_')
+                            const stemExt = stemFile.name.split('.').pop()
+                            const stemPath = `samples/${packDetails.title.replace(/[^a-z0-9]/gi, '_')}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
 
-            // 4. Append Samples Metadata (exclude file objects)
-            const cleanSamples = finalSamples.map(({ file, stemsFiles, ...rest }) => ({
-                ...rest,
-                fileName: file.name, // Ensure we link back to the file
-                category: packDetails.title, // Double safety: ensure category matches pack title
-                stems: stemsFiles?.map((s: any) => ({
-                    name: s.name,
-                    fileName: s.file.name
-                })) || []
-            }))
-            formData.append('samplesMetadata', JSON.stringify(cleanSamples))
+                            const stemUrl = await uploadFileToSupabase(stemFile, stemPath)
 
-            // 5. Send Request
+                            processedStems.push({
+                                name: stem.name,
+                                url: stemUrl,
+                                size: stemFile.size,
+                                filename: stemFile.name
+                            })
+                        }
+                    }
+                }
+
+                processedSamples.push({
+                    name: sample.name,
+                    filename: audioFile?.name,
+                    category: packDetails.title,
+                    bpm: sample.tempo ? parseInt(sample.tempo) : 0,
+                    key: sample.key,
+                    time_signature: sample.timeSignature || '4/4',
+                    genres: sample.genres || [],
+                    instruments: sample.instruments || [],
+                    drum_type: sample.drumType || '',
+                    keywords: sample.keywords || [],
+                    audio_url: audioUrl,
+                    duration: duration,
+                    is_featured: sample.featured || false,
+                    stems: processedStems
+                })
+            }
+
+            // 3. Send JSON Payload
+            const payload = {
+                packDetails: {
+                    ...packDetails,
+                    cover_image: coverImageUrl
+                },
+                samples: processedSamples
+            }
+
             const response = await fetch('/api/admin/create-pack', {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             })
 
             const result = await response.json()

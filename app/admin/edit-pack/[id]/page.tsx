@@ -145,66 +145,124 @@ export default function EditPackPage({ params }: PageProps) {
     }
 
     const handleSubmit = async (updatedSamples: any[]) => {
-        // Here we would call an API to update the metadata in metadata.json
-        // Since we are editing existing R2 files, we don't need to re-upload audio
+        setIsLoadingData(true) // Reuse loading state or add specific valid one if needed
+        setShowSuccessModal(false)
 
         try {
-            const formData = new FormData()
+            const { uploadFileToSupabase } = await import('@/lib/upload-utils')
 
-            const cleanSamples = updatedSamples.map(({ file, stemsFiles, ...rest }) => ({
-                ...rest,
-                fileName: file.name,
-                category: categoryName, // Force category to match current pack name
-                stems: stemsFiles?.map((s: any) => ({
-                    name: s.name,
-                    fileName: s.file.name
-                })) || []
-            }))
+            // 1. Upload Cover Image (if changed)
+            let coverImageUrl = null
+            if (packDetails?.coverArt instanceof File) {
+                const timestamp = Date.now()
+                const cleanTitle = (packDetails.title || categoryName).replace(/[^a-z0-9]/gi, '_')
+                const imageExt = packDetails.coverArt.name.split('.').pop()
+                const imagePath = `packs/${timestamp}_${cleanTitle}_cover.${imageExt}`
 
-            formData.append('samplesMetadata', JSON.stringify(cleanSamples))
-            formData.append('originalCategory', initialCategoryName) // Identify which pack to update (old name)
-
-            // Append Pack Details
-            if (packDetails) {
-                const { coverArt, coverPreview, ...cleanPackDetails } = packDetails
-                formData.append('packDetails', JSON.stringify(cleanPackDetails))
-
-                // Append Cover Image if changed (it's a File)
-                if (coverArt instanceof File) {
-                    formData.append('coverImage', coverArt)
-                }
-            } else {
-                // If no changes to details, just send current name as details
-                formData.append('packDetails', JSON.stringify({ title: categoryName }))
+                coverImageUrl = await uploadFileToSupabase(packDetails.coverArt, imagePath)
+            } else if (packDetails?.coverPreview) {
+                // Keep existing URL if not changed
+                coverImageUrl = packDetails.coverPreview
             }
 
-            // Append new files (real files have size > 0, dummy existing files have size 0)
-            updatedSamples.forEach(({ file, stemsFiles }) => {
-                // Main audio file
-                if (file && file.size > 0) {
-                    formData.append('files', file)
+            // 2. Process Samples (Upload new files)
+            const processedSamples = []
+
+            for (const sample of updatedSamples) {
+                // Is this a new file?
+                // The initData mapped existing samples to a dummy File with size 0 but attached 'r2_url'
+                // If the user replaced it, it will be a real File with size > 0
+
+                let audioUrl = null
+                const audioFile = sample.file
+
+                // Check if existing URL is preserved on the dummy file
+                // We stored it in 'r2_url' property on the file object in initData
+                const existingUrl = (audioFile as any).r2_url || sample.audioUrl || sample.url
+
+                if (audioFile && audioFile.size > 0) {
+                    // New File Upload
+                    const timestamp = Date.now()
+                    const cleanTitle = (packDetails?.title || categoryName).replace(/[^a-z0-9]/gi, '_')
+                    const safeNameBase = sample.name.replace(/[^a-z0-9]/gi, '_')
+                    const audioExt = audioFile.name.split('.').pop()
+                    const audioPath = `samples/${cleanTitle}/${timestamp}_${safeNameBase}.${audioExt}`
+
+                    audioUrl = await uploadFileToSupabase(audioFile, audioPath)
+                } else {
+                    // Start with existing
+                    audioUrl = existingUrl
                 }
 
-                // Stems files
-                if (stemsFiles && stemsFiles.length > 0) {
-                    stemsFiles.forEach((stem: any) => {
-                        if (stem.file && stem.file.size > 0) {
-                            formData.append('stemFiles', stem.file)
+                // Process Stems
+                const processedStems = []
+                if (sample.stemsFiles && sample.stemsFiles.length > 0) {
+                    for (const stem of sample.stemsFiles) {
+                        const stemFile = stem.file
+                        // Check for existing URL on dummy file
+                        const existingStemUrl = (stemFile as any).r2_url || stem.url
+
+                        let finalStemUrl = existingStemUrl
+
+                        if (stemFile && stemFile.size > 0) {
+                            // New Stem Upload
+                            const timestamp = Date.now()
+                            const cleanTitle = (packDetails?.title || categoryName).replace(/[^a-z0-9]/gi, '_')
+                            const safeNameBase = sample.name.replace(/[^a-z0-9]/gi, '_')
+                            const stemExt = stemFile.name.split('.').pop()
+                            const stemPath = `samples/${cleanTitle}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
+
+                            finalStemUrl = await uploadFileToSupabase(stemFile, stemPath)
                         }
-                    })
+
+                        if (finalStemUrl) {
+                            processedStems.push({
+                                name: stem.name,
+                                url: finalStemUrl,
+                                filename: stemFile?.name || stem.name
+                            })
+                        }
+                    }
                 }
-            })
+
+                processedSamples.push({
+                    ...sample, // keep IDs/etc
+                    fileName: audioFile?.name, // backend uses this to match? actually we just pass URL now
+                    category: packDetails?.title || categoryName,
+                    bpm: sample.tempo ? parseInt(sample.tempo) : 0,
+                    time_signature: sample.timeSignature || '4/4',
+                    drum_type: sample.drumType || '',
+                    audio_url: audioUrl,
+                    stems: processedStems,
+                    // Pass explicit properties to ensure backend receives clean data
+                    name: sample.name,
+                    key: sample.key,
+                    genres: sample.genres,
+                    instruments: sample.instruments,
+                    keywords: sample.keywords,
+                    is_featured: sample.featured
+                })
+            }
+
+            // 3. Send JSON Payload
+            const payload = {
+                originalCategory: initialCategoryName,
+                packDetails: {
+                    ...packDetails,
+                    cover_image: coverImageUrl
+                },
+                samples: processedSamples
+            }
 
             const response = await fetch('/api/admin/update-pack', {
                 method: 'POST',
-                // Headers are automatically set by browser for FormData (multipart/form-data)
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             })
 
             if (!response.ok) throw new Error('Update failed')
 
             setShowSuccessModal(true)
-            // Force a hard reload after a short delay to ensure UI updates with new image
             setTimeout(() => {
                 window.location.reload()
             }, 1500)
@@ -212,100 +270,115 @@ export default function EditPackPage({ params }: PageProps) {
         } catch (error) {
             console.error('Update error:', error)
             alert('Failed to update pack')
+            setIsLoadingData(false)
         }
     }
 
-    if (loading || isLoadingData) {
-        return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-            </div>
-        )
+    if (!response.ok) throw new Error('Update failed')
+
+    setShowSuccessModal(true)
+    // Force a hard reload after a short delay to ensure UI updates with new image
+    setTimeout(() => {
+        window.location.reload()
+    }, 1500)
+
+} catch (error) {
+    console.error('Update error:', error)
+    alert('Failed to update pack')
+}
     }
 
+if (loading || isLoadingData) {
     return (
-        <div className="min-h-screen bg-black text-white relative overflow-hidden font-sans">
-            {/* Background Elements - reused for consistency */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-green-900/10 rounded-full blur-[150px]" />
-                <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-emerald-900/10 rounded-full blur-[150px]" />
-            </div>
-
-            {/* Top Navigation Bar - Reused from Upload Page */}
-            <div className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleBack}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
-                    >
-                        <X className="w-6 h-6 text-white/60" />
-                    </button>
-                    <h1 className="text-xl font-bold text-white">
-                        {categoryName} <span className="text-white/40 font-normal text-sm ml-2">(Editing)</span>
-                    </h1>
-                </div>
-
-                {/* Stepper */}
-                <div className="flex items-center gap-4">
-                    <StepIndicator step={1} currentStep={currentStep} label="Pack details" onClick={() => setCurrentStep(1)} />
-                    <StepIndicator step={2} currentStep={currentStep} label="Files" onClick={() => setCurrentStep(2)} />
-                    <StepIndicator step={3} currentStep={currentStep} label="Edit samples" onClick={() => setCurrentStep(3)} />
-                </div>
-
-                <div className="w-[200px] flex justify-end">
-                    {/* Placeholder */}
-                </div>
-            </div>
-
-            <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
-                {currentStep === 1 && (
-                    <PackDetailsStep
-                        data={packDetails || {
-                            name: categoryName,
-                            title: categoryName,
-                            coverPreview: packSamples[0]?.imageUrl || "", // Fallback to sample image if available
-                            description: ""
-                        }}
-                        onNext={(data) => {
-                            setPackDetails(data) // Persist
-                            if (data.title && data.title !== categoryName) {
-                                setCategoryName(data.title)
-                                // Also update local samples so they reflect the new category immediately
-                                setPackSamples(prev => prev.map(s => ({ ...s, category: data.title })))
-                            }
-                            setCurrentStep(2)
-                        }}
-                    />
-                )}
-
-                {currentStep === 2 && (
-                    <FilesUploadStep
-                        initialFiles={files}
-                        onBack={() => setCurrentStep(1)}
-                        onNext={(updatedFiles) => {
-                            setFiles(updatedFiles)
-                            setCurrentStep(3)
-                        }}
-                    />
-                )}
-
-
-                {currentStep === 3 && (
-                    <EditSamplesStep
-                        files={files}
-                        initialData={packSamples}
-                        onBack={() => setCurrentStep(2)}
-                        onSubmit={handleSubmit}
-                        defaultCategory={categoryName}
-                        onChange={(updatedSamples) => setPackSamples(updatedSamples)}
-                    />
-                )}
-            </div>
-
-            {/* Success Modal */}
-            {/* ... */}
+        <div className="min-h-screen bg-black text-white flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
         </div>
     )
+}
+
+return (
+    <div className="min-h-screen bg-black text-white relative overflow-hidden font-sans">
+        {/* Background Elements - reused for consistency */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-green-900/10 rounded-full blur-[150px]" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-emerald-900/10 rounded-full blur-[150px]" />
+        </div>
+
+        {/* Top Navigation Bar - Reused from Upload Page */}
+        <div className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/50 backdrop-blur-md">
+            <div className="flex items-center gap-4">
+                <button
+                    onClick={handleBack}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                    <X className="w-6 h-6 text-white/60" />
+                </button>
+                <h1 className="text-xl font-bold text-white">
+                    {categoryName} <span className="text-white/40 font-normal text-sm ml-2">(Editing)</span>
+                </h1>
+            </div>
+
+            {/* Stepper */}
+            <div className="flex items-center gap-4">
+                <StepIndicator step={1} currentStep={currentStep} label="Pack details" onClick={() => setCurrentStep(1)} />
+                <StepIndicator step={2} currentStep={currentStep} label="Files" onClick={() => setCurrentStep(2)} />
+                <StepIndicator step={3} currentStep={currentStep} label="Edit samples" onClick={() => setCurrentStep(3)} />
+            </div>
+
+            <div className="w-[200px] flex justify-end">
+                {/* Placeholder */}
+            </div>
+        </div>
+
+        <div className="relative z-10 container mx-auto px-4 py-8 pb-32">
+            {currentStep === 1 && (
+                <PackDetailsStep
+                    data={packDetails || {
+                        name: categoryName,
+                        title: categoryName,
+                        coverPreview: packSamples[0]?.imageUrl || "", // Fallback to sample image if available
+                        description: ""
+                    }}
+                    onNext={(data) => {
+                        setPackDetails(data) // Persist
+                        if (data.title && data.title !== categoryName) {
+                            setCategoryName(data.title)
+                            // Also update local samples so they reflect the new category immediately
+                            setPackSamples(prev => prev.map(s => ({ ...s, category: data.title })))
+                        }
+                        setCurrentStep(2)
+                    }}
+                />
+            )}
+
+            {currentStep === 2 && (
+                <FilesUploadStep
+                    initialFiles={files}
+                    onBack={() => setCurrentStep(1)}
+                    onNext={(updatedFiles) => {
+                        setFiles(updatedFiles)
+                        setCurrentStep(3)
+                    }}
+                />
+            )}
+
+
+            {currentStep === 3 && (
+                <EditSamplesStep
+                    files={files}
+                    initialData={packSamples}
+                    onBack={() => setCurrentStep(2)}
+                    onSubmit={handleSubmit}
+                    defaultCategory={categoryName}
+                    onChange={(updatedSamples) => setPackSamples(updatedSamples)}
+                />
+            )}
+        </div>
+
+        {/* Success Modal */}
+        {/* ... */}
+    </div>
+)
 }
 
 function StepIndicator({ step, currentStep, label, onClick }: { step: number, currentStep: number, label: string, onClick?: () => void }) {
