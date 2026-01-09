@@ -56,8 +56,7 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
 
       // Optional category filter at database level
       if (category) {
-        // query = query.eq('category', category) 
-        // Don't filter at DB level yet since category names might need normalization
+        query = query.eq('category', category)
       }
 
       const { data, error } = await query
@@ -85,6 +84,7 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
           keywords: s.keywords || [],
           storage: 'supabase', // Mark as supabase source
           moodTag: s.mood_tag || s.mood, // Try to find mood tag
+          stems: s.stems || []
         }))
         setSamples(mappedSamples)
       }

@@ -97,6 +97,19 @@ export async function POST(request: Request) {
 
         // Now update specific fields for each modified sample
         if (existingSamples) {
+            const updatedSampleIds = new Set(updatedSamples.map((s: any) => s.id).filter((id: any) => id));
+            const samplesToDelete = existingSamples
+                .filter((s: any) => !updatedSampleIds.has(s.id))
+                .map((s: any) => s.id);
+
+            if (samplesToDelete.length > 0) {
+                console.log(`Deleting ${samplesToDelete.length} removed samples...`);
+                await supabaseAdmin
+                    .from('samples')
+                    .delete()
+                    .in('id', samplesToDelete);
+            }
+
             for (const sampleData of updatedSamples) {
                 // Determine if this is an existing sample update
                 const existing = existingSamples.find((s: any) => s.filename === sampleData.fileName)

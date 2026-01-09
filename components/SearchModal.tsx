@@ -7,6 +7,8 @@ import { Search, X, Play, Pause, TrendingUp } from "lucide-react"
 import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 
+import SampleActionsMenu from "./SampleActionsMenu"
+
 interface SearchModalProps {
   isOpen: boolean
   onClose: () => void
@@ -285,17 +287,26 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                             </div>
 
                             {/* Tags */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 mr-2">
                               {sample.key && (
-                                <span className="px-2 py-1 bg-white/5 rounded text-xs text-white/60">
+                                <span className="px-2 py-1 bg-white/5 rounded text-xs text-white/60 hidden sm:inline-block">
                                   {sample.key}
                                 </span>
                               )}
                               {sample.moodTag && (
-                                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs">
+                                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs hidden sm:inline-block">
                                   {sample.moodTag}
                                 </span>
                               )}
+                            </div>
+
+                            {/* Stems Menu */}
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <SampleActionsMenu
+                                sample={sample}
+                                iconColor="text-white/40"
+                                buttonClass="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                              />
                             </div>
                           </div>
                         )
@@ -311,4 +322,5 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     </AnimatePresence>
   )
 }
+
 

@@ -5,6 +5,7 @@ import { Play, Pause, Heart, Download } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import SampleActionsMenu from "./SampleActionsMenu"
 
 // Import drum images
 import kickDrumImage from "./images/kickdrum.jpg"
@@ -28,13 +29,13 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
   // Handle audio playback
   const handlePlayPause = async (sampleId: string, audioUrl?: string) => {
     const audioElement = audioRefs.current[sampleId]
-    
+
     if (!audioElement && audioUrl) {
       // Create new audio element if it doesn't exist
       const newAudio = new Audio(audioUrl)
       newAudio.loop = true
       audioRefs.current[sampleId] = newAudio
-      
+
       try {
         await newAudio.play()
         onSamplePlay(sampleId)
@@ -44,7 +45,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
       }
       return
     }
-    
+
     if (!audioElement) {
       console.error('Audio element not found for:', sampleId)
       return
@@ -64,7 +65,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
             audio.currentTime = 0
           }
         })
-        
+
         // Play the selected sample
         await audioElement.play()
         onSamplePlay(sampleId)
@@ -136,7 +137,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 className="object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
-              
+
               {/* Modern Waveform Overlay */}
               <div className="absolute bottom-3 left-3 right-3 h-8 bg-black/50 backdrop-blur-md rounded-xl border border-white/10">
                 <div className="flex items-end justify-center px-2 h-full">
@@ -149,10 +150,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                         animate={
                           currentlyPlaying === sample.id
                             ? {
-                                scaleY: [1, 1.5, 1],
-                                opacity: [0.7, 1, 0.7],
-                                backgroundColor: ["#34d399", "#ffffff", "#34d399"],
-                              }
+                              scaleY: [1, 1.5, 1],
+                              opacity: [0.7, 1, 0.7],
+                              backgroundColor: ["#34d399", "#ffffff", "#34d399"],
+                            }
                             : {}
                         }
                         transition={{
@@ -187,11 +188,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                     e.stopPropagation()
                     handlePlayPause(sample.id, sample.audioUrl)
                   }}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${
-                    currentlyPlaying === sample.id
-                      ? "bg-emerald-500 border-emerald-400 shadow-emerald-500/50"
-                      : "bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40"
-                  }`}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${currentlyPlaying === sample.id
+                    ? "bg-emerald-500 border-emerald-400 shadow-emerald-500/50"
+                    : "bg-white/10 border-white/20 hover:bg-white/20 hover:border-white/40"
+                    }`}
                   whileHover={{ scale: 1.15 }}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -229,11 +229,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                     e.stopPropagation()
                     toggleLike(sample.id)
                   }}
-                  className={`p-2 rounded-lg transition-all duration-300 ${
-                    likedSamples.has(sample.id)
-                      ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
-                      : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
-                  }`}
+                  className={`p-2 rounded-lg transition-all duration-300 ${likedSamples.has(sample.id)
+                    ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
+                    : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
+                    }`}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -251,6 +250,14 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 >
                   <Download className="w-4 h-4" />
                 </motion.button>
+
+                <div onClick={(e) => e.stopPropagation()}>
+                  <SampleActionsMenu
+                    sample={sample}
+                    buttonClass="p-2 rounded-lg text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
+                    iconColor="text-white/60"
+                  />
+                </div>
               </div>
             </div>
 
@@ -292,7 +299,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-transparent to-transparent" />
-              
+
               {/* Compact Waveform */}
               <div className="absolute bottom-1 left-1 right-1 h-4 bg-black/50 backdrop-blur-md rounded-lg border border-white/10 flex items-center px-1">
                 <div className="flex items-end space-x-0.5 h-2.5 w-full">
@@ -304,9 +311,9 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                       animate={
                         currentlyPlaying === sample.id
                           ? {
-                              scaleY: [1, 1.5, 1],
-                              backgroundColor: ["#34d399", "#ffffff", "#34d399"],
-                            }
+                            scaleY: [1, 1.5, 1],
+                            backgroundColor: ["#34d399", "#ffffff", "#34d399"],
+                          }
                           : {}
                       }
                       transition={{
@@ -346,11 +353,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                   e.stopPropagation()
                   handlePlayPause(sample.id, sample.audioUrl)
                 }}
-                className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${
-                  currentlyPlaying === sample.id
-                    ? "bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/50"
-                    : "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40"
-                }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all duration-300 shadow-lg ${currentlyPlaying === sample.id
+                  ? "bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/50"
+                  : "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40"
+                  }`}
                 whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -362,11 +368,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                   e.stopPropagation()
                   toggleLike(sample.id)
                 }}
-                className={`p-2.5 rounded-lg transition-all duration-300 ${
-                  likedSamples.has(sample.id)
-                    ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
-                    : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
-                }`}
+                className={`p-2.5 rounded-lg transition-all duration-300 ${likedSamples.has(sample.id)
+                  ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
+                  : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
+                  }`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -385,6 +390,14 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 <Download className="w-4 h-4" />
                 <span className="text-sm">Download</span>
               </motion.button>
+
+              <div onClick={(e) => e.stopPropagation()}>
+                <SampleActionsMenu
+                  sample={sample}
+                  buttonClass="p-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  iconColor="text-white/60"
+                />
+              </div>
             </div>
           </div>
 

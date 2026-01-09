@@ -22,8 +22,8 @@ export default function EditPackPage({ params }: PageProps) {
     const initialCategoryName = decodeURIComponent(packId)
     const [categoryName, setCategoryName] = useState(initialCategoryName)
 
-    // Fetch existing samples
-    const { samples: allSamples, loading } = useSamples({ autoFetch: true })
+    // Fetch existing samples with category filter
+    const { samples: allSamples, loading } = useSamples({ autoFetch: true, category: categoryName })
     const [packSamples, setPackSamples] = useState<any[]>([])
     const [files, setFiles] = useState<File[]>([])
     // New: Store Step 1 details
@@ -44,7 +44,7 @@ export default function EditPackPage({ params }: PageProps) {
             if (isLoadingData) {
                 // Filter samples belonging to this pack/category
                 // If allSamples is empty, filtered will just be empty, preventing the deadlock
-                const filtered = allSamples.filter(s => s.category === categoryName)
+                const filtered = allSamples // Already filtered by hook
 
                 // Fetch pack metadata (Description, Cover, etc) from Supabase
                 let existingPackDetails: any = null
@@ -87,7 +87,17 @@ export default function EditPackPage({ params }: PageProps) {
                         category: s.category || "Uncategorized",
                         keywords: s.keywords || [],
                         selected: false,
-                        featured: s.featured || false
+                        featured: s.featured || false,
+                        // Map existing stems to stemsFiles format expected by UI
+                        stemsFiles: s.stems?.map((stem: any) => {
+                            const dummyStemFile = new File([""], stem.filename || stem.name, { type: "audio/wav" })
+                            Object.defineProperty(dummyStemFile, 'r2_url', { value: stem.url })
+                            return {
+                                file: dummyStemFile,
+                                name: stem.name,
+                                id: Math.random().toString(36).substr(2, 9) // temporary UI id
+                            }
+                        }) || []
                     }
                 })
 
