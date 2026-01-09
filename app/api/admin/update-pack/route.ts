@@ -115,7 +115,7 @@ export async function POST(request: Request) {
                 const existing = existingSamples.find((s: any) => s.filename === sampleData.fileName)
 
                 if (existing) {
-                    const updatePayload = {
+                    const updatePayload: any = {
                         name: sampleData.name,
                         bpm: sampleData.tempo ? parseInt(sampleData.tempo) : 0,
                         key: sampleData.key,
@@ -126,6 +126,73 @@ export async function POST(request: Request) {
                         keywords: sampleData.keywords,
                         is_featured: sampleData.featured
                         // category and imageUrl are already bulk updated above if needed
+                    }
+
+                    // Process Stems for Existing Sample
+                    if (sampleData.stems && Array.isArray(sampleData.stems)) {
+                        const processedStems = []
+                        const stemFiles = formData.getAll('stemFiles') as File[]
+                        const timestamp = Date.now()
+                        const safeNameBase = sampleData.name.replace(/[^a-z0-9]/gi, '_')
+
+                        for (const stem of sampleData.stems) {
+                            // Link stem metadata to uploaded file OR existing URL
+                            // Frontend sends fileName for new uploads
+                            const stemFile = stemFiles.find(f => f.name === stem.fileName)
+
+                            if (stemFile) {
+                                // New Stem Upload
+                                const stemExt = stemFile.name.split('.').pop()
+                                const stemPath = `samples/${newCategoryName.replace(/[^a-z0-9]/gi, '_')}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
+
+                                console.log(`Uploading new stem for existing sample: ${stemPath}`)
+
+                                const { error: stemUploadError } = await supabaseAdmin
+                                    .storage
+                                    .from('audio')
+                                    .upload(stemPath, stemFile, {
+                                        contentType: stemFile.type || 'application/octet-stream',
+                                        upsert: true
+                                    })
+
+                                if (!stemUploadError) {
+                                    const { data: stemUrlData } = supabaseAdmin
+                                        .storage
+                                        .from('audio')
+                                        .getPublicUrl(stemPath)
+
+                                    processedStems.push({
+                                        name: stem.name,
+                                        url: stemUrlData.publicUrl,
+                                        size: stemFile.size,
+                                        filename: stemFile.name
+                                    })
+                                } else {
+                                    console.error("Stem upload failed", stemUploadError)
+                                }
+                            } else {
+                                // Existing stem (no file upload), preserve it if it has a URL
+                                // Currently the frontend might not send back the full existing stem object with URL if we only mapped names?
+                                // Let's check: The frontend converts existing stems to have a dummy file. 
+                                // But cleanSamples logic maps `stemsFiles` to `{ name, fileName }`. 
+                                // PROBLEM: We lose the URL of existing stems if we don't pass it back!
+                                // The frontend `cleanSamples` logic only sends name/fileName.
+                                // We need to check if we can retrieve existing stems from DB or if frontend passes URL?
+                                // Current frontend implementation only passes name and fileName.
+
+                                // Workaround: Try to find existing stem in 'existing.stems' by name? 
+                                // Or assume if no file matched, we skip updating it? 
+                                // But `updatePayload` will overwrite `stems` column!
+
+                                // Better approach: We need to preserve existing stems data. 
+                                // If the matching stem is not in stemFiles, check if it was already in existing.stems
+                                const oldStem = existing.stems?.find((s: any) => s.name === stem.name)
+                                if (oldStem) {
+                                    processedStems.push(oldStem)
+                                }
+                            }
+                        }
+                        updatePayload.stems = processedStems
                     }
 
                     await supabaseAdmin
@@ -184,6 +251,42 @@ export async function POST(request: Request) {
                         .from('audio')
                         .getPublicUrl(audioPath)
 
+                    // Process Stems for New Sample
+                    const processedStems = []
+                    const stemFiles = formData.getAll('stemFiles') as File[]
+
+                    if (sampleMeta.stems && Array.isArray(sampleMeta.stems)) {
+                        for (const stem of sampleMeta.stems) {
+                            const stemFile = stemFiles.find(f => f.name === stem.fileName)
+                            if (stemFile) {
+                                const stemExt = stemFile.name.split('.').pop()
+                                const stemPath = `samples/${newCategoryName.replace(/[^a-z0-9]/gi, '_')}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
+
+                                const { error: stemUploadError } = await supabaseAdmin
+                                    .storage
+                                    .from('audio')
+                                    .upload(stemPath, stemFile, {
+                                        contentType: stemFile.type || 'application/octet-stream',
+                                        upsert: true
+                                    })
+
+                                if (!stemUploadError) {
+                                    const { data: stemUrlData } = supabaseAdmin
+                                        .storage
+                                        .from('audio')
+                                        .getPublicUrl(stemPath)
+
+                                    processedStems.push({
+                                        name: stem.name,
+                                        url: stemUrlData.publicUrl,
+                                        size: stemFile.size,
+                                        filename: stemFile.name
+                                    })
+                                }
+                            }
+                        }
+                    }
+
                     const finalImageUrl = coverImageUrl || existingSamples?.[0]?.image_url || '/placeholder.jpg'
 
                     newSamplesToInsert.push({
@@ -200,7 +303,8 @@ export async function POST(request: Request) {
                         image_url: finalImageUrl,
                         duration: duration,
                         time_signature: sampleMeta.timeSignature || "4/4",
-                        is_featured: sampleMeta.featured || false
+                        is_featured: sampleMeta.featured || false,
+                        stems: processedStems
                     })
 
                 } catch (uploadError) {

@@ -9,6 +9,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '100mb',
+    },
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Don't bundle ffmpeg-static binary - use the actual file
@@ -16,14 +21,14 @@ const nextConfig = {
       config.externals.push({
         'ffmpeg-static': 'commonjs ffmpeg-static'
       });
-      
+
       // Allow WASM files for Essentia.js
       config.experiments = {
         ...config.experiments,
         asyncWebAssembly: true,
         layers: true,
       };
-      
+
       // Handle .wasm files
       config.module.rules.push({
         test: /\.wasm$/,

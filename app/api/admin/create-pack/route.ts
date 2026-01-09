@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
                                 .storage
                                 .from('audio')
                                 .upload(stemPath, stemFile, {
-                                    contentType: stemFile.type || 'audio/wav',
+                                    contentType: stemFile.type || 'application/octet-stream',
                                     upsert: true
                                 })
 

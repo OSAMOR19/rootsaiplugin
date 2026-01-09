@@ -151,10 +151,14 @@ export default function EditPackPage({ params }: PageProps) {
         try {
             const formData = new FormData()
 
-            const cleanSamples = updatedSamples.map(({ file, ...rest }) => ({
+            const cleanSamples = updatedSamples.map(({ file, stemsFiles, ...rest }) => ({
                 ...rest,
                 fileName: file.name,
-                category: categoryName // Force category to match current pack name
+                category: categoryName, // Force category to match current pack name
+                stems: stemsFiles?.map((s: any) => ({
+                    name: s.name,
+                    fileName: s.file.name
+                })) || []
             }))
 
             formData.append('samplesMetadata', JSON.stringify(cleanSamples))
@@ -175,9 +179,19 @@ export default function EditPackPage({ params }: PageProps) {
             }
 
             // Append new files (real files have size > 0, dummy existing files have size 0)
-            updatedSamples.forEach(({ file }) => {
+            updatedSamples.forEach(({ file, stemsFiles }) => {
+                // Main audio file
                 if (file && file.size > 0) {
                     formData.append('files', file)
+                }
+
+                // Stems files
+                if (stemsFiles && stemsFiles.length > 0) {
+                    stemsFiles.forEach((stem: any) => {
+                        if (stem.file && stem.file.size > 0) {
+                            formData.append('stemFiles', stem.file)
+                        }
+                    })
                 }
             })
 
