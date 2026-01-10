@@ -1,0 +1,65 @@
+
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
+
+// Manual env parsing
+function loadEnv() {
+    try {
+        const envPath = path.resolve(__dirname, '../.env.local');
+        if (!fs.existsSync(envPath)) return;
+        const envConfig = fs.readFileSync(envPath, 'utf8');
+        envConfig.split('\n').forEach(line => {
+            const [key, ...values] = line.split('=');
+            if (key && values) {
+                const val = values.join('=').trim().replace(/^['"]|['"]$/g, '');
+                process.env[key.trim()] = val;
+            }
+        });
+    } catch (e) {
+        console.error("Error reading .env.local", e);
+    }
+}
+
+loadEnv();
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("Missing env vars!");
+    process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+async function createStemsBucket() {
+    console.log("Checking if 'stems' bucket exists...");
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+
+    if (listError) {
+        console.error("Error listing buckets:", listError);
+        return;
+    }
+
+    const exists = buckets.find(b => b.name === 'stems');
+    if (exists) {
+        console.log("'stems' bucket already exists.");
+        // Try to update public
+        await supabase.storage.updateBucket('stems', { public: true });
+        return;
+    }
+
+    console.log("'stems' bucket missing. Creating (simple)...");
+    const { data, error } = await supabase.storage.createBucket('stems', {
+        public: true
+    });
+
+    if (error) {
+        console.error("Error creating bucket:", error);
+    } else {
+        console.log("Successfully created 'stems' bucket!");
+    }
+}
+
+createStemsBucket();

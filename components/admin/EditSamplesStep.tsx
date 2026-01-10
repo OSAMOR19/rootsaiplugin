@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Play, Pause, CheckCircle, Circle, Music, Star, X } from "lucide-react"
+import { toast } from "sonner"
 import CustomDropdown from "@/components/CustomDropdown"
 import EditActionsDropdown from "@/components/admin/EditActionsDropdown"
 import MultiSelectDropdown from "@/components/MultiSelectDropdown"
@@ -398,7 +399,6 @@ export default function EditSamplesStep({ files, initialData, onBack, onSubmit, 
                                     <input
                                         type="file"
                                         className="hidden"
-                                        accept="audio/*"
                                         multiple
                                         onChange={(e) => {
                                             if (e.target.files && e.target.files.length > 0) {

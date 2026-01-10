@@ -8,6 +8,7 @@ import FilesUploadStep from "@/components/admin/FilesUploadStep"
 import { useSamples } from "@/hooks/useSamples"
 import { supabase } from "@/lib/supabase"
 import { X, Check } from "lucide-react"
+import { toast } from "sonner"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -145,8 +146,21 @@ export default function EditPackPage({ params }: PageProps) {
     }
 
     const handleSubmit = async (updatedSamples: any[]) => {
-        setIsLoadingData(true) // Reuse loading state or add specific valid one if needed
+        setIsLoadingData(true)
         setShowSuccessModal(false)
+
+        // Count total stems to upload (new ones only)
+        const totalNewStems = updatedSamples.reduce((count, sample) => {
+            const newStems = sample.stemsFiles?.filter((stem: any) => stem.file && stem.file.size > 0) || []
+            return count + newStems.length
+        }, 0)
+
+        let uploadToastId: string | number | undefined
+        if (totalNewStems > 0) {
+            uploadToastId = toast.loading(`Uploading ${totalNewStems} stem${totalNewStems > 1 ? 's' : ''}...`, {
+                description: 'Please wait while files are uploaded to storage'
+            })
+        }
 
         try {
             const { uploadFileToSupabase } = await import('@/lib/upload-utils')
@@ -197,6 +211,9 @@ export default function EditPackPage({ params }: PageProps) {
                 // Process Stems
                 const processedStems = []
                 if (sample.stemsFiles && sample.stemsFiles.length > 0) {
+                    let stemUploadCount = 0
+                    const totalStems = sample.stemsFiles.length
+
                     for (const stem of sample.stemsFiles) {
                         const stemFile = stem.file
                         // Check for existing URL on dummy file
@@ -206,13 +223,17 @@ export default function EditPackPage({ params }: PageProps) {
 
                         if (stemFile && stemFile.size > 0) {
                             // New Stem Upload
+                            stemUploadCount++
+                            console.log(`[Upload] Uploading stem ${stemUploadCount}/${totalStems}: ${stem.name}`)
+
                             const timestamp = Date.now()
                             const cleanTitle = (packDetails?.title || categoryName).replace(/[^a-z0-9]/gi, '_')
                             const safeNameBase = sample.name.replace(/[^a-z0-9]/gi, '_')
                             const stemExt = stemFile.name.split('.').pop()
                             const stemPath = `samples/${cleanTitle}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
 
-                            finalStemUrl = await uploadFileToSupabase(stemFile, stemPath)
+                            finalStemUrl = await uploadFileToSupabase(stemFile, stemPath, 'stems')
+                            console.log(`[Upload] Stem uploaded successfully: ${finalStemUrl}`)
                         }
 
                         if (finalStemUrl) {
@@ -260,16 +281,43 @@ export default function EditPackPage({ params }: PageProps) {
                 body: JSON.stringify(payload)
             })
 
-            if (!response.ok) throw new Error('Update failed')
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                console.error('Update failed:', errorData)
+                throw new Error(errorData.error || 'Update failed')
+            }
+
+            const result = await response.json()
+            console.log('Update successful:', result)
+
+            // Dismiss upload loading toast and show success
+            if (uploadToastId) {
+                toast.dismiss(uploadToastId)
+                toast.success(`Successfully uploaded ${totalNewStems} stem${totalNewStems > 1 ? 's' : ''}!`, {
+                    description: 'Pack updated successfully'
+                })
+            }
 
             setShowSuccessModal(true)
             setTimeout(() => {
-                window.location.reload()
+                // Navigate to the updated category URL if title changed
+                const finalCategoryName = packDetails?.title || categoryName
+                if (finalCategoryName !== initialCategoryName) {
+                    router.push(`/admin/edit-pack/${encodeURIComponent(finalCategoryName)}`)
+                } else {
+                    // Just reload if same category
+                    window.location.reload()
+                }
             }, 1500)
 
         } catch (error) {
+            // Dismiss loading toast on error
+            if (uploadToastId) {
+                toast.dismiss(uploadToastId)
+            }
+
             console.error('Update error:', error)
-            alert('Failed to update pack')
+            alert(`Failed to update pack: ${error instanceof Error ? error.message : 'Unknown error'}`)
             setIsLoadingData(false)
         }
     }

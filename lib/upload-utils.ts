@@ -13,7 +13,7 @@ export async function uploadFileToSupabase(
     bucket: string = 'audio'
 ): Promise<string> {
     try {
-        console.log(`[UploadUtils] Uploading ${file.name} to ${path}...`)
+        console.log(`[UploadUtils] Uploading ${file.name} to ${bucket}/${path}...`)
 
         const { error: uploadError } = await supabase
             .storage
@@ -24,7 +24,8 @@ export async function uploadFileToSupabase(
             })
 
         if (uploadError) {
-            console.error(`[UploadUtils] Upload failed for ${path}:`, uploadError)
+            console.error(`[UploadUtils] Upload failed for ${path}. Error details:`, uploadError)
+            console.error(`[UploadUtils] File info - Name: ${file.name}, Type: ${file.type}, Size: ${file.size}`)
             throw uploadError
         }
 
@@ -33,6 +34,7 @@ export async function uploadFileToSupabase(
             .from(bucket)
             .getPublicUrl(path)
 
+        console.log(`[UploadUtils] Upload successful: ${publicUrlData.publicUrl}`)
         return publicUrlData.publicUrl
 
     } catch (error) {
