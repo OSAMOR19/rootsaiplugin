@@ -66,7 +66,7 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
                         }}
                         className="flex items-center justify-between cursor-pointer group"
                     >
-                        <span className="truncate font-medium">Download Original</span>
+                        <span className="truncate font-medium">Download stems</span>
                         <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
                     </DropdownMenuItem>
 
