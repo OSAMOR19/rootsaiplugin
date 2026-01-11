@@ -260,7 +260,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           // Dismiss loading toast and show success
           toast.dismiss(toastId)
           toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
-            duration: 5000
+            duration: 15000 // Increased duration to 15s
           })
 
           // ⚡ SKIP processAudio - we already have the BPM!
@@ -573,7 +573,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       // Dismiss loading and show success
       toast.dismiss(toastId)
       toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
-        duration: 5000
+        duration: 15000 // Increased duration to 15s
       })
 
       // Mark as listened
@@ -854,7 +854,8 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
               <path id="circle-path" d="M 128,128 m -110,0 a 110,110 0 1,1 220,0 a 110,110 0 1,1 -220,0" />
             </defs>
             <text
-              className="text-xs font-light fill-gray-400 tracking-widest opacity-40"
+              className={`text-xs tracking-widest ${hasListened ? "font-bold fill-green-500 opacity-100" : "font-light fill-gray-400 opacity-40"
+                }`}
             >
               <textPath href="#circle-path" startOffset="0%">
                 {hasListened && recordedAudioBuffer
@@ -862,7 +863,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                     ? "PLAYING EXTRACTED AUDIO • LISTEN TO THE 4 BARS • "
                     : "CLICK TO PLAY • PREVIEW EXTRACTED 4 BARS • CLICK TO PLAY • "
                   : hasListened
-                    ? "AUDIO ANALYZED • SAMPLES READY • AUDIO ANALYZED • SAMPLES READY • "
+                    ? `BPM DETECTED: ${recordedBPM ? recordedBPM : '...'} • SAMPLES READY • BPM DETECTED: ${recordedBPM ? recordedBPM : '...'} • SAMPLES READY • `
                     : isRecording
                       ? "RECORDING • LISTENING TO INTERNAL AUDIO • RECORDING • "
                       : isProcessing

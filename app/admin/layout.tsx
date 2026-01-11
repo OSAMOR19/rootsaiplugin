@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Package, LogOut, ChevronRight, Upload } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
@@ -53,9 +54,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Sidebar */}
             <aside className="w-64 border-r border-white/10 flex flex-col bg-black/50 backdrop-blur-xl">
                 <div className="p-6 border-b border-white/5">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-                        ROOTS Admin
-                    </h1>
+                    <div className="flex items-center gap-2">
+                        <Image src="/rootslogo.png" alt="ROOTS" width={32} height={32} className="h-8 w-auto object-contain" />
+                        <span className="text-xl font-bold text-white">Admin</span>
+                    </div>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-2">

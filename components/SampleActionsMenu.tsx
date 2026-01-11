@@ -52,12 +52,30 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 z-[100]" onClick={(e) => e.stopPropagation()}>
-                    {sample.stems && sample.stems.length > 0 ? (
+                    <DropdownMenuItem
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            const mainFileUrl = sample.url || sample.audioUrl
+                            if (mainFileUrl) {
+                                handleDownloadStem({
+                                    url: mainFileUrl,
+                                    name: sample.name,
+                                    filename: sample.filename || `${sample.name}.wav` // Fallback, though likely zip
+                                })
+                            }
+                        }}
+                        className="flex items-center justify-between cursor-pointer group"
+                    >
+                        <span className="truncate font-medium">Download Original</span>
+                        <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                    </DropdownMenuItem>
+
+                    {sample.stems && sample.stems.length > 0 && (
                         <>
-                            <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Download Stems
-                            </DropdownMenuLabel>
                             <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                Stems
+                            </DropdownMenuLabel>
                             {sample.stems.map((stem: any, i: number) => (
                                 <DropdownMenuItem
                                     key={i}
@@ -72,10 +90,6 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
                                 </DropdownMenuItem>
                             ))}
                         </>
-                    ) : (
-                        <div className="px-2 py-4 text-sm text-muted-foreground text-center italic">
-                            No stems available
-                        </div>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

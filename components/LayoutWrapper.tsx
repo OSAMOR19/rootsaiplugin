@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation"
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  // Show sidebar/player on all pages EXCEPT the home page ("/")
-  const showAppLayout = pathname !== "/"
+  // Show sidebar/player on all pages EXCEPT the home page ("/") AND admin pages ("/admin")
+  const showAppLayout = pathname !== "/" && !pathname.startsWith("/admin")
 
   if (!showAppLayout) {
     return <>{children}</>

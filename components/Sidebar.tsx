@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Home, Search, Music2, Compass, Settings, Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,8 +25,7 @@ export default function Sidebar() {
 
   return (
     <div className="w-16 flex flex-col items-center py-6 bg-black border-r border-white/10 h-screen sticky top-0 z-50">
-      {/* Logo Placeholder */}
-      <div className="w-1 bg-yellow-500 h-6 absolute left-0 top-8 rounded-r-full" />
+      {/* Logo Removed as requested */}
 
       <nav className="flex-1 flex flex-col gap-8 mt-4">
         {navItems.map((item) => {
@@ -42,7 +42,17 @@ export default function Sidebar() {
               )}
               title={item.label}
             >
-              <item.icon className={cn("w-6 h-6", isActive && "fill-current")} />
+              {item.label === "Home" ? (
+                <Image
+                  src="/rootslogo.png"
+                  alt="Home"
+                  width={24}
+                  height={24}
+                  className="w-6 h-6 object-contain"
+                />
+              ) : (
+                <item.icon className={cn("w-6 h-6", isActive && "fill-current")} />
+              )}
               {/* Removed blur background as requested */}
             </Link>
           )
