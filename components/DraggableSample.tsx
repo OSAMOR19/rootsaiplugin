@@ -315,8 +315,13 @@ export default function DraggableSample({
           })
 
           ws.on('finish', () => {
-            setAudioProgress(0)
-            setHasStarted(false)
+            if (isPlaying) {
+              ws.seekTo(0)
+              ws.play()
+            } else {
+              setAudioProgress(0)
+              setHasStarted(false)
+            }
           })
 
           ws.on('error', (error) => {

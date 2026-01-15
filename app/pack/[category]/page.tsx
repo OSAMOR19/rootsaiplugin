@@ -10,6 +10,7 @@ import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
 import { useFavorites } from "@/hooks/useFavorites"
 import WaveformCell from "@/components/WaveformCell"
+import SampleActionsMenu from "@/components/SampleActionsMenu"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
 
@@ -96,18 +97,27 @@ export default function PackDetailPage({ params }: PageProps) {
     }
   }
 
-  const handleDownload = (e: React.MouseEvent, sample: any) => {
+  const handleDownload = async (e: React.MouseEvent, sample: any) => {
     e.stopPropagation()
     const audioUrl = sample.audioUrl || sample.url
     if (!audioUrl) return
 
-    const link = document.createElement('a')
-    link.href = audioUrl
-    link.download = `${sample.name}.wav` // Assuming wav, or just name
-    link.target = "_blank" // Fallback for cross-origin
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    try {
+      const response = await fetch(audioUrl)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${sample.name}.wav` // Assuming wav, or just name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Download failed:', error)
+      // Fallback
+      window.open(audioUrl, '_blank')
+    }
   }
 
   const toggleFavorite = (e: React.MouseEvent, sample: any) => {
@@ -363,12 +373,14 @@ export default function PackDetailPage({ params }: PageProps) {
                       >
                         <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />
                       </button>
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
+                      <button 
+                        onClick={(e) => { e.stopPropagation() }}
+                        className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
                         <Plus className="w-4 h-4" />
                       </button>
-                      <button className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <SampleActionsMenu sample={sample} />
+                      </div>
                     </div>
                   </motion.div>
                 )

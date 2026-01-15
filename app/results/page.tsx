@@ -107,6 +107,8 @@ function ResultsContent() {
         if (searchQuery) {
           const lowerName = fileName.toLowerCase() || ''
           const lowerCat = (loop.category || '').toLowerCase()
+          const loopGenres = (loop.genres || []).map((g: string) => g.toLowerCase())
+          const loopKeywords = (loop.keywords || []).map((k: string) => k.toLowerCase())
 
           const stopWords = ['i', 'need', 'a', 'want', 'the', 'of', 'for', 'with', 'sound', 'loop', 'sample', 'drums', 'drum', 'beat', 'me', 'get', 'find', 'show', 'please']
           const keywords = searchQuery.toLowerCase()
@@ -117,7 +119,7 @@ function ResultsContent() {
           if (keywords.length > 0) {
             let matchCount = 0
             keywords.forEach(k => {
-              if (lowerName.includes(k) || lowerCat.includes(k)) {
+              if (lowerName.includes(k) || lowerCat.includes(k) || loopGenres.some((g: string) => g.includes(k)) || loopKeywords.some((kw: string) => kw.includes(k))) {
                 matchCount++
               }
             })
@@ -129,20 +131,22 @@ function ResultsContent() {
           } else {
             // Fallback exact substring match
             const lowerQuery = searchQuery.toLowerCase()
-            if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery)) {
+            if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery) || loopGenres.some((g: string) => g.includes(lowerQuery))) {
               score += 50
             }
           }
         }
 
         // BPM matching
-        const bpmRatio = loopBPM / bpm
-        if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
-          score += 40
-        } else if (Math.abs(bpm - loopBPM) <= 5) {
-          score += 30
-        } else if (Math.abs(bpm - loopBPM) <= 10) {
-          score += 20
+        if (bpm) {
+          const bpmRatio = loopBPM / bpm
+          if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
+            score += 40
+          } else if (Math.abs(bpm - loopBPM) <= 5) {
+            score += 30
+          } else if (Math.abs(bpm - loopBPM) <= 10) {
+            score += 20
+          }
         }
 
         // Key matching
@@ -439,7 +443,8 @@ function ResultsContent() {
 
   const handleViewMore = async () => {
     const bpmToUse = editedBPM ?? recordedBPM
-    if (!recordedAudioBuffer || isLoadingMore || !bpmToUse || !detectedKey) return
+    // For text search, we don't need recordedAudioBuffer or detectedKey
+    if ((!recordedAudioBuffer && !query) || isLoadingMore || (!bpmToUse && !query)) return
 
     setIsLoadingMore(true)
 
@@ -457,86 +462,104 @@ function ResultsContent() {
 
       // Calculate compatibility scores for all loops (same algorithm as API)
       const calculateCompatibilityScore = (
-        detectedBPM: number,
-        detectedKey: string,
+        detectedBPM: number | null,
+        detectedKey: string | null,
         loopBPM: number,
         loopKey: string,
-        loopFilename: string
+        loopFilename: string,
+        loopCategory: string,
+        loopGenres: string[] = [],
+        loopKeywords: string[] = []
       ): number => {
         let totalScore = 0
 
-        // 1. Musical Compatibility
-        let musicalScore = 0
-        if (detectedKey === loopKey) {
-          musicalScore += 25
-        } else {
-          const harmonicRelationships: { [key: string]: { [relatedKey: string]: number } } = {
-            'C': { 'Am': 35, 'F': 30, 'G': 32, 'Dm': 25, 'Em': 20 },
-            'Am': { 'C': 35, 'F': 32, 'G': 28, 'Dm': 30, 'Em': 25 },
-            'F': { 'C': 30, 'Am': 32, 'Dm': 35, 'Bb': 25, 'G': 20 },
-            'G': { 'C': 32, 'Am': 28, 'Em': 35, 'D': 30, 'F': 20 },
-            'Dm': { 'F': 35, 'Am': 30, 'Bb': 32, 'C': 25, 'G': 18 },
-            'F#m': { 'A': 35, 'D': 32, 'E': 30, 'Bm': 25, 'C#m': 20 }
-          }
-          musicalScore += harmonicRelationships[detectedKey]?.[loopKey] || 10
+        // 0. Text Search Scoring (if query exists)
+        if (query) {
+           const lowerName = loopFilename.toLowerCase()
+           const lowerCat = loopCategory.toLowerCase()
+           const lGenres = loopGenres.map(g => g.toLowerCase())
+           const lKeywords = loopKeywords.map(k => k.toLowerCase())
+           const lowerQuery = query.toLowerCase()
+           
+           if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery) || lGenres.some(g => g.includes(lowerQuery)) || lKeywords.some(k => k.includes(lowerQuery))) {
+             totalScore += 50
+           }
         }
 
-        const bpmRatio = loopBPM / detectedBPM
-        if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
-          musicalScore += 15
-        } else if (bpmRatio >= 0.5 && bpmRatio <= 0.52 || bpmRatio >= 1.98 && bpmRatio <= 2.02) {
-          musicalScore += 25
-        } else if (Math.abs(detectedBPM - loopBPM) <= 5) {
-          musicalScore += 18
-        } else if (Math.abs(detectedBPM - loopBPM) <= 10) {
-          musicalScore += 12
-        } else {
-          musicalScore += Math.max(0, 15 - Math.abs(detectedBPM - loopBPM) / 2)
-        }
+        if (detectedBPM && detectedKey) {
+            // 1. Musical Compatibility
+            let musicalScore = 0
+            if (detectedKey === loopKey) {
+            musicalScore += 25
+            } else {
+            const harmonicRelationships: { [key: string]: { [relatedKey: string]: number } } = {
+                'C': { 'Am': 35, 'F': 30, 'G': 32, 'Dm': 25, 'Em': 20 },
+                'Am': { 'C': 35, 'F': 32, 'G': 28, 'Dm': 30, 'Em': 25 },
+                'F': { 'C': 30, 'Am': 32, 'Dm': 35, 'Bb': 25, 'G': 20 },
+                'G': { 'C': 32, 'Am': 28, 'Em': 35, 'D': 30, 'F': 20 },
+                'Dm': { 'F': 35, 'Am': 30, 'Bb': 32, 'C': 25, 'G': 18 },
+                'F#m': { 'A': 35, 'D': 32, 'E': 30, 'Bm': 25, 'C#m': 20 }
+            }
+            musicalScore += harmonicRelationships[detectedKey]?.[loopKey] || 10
+            }
 
-        totalScore += musicalScore
+            const bpmRatio = loopBPM / detectedBPM
+            if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
+            musicalScore += 15
+            } else if (bpmRatio >= 0.5 && bpmRatio <= 0.52 || bpmRatio >= 1.98 && bpmRatio <= 2.02) {
+            musicalScore += 25
+            } else if (Math.abs(detectedBPM - loopBPM) <= 5) {
+            musicalScore += 18
+            } else if (Math.abs(detectedBPM - loopBPM) <= 10) {
+            musicalScore += 12
+            } else {
+            musicalScore += Math.max(0, 15 - Math.abs(detectedBPM - loopBPM) / 2)
+            }
 
-        // 2. Rhythmic Complexity
-        const filename = loopFilename.toLowerCase()
-        let rhythmScore = 0
-        if (filename.includes('fill') || filename.includes('roll')) {
-          rhythmScore += 20
-        } else if (filename.includes('kick') || filename.includes('bass')) {
-          rhythmScore += 25
-        } else if (filename.includes('shaker') || filename.includes('hi') || filename.includes('perc')) {
-          rhythmScore += 30
-        } else if (filename.includes('full') || filename.includes('complete')) {
-          rhythmScore += 15
-        } else if (filename.includes('top') || filename.includes('melody')) {
-          rhythmScore += 22
-        }
-        totalScore += rhythmScore
+            totalScore += musicalScore
 
-        // 3. Timbral Compatibility
-        let timbreScore = 0
-        if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
-          timbreScore += 15
-        }
-        if (filename.includes('kick') || filename.includes('bass') || filename.includes('low')) {
-          timbreScore += 10
-        } else if (filename.includes('hi') || filename.includes('cymbal') || filename.includes('shaker')) {
-          timbreScore += 12
-        } else if (filename.includes('mid') || filename.includes('tom') || filename.includes('snare')) {
-          timbreScore += 8
-        }
-        totalScore += timbreScore
+            // 2. Rhythmic Complexity
+            const filename = loopFilename.toLowerCase()
+            let rhythmScore = 0
+            if (filename.includes('fill') || filename.includes('roll')) {
+            rhythmScore += 20
+            } else if (filename.includes('kick') || filename.includes('bass')) {
+            rhythmScore += 25
+            } else if (filename.includes('shaker') || filename.includes('hi') || filename.includes('perc')) {
+            rhythmScore += 30
+            } else if (filename.includes('full') || filename.includes('complete')) {
+            rhythmScore += 15
+            } else if (filename.includes('top') || filename.includes('melody')) {
+            rhythmScore += 22
+            }
+            totalScore += rhythmScore
 
-        // 4. Cultural/Stylistic Coherence
-        let styleScore = 15
-        if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
-          (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
-          (filename.includes('shekere') && filename.includes('perc'))) {
-          styleScore += 10
+            // 3. Timbral Compatibility
+            let timbreScore = 0
+            if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
+            timbreScore += 15
+            }
+            if (filename.includes('kick') || filename.includes('bass') || filename.includes('low')) {
+            timbreScore += 10
+            } else if (filename.includes('hi') || filename.includes('cymbal') || filename.includes('shaker')) {
+            timbreScore += 12
+            } else if (filename.includes('mid') || filename.includes('tom') || filename.includes('snare')) {
+            timbreScore += 8
+            }
+            totalScore += timbreScore
+
+            // 4. Cultural/Stylistic Coherence
+            let styleScore = 15
+            if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
+            (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
+            (filename.includes('shekere') && filename.includes('perc'))) {
+            styleScore += 10
+            }
+            totalScore += styleScore
         }
-        totalScore += styleScore
 
         const finalScore = Math.min(100, totalScore)
-        return finalScore >= 75 ? finalScore : 0
+        return finalScore >= (query ? 30 : 75) ? finalScore : 0 // Lower threshold for search results
       }
 
       // Score all loops and filter out already shown ones
@@ -564,7 +587,10 @@ function ResultsContent() {
               detectedKey,
               loop.bpm,
               loopKey,
-              fileName
+              fileName,
+              loop.category || '',
+              loop.genres,
+              loop.keywords
             )
           }
         })
@@ -1041,8 +1067,8 @@ function ResultsContent() {
           </motion.div>
         )}
 
-        {/* View More Button - Only show for AI-matched results */}
-        {recommendationsParam && filteredSamples.length > 0 && (
+        {/* View More Button - Only show for AI-matched results or text search results */}
+        {(recommendationsParam || query) && filteredSamples.length > 0 && (
           <motion.div
             className="flex justify-center mt-8 mb-6"
             initial={{ opacity: 0, y: 20 }}
@@ -1051,8 +1077,8 @@ function ResultsContent() {
           >
             <motion.button
               onClick={handleViewMore}
-              disabled={isLoadingMore || !recordedAudioBuffer}
-              className={`px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${isLoadingMore || !recordedAudioBuffer
+              disabled={isLoadingMore || (!recordedAudioBuffer && !query)}
+              className={`px-8 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center space-x-2 ${isLoadingMore || (!recordedAudioBuffer && !query)
                 ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                 : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
                 }`}

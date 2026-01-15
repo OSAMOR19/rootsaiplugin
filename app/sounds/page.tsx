@@ -31,7 +31,7 @@ export default function SoundsPage() {
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
     // Derived Filters Options
-    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
+    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean).filter(g => g !== 'Afrobeat' && g !== 'Afrobeats') as string[]
     const instruments = [...new Set(samples.flatMap(s => s.instruments || []))].filter(Boolean) as string[]
     const keys = [...new Set(samples.map(s => s.key).filter(Boolean))] as string[]
     const drumTypes = [...new Set(samples.map(s => s.drumType).filter(Boolean))] as string[]

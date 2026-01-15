@@ -9,6 +9,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 interface SampleActionsMenuProps {
     sample: any
@@ -18,26 +20,52 @@ interface SampleActionsMenuProps {
 
 export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 dark:text-gray-500", buttonClass }: SampleActionsMenuProps) {
 
-    const handleDownloadStem = async (stem: any) => {
+    const handleDownloadFile = async (url: string, filename: string) => {
         try {
-            if (!stem.url) {
-                console.error("Stem has no URL:", stem)
-                return
-            }
-
-            const response = await fetch(stem.url)
+            const response = await fetch(url)
             const blob = await response.blob()
-            const url = window.URL.createObjectURL(blob)
+            const blobUrl = window.URL.createObjectURL(blob)
             const link = document.createElement('a')
-            link.href = url
-            link.download = stem.filename || `${stem.name}.wav`
+            link.href = blobUrl
+            link.download = filename
             document.body.appendChild(link)
             link.click()
             document.body.removeChild(link)
-            window.URL.revokeObjectURL(url)
+            window.URL.revokeObjectURL(blobUrl)
         } catch (error) {
             console.error('Download failed:', error)
-            if (stem.url) window.open(stem.url, '_blank')
+            window.open(url, '_blank')
+        }
+    }
+
+    const handleDownloadAllStems = async () => {
+        if (!sample.stems || sample.stems.length === 0) return
+
+        try {
+            const zip = new JSZip()
+            const folder = zip.folder(sample.name || "stems")
+
+            // Add main file
+            if (sample.audioUrl || sample.url) {
+                const mainUrl = sample.audioUrl || sample.url
+                const mainBlob = await fetch(mainUrl).then(r => r.blob())
+                folder?.file(`${sample.name}.wav`, mainBlob)
+            }
+
+            // Add stems
+            await Promise.all(sample.stems.map(async (stem: any) => {
+                if (stem.url) {
+                    const stemBlob = await fetch(stem.url).then(r => r.blob())
+                    folder?.file(stem.filename || `${stem.name}.wav`, stemBlob)
+                }
+            }))
+
+            const content = await zip.generateAsync({ type: "blob" })
+            saveAs(content, `${sample.name}_stems.zip`)
+
+        } catch (error) {
+            console.error("Failed to zip stems:", error)
+            alert("Failed to create ZIP file. Please try downloading individual files.")
         }
     }
 
@@ -52,36 +80,48 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 z-[100]" onClick={(e) => e.stopPropagation()}>
+                    
+                    {/* Main File Download */}
                     <DropdownMenuItem
                         onClick={(e) => {
                             e.stopPropagation()
                             const mainFileUrl = sample.url || sample.audioUrl
                             if (mainFileUrl) {
-                                handleDownloadStem({
-                                    url: mainFileUrl,
-                                    name: sample.name,
-                                    filename: sample.filename || `${sample.name}.wav` // Fallback, though likely zip
-                                })
+                                handleDownloadFile(mainFileUrl, sample.filename || `${sample.name}.wav`)
                             }
                         }}
                         className="flex items-center justify-between cursor-pointer group"
                     >
-                        <span className="truncate font-medium">Download stems</span>
+                        <span className="truncate font-medium">Download File</span>
                         <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
                     </DropdownMenuItem>
+
+                    {/* Stems ZIP Download */}
+                    {sample.stems && sample.stems.length > 0 && (
+                        <DropdownMenuItem
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleDownloadAllStems()
+                            }}
+                            className="flex items-center justify-between cursor-pointer group"
+                        >
+                            <span className="truncate font-medium">Download Stems (ZIP)</span>
+                            <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                        </DropdownMenuItem>
+                    )}
 
                     {sample.stems && sample.stems.length > 0 && (
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Stems
+                                Individual Stems
                             </DropdownMenuLabel>
                             {sample.stems.map((stem: any, i: number) => (
                                 <DropdownMenuItem
                                     key={i}
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        handleDownloadStem(stem)
+                                        handleDownloadFile(stem.url, stem.filename || `${stem.name}.wav`)
                                     }}
                                     className="flex items-center justify-between cursor-pointer group"
                                 >

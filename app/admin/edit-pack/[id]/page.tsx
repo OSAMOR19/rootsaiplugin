@@ -232,7 +232,7 @@ export default function EditPackPage({ params }: PageProps) {
                             const stemExt = stemFile.name.split('.').pop()
                             const stemPath = `samples/${cleanTitle}/stems/${timestamp}_${safeNameBase}_${stem.name.replace(/[^a-z0-9]/gi, '_')}.${stemExt}`
 
-                            finalStemUrl = await uploadFileToSupabase(stemFile, stemPath, 'stems')
+                            finalStemUrl = await uploadFileToSupabase(stemFile, stemPath, 'audio')
                             console.log(`[Upload] Stem uploaded successfully: ${finalStemUrl}`)
                         }
 
