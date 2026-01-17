@@ -69,6 +69,11 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
         }
     }
 
+    // If no stems, don't show the menu at all (since we removed "Download File")
+    if (!sample.stems || sample.stems.length === 0) {
+        return null
+    }
+
     return (
         <div onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
@@ -80,57 +85,30 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 z-[100]" onClick={(e) => e.stopPropagation()}>
-                    
-                    {/* Main File Download */}
+
+                    {/* Consolidated Download Stem Button */}
                     <DropdownMenuItem
                         onClick={(e) => {
                             e.stopPropagation()
-                            const mainFileUrl = sample.url || sample.audioUrl
-                            if (mainFileUrl) {
-                                handleDownloadFile(mainFileUrl, sample.filename || `${sample.name}.wav`)
+                            // Check for pre-uploaded zip
+                            const zipStem = sample.stems?.find((s: any) =>
+                                s.url?.toLowerCase().endsWith('.zip') ||
+                                s.filename?.toLowerCase().endsWith('.zip') ||
+                                s.name?.toLowerCase().endsWith('.zip')
+                            )
+
+                            if (zipStem) {
+                                handleDownloadFile(zipStem.url, zipStem.filename || `${sample.name}.zip`)
+                            } else {
+                                handleDownloadAllStems()
                             }
                         }}
                         className="flex items-center justify-between cursor-pointer group"
                     >
-                        <span className="truncate font-medium">Download File</span>
+                        <span className="truncate font-medium">Download Stem</span>
                         <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
                     </DropdownMenuItem>
 
-                    {/* Stems ZIP Download */}
-                    {sample.stems && sample.stems.length > 0 && (
-                        <DropdownMenuItem
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                handleDownloadAllStems()
-                            }}
-                            className="flex items-center justify-between cursor-pointer group"
-                        >
-                            <span className="truncate font-medium">Download Stems (ZIP)</span>
-                            <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
-                        </DropdownMenuItem>
-                    )}
-
-                    {sample.stems && sample.stems.length > 0 && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Individual Stems
-                            </DropdownMenuLabel>
-                            {sample.stems.map((stem: any, i: number) => (
-                                <DropdownMenuItem
-                                    key={i}
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleDownloadFile(stem.url, stem.filename || `${stem.name}.wav`)
-                                    }}
-                                    className="flex items-center justify-between cursor-pointer group"
-                                >
-                                    <span className="truncate">{stem.name}</span>
-                                    <Download className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
-                                </DropdownMenuItem>
-                            ))}
-                        </>
-                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

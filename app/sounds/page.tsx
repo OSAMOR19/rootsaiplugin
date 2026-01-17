@@ -9,6 +9,7 @@ import { motion } from "framer-motion"
 import { useSearchParams, useRouter } from "next/navigation"
 import { DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
 import WaveformCell from "@/components/WaveformCell"
+import SampleActionsMenu from "@/components/SampleActionsMenu"
 import { formatTimeSeconds } from "@/lib/utils"
 
 export default function SoundsPage() {
@@ -31,7 +32,7 @@ export default function SoundsPage() {
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
     // Derived Filters Options
-    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean).filter(g => g !== 'Afrobeat' && g !== 'Afrobeats') as string[]
+    const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
     const instruments = [...new Set(samples.flatMap(s => s.instruments || []))].filter(Boolean) as string[]
     const keys = [...new Set(samples.map(s => s.key).filter(Boolean))] as string[]
     const drumTypes = [...new Set(samples.map(s => s.drumType).filter(Boolean))] as string[]
@@ -337,7 +338,7 @@ export default function SoundsPage() {
                                     </div>
 
                                     {/* Actions */}
-                                    <div className="col-span-1 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="col-span-1 flex justify-end gap-2 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={(e) => toggleFav(e, sample)}
                                             className={`p-1.5 rounded-full transition-colors ${isFavorite(sample.id) ? 'text-red-500 bg-red-500/10' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
@@ -352,6 +353,7 @@ export default function SoundsPage() {
                                         >
                                             <Download className="w-4 h-4" />
                                         </button>
+                                        <SampleActionsMenu sample={sample} />
                                     </div>
                                 </motion.div>
                             )

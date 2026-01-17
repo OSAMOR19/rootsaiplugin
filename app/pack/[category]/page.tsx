@@ -11,6 +11,7 @@ import { useAudio } from "@/contexts/AudioContext"
 import { useFavorites } from "@/hooks/useFavorites"
 import WaveformCell from "@/components/WaveformCell"
 import SampleActionsMenu from "@/components/SampleActionsMenu"
+import { formatTimeSeconds } from "@/lib/utils"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
 
@@ -27,13 +28,14 @@ export default function PackDetailPage({ params }: PageProps) {
 
   const { samples, loading: samplesLoading } = useSamples({ autoFetch: true })
   const { packs, loading: packsLoading, getPackByTitle } = usePacks()
-  const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+  const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
   const { isFavorite, addFavorite, removeFavorite } = useFavorites()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
   const [selectedKey, setSelectedKey] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("popular")
+  const [loadedDurations, setLoadedDurations] = useState<Record<string, number>>({})
 
   // Find the current pack details
   const currentPack = getPackByTitle(categoryName)
@@ -338,13 +340,21 @@ export default function PackDetailPage({ params }: PageProps) {
                           height={32}
                           waveColor={isCurrentPlaying ? 'rgb(74, 222, 128)' : 'rgb(107, 114, 128)'}
                           progressColor="rgb(34, 197, 94)"
+                          onDurationLoaded={(d) => setLoadedDurations(prev => ({ ...prev, [sample.id]: d }))}
                         />
                       </div>
                     </div>
 
                     {/* Time */}
                     <div className="col-span-2 flex items-center justify-center">
-                      <p className="text-sm text-white/60">{sample.duration || '0:16'}</p>
+                      <p className="text-sm text-white/60">
+                        {isCurrent && duration > 0
+                          ? formatTimeSeconds(duration)
+                          : loadedDurations[sample.id]
+                            ? formatTimeSeconds(loadedDurations[sample.id])
+                            : (sample.duration || '0:00')
+                        }
+                      </p>
                     </div>
 
                     {/* Key */}
@@ -358,7 +368,7 @@ export default function PackDetailPage({ params }: PageProps) {
                     </div>
 
                     {/* Actions */}
-                    <div className="col-span-1 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="col-span-1 flex items-center justify-end gap-2 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => handleDownload(e, sample)}
                         className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors text-white/60 hover:text-white"
@@ -372,11 +382,6 @@ export default function PackDetailPage({ params }: PageProps) {
                         title="Toogle Favorite"
                       >
                         <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation() }}
-                        className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
-                        <Plus className="w-4 h-4" />
                       </button>
                       <div onClick={(e) => e.stopPropagation()}>
                         <SampleActionsMenu sample={sample} />
