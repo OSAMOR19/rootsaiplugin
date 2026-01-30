@@ -188,7 +188,7 @@ export default function CapturePage() {
               height={32}
               className="h-8 w-auto object-contain"
             />
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-wide">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-wide">
               ROOTS
             </h1>
           </div>
