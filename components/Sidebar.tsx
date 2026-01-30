@@ -24,7 +24,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <div className="w-16 flex flex-col items-center py-6 bg-black border-r border-white/10 h-screen sticky top-0 z-50">
+    <div className="w-16 flex flex-col items-center py-6 bg-white dark:bg-black border-r border-gray-200 dark:border-white/10 h-screen sticky top-0 z-50 transition-colors duration-300">
       {/* Logo Removed as requested */}
 
       <nav className="flex-1 flex flex-col gap-8 mt-4">
@@ -37,8 +37,8 @@ export default function Sidebar() {
               className={cn(
                 "p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center",
                 isActive
-                  ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
-                  : "text-white/40 hover:text-white"
+                  ? "text-gray-900 dark:text-white drop-shadow-[0_0_8px_rgba(0,0,0,0.2)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+                  : "text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white"
               )}
               title={item.label}
             >
@@ -61,7 +61,7 @@ export default function Sidebar() {
         {/* Search Button (Opens Modal) */}
         <button
           onClick={() => setIsSearchOpen(true)}
-          className="p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center text-white/40 hover:text-white"
+          className="p-2 rounded-xl transition-all duration-200 group relative flex items-center justify-center text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white"
           title="Search"
         >
           <Search className="w-6 h-6" />
@@ -76,7 +76,7 @@ export default function Sidebar() {
           <Link
             key={item.href}
             href={item.href}
-            className="p-2 text-white/40 hover:text-white transition-colors flex items-center justify-center"
+            className="p-2 text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white transition-colors flex items-center justify-center"
             title={item.label}
           >
             <item.icon className="w-6 h-6" />

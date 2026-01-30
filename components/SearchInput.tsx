@@ -13,8 +13,8 @@ interface SearchInputProps {
 
 export default function SearchInput({ value, onChange, placeholder, disabled, onEnter }: SearchInputProps) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Trigger search on Ctrl/Cmd + Enter
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // Trigger search on Enter (Shift+Enter for new line)
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onEnter?.();
     }
@@ -53,7 +53,7 @@ export default function SearchInput({ value, onChange, placeholder, disabled, on
           animate={{ opacity: 1, y: 0 }}
           className="absolute -bottom-6 right-0 text-xs text-gray-400 dark:text-gray-500"
         >
-          Press Ctrl+Enter to search
+          Press Enter to search
         </motion.div>
       )}
     </motion.div>

@@ -114,21 +114,21 @@ export default function SampleGroupSection({ title, subTitle, filterFn }: Sample
         <div className="mb-12">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h2 className="text-xl font-bold text-white uppercase">{title}</h2>
-                    <p className="text-sm text-white/60 mt-1">{subTitle}</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white uppercase">{title}</h2>
+                    <p className="text-sm text-gray-600 dark:text-white/60 mt-1">{subTitle}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => scroll('left')}
                         disabled={!canScrollLeft}
-                        className={`p-2 rounded-full border border-white/10 transition-colors ${canScrollLeft ? 'text-white hover:bg-white/10' : 'text-white/20 cursor-not-allowed'}`}
+                        className={`p-2 rounded-full border border-gray-200 dark:border-white/10 transition-colors ${canScrollLeft ? 'text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10' : 'text-gray-300 dark:text-white/20 cursor-not-allowed'}`}
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                         onClick={() => scroll('right')}
                         disabled={!canScrollRight}
-                        className={`p-2 rounded-full border border-white/10 transition-colors ${canScrollRight ? 'text-white hover:bg-white/10' : 'text-white/20 cursor-not-allowed'}`}
+                        className={`p-2 rounded-full border border-gray-200 dark:border-white/10 transition-colors ${canScrollRight ? 'text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-white/10' : 'text-gray-300 dark:text-white/20 cursor-not-allowed'}`}
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>
@@ -144,7 +144,7 @@ export default function SampleGroupSection({ title, subTitle, filterFn }: Sample
                 {loading ? (
                     <div className="flex gap-4">
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="flex-shrink-0 w-48 h-48 bg-white/5 rounded-lg animate-pulse" />
+                            <div key={i} className="flex-shrink-0 w-48 h-48 bg-gray-200 dark:bg-white/5 rounded-lg animate-pulse" />
                         ))}
                     </div>
                 ) : displayItems.map(({ sample, bestImageUrl, count }, index) => {
@@ -159,11 +159,11 @@ export default function SampleGroupSection({ title, subTitle, filterFn }: Sample
                     return (
                         <motion.div
                             key={sample.id}
-                            className="flex-shrink-0 w-52 group cursor-pointer p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all"
+                            className="flex-shrink-0 w-52 group cursor-pointer p-3 rounded-2xl bg-gray-100/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 backdrop-blur-sm hover:bg-gray-200/80 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all"
                             whileHover={{ y: -4 }}
                             onClick={() => handleCardClick(sample.category || "")}
                         >
-                            <div className={`w-full aspect-square rounded-lg mb-3 bg-gray-900 relative overflow-hidden border border-white/5 group-hover:border-green-500/50 transition-colors`}>
+                            <div className={`w-full aspect-square rounded-lg mb-3 bg-gray-200 dark:bg-gray-900 relative overflow-hidden border border-gray-200 dark:border-white/5 group-hover:border-green-500/50 transition-colors`}>
                                 {/* Image */}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
@@ -194,10 +194,10 @@ export default function SampleGroupSection({ title, subTitle, filterFn }: Sample
                                 </div>
                             </div>
 
-                            <h3 className={`text-sm font-medium truncate transition-colors ${isCurrentPlaying ? 'text-green-400' : 'text-white group-hover:text-white'}`}>{sample.category}</h3>
+                            <h3 className={`text-sm font-medium truncate transition-colors ${isCurrentPlaying ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white group-hover:text-gray-900 dark:group-hover:text-white'}`}>{sample.category}</h3>
                             <div className="flex gap-1 mt-1.5 overflow-hidden">
                                 {(sample.genres && sample.genres.length > 0 ? sample.genres.slice(0, 2) : ['Multi-Genre']).map((g: string, i: number) => (
-                                    <span key={i} className="text-[10px] uppercase font-bold tracking-wider bg-white/10 px-2 py-0.5 rounded-full text-white/60 whitespace-nowrap">
+                                    <span key={i} className="text-[10px] uppercase font-bold tracking-wider bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-full text-gray-600 dark:text-white/60 whitespace-nowrap">
                                         {g}
                                     </span>
                                 ))}

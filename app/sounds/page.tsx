@@ -129,19 +129,19 @@ export default function SoundsPage() {
     }
 
     return (
-        <div className="w-full h-full p-6 text-white">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300 p-6">
             {/* Header */}
             <div className="flex items-end justify-between mb-8">
                 <div>
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center text-white/50 hover:text-white mb-4 transition-colors group"
+                        className="flex items-center text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white mb-4 transition-colors group"
                     >
                         <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
                         Back
                     </button>
-                    <h1 className="text-4xl font-bold text-white mb-2">Sounds</h1>
-                    <p className="text-white/60">
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Sounds</h1>
+                    <p className="text-gray-600 dark:text-white/60">
                         {filteredSamples.length} results
                         {loading && <span className="ml-2 animate-pulse">Loading...</span>}
                     </p>
@@ -149,16 +149,16 @@ export default function SoundsPage() {
             </div>
 
             {/* Sticky Filter Bar */}
-            <div className="sticky top-0 z-30 bg-black/90 backdrop-blur-md pb-4 pt-2 -mx-2 px-2 border-b border-white/10 mb-6 space-y-4">
+            <div className="sticky top-0 z-30 bg-white/90 dark:bg-black/90 backdrop-blur-md pb-4 pt-2 -mx-2 px-2 border-b border-gray-200 dark:border-white/10 mb-6 space-y-4">
                 {/* Search */}
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/40" />
                     <input
                         type="text"
                         placeholder="Search sounds..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 transition-colors"
+                        className="w-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-green-500 dark:focus:border-white/30 transition-colors"
                     />
                 </div>
 
@@ -225,10 +225,10 @@ export default function SoundsPage() {
             </div>
 
             {/* Sounds List */}
-            <div className="bg-black/20 rounded-xl overflow-hidden border border-white/5">
+            <div className="bg-white/50 dark:bg-black/20 rounded-xl overflow-hidden border border-gray-200 dark:border-white/5">
                 {/* Table Header */}
                 {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-medium text-white/40 uppercase tracking-wider relative z-20">
+                <div className="grid grid-cols-12 gap-4 p-4 border-b border-gray-200 dark:border-white/5 text-xs font-medium text-gray-500 dark:text-white/40 uppercase tracking-wider relative z-20">
                     <div className="col-span-1"></div>
                     <div className="col-span-1">Pack</div>
                     <div className="col-span-3">Filename</div>
@@ -239,13 +239,13 @@ export default function SoundsPage() {
                     <div className="col-span-1"></div>
                 </div>
 
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-gray-100 dark:divide-white/5">
                     {loading && filteredSamples.length === 0 ? (
-                        <div className="p-8 text-center text-white/40">Loading sounds...</div>
+                        <div className="p-8 text-center text-gray-500 dark:text-white/40">Loading sounds...</div>
                     ) : filteredSamples.length === 0 ? (
                         <div className="p-12 text-center">
-                            <Filter className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                            <p className="text-white/40">No sounds found matching your filters.</p>
+                            <Filter className="w-12 h-12 text-gray-300 dark:text-white/10 mx-auto mb-4" />
+                            <p className="text-gray-500 dark:text-white/40">No sounds found matching your filters.</p>
                         </div>
                     ) : (
                         filteredSamples.map((sample, index) => {
@@ -258,13 +258,13 @@ export default function SoundsPage() {
                                     initial={{ opacity: 0 }}
                                     whileInView={{ opacity: 1 }}
                                     viewport={{ once: true }}
-                                    className={`grid grid-cols-12 gap-4 p-3 items-center hover:bg-white/5 transition-colors group ${isCurrent ? 'bg-white/5' : ''}`}
+                                    className={`grid grid-cols-12 gap-4 p-3 items-center hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group ${isCurrent ? 'bg-green-50 dark:bg-white/5' : ''}`}
                                 >
                                     {/* Play Button */}
                                     <div className="col-span-1 flex justify-center">
                                         <button
                                             onClick={() => handlePlay(sample)}
-                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isCurrentPlaying ? 'bg-green-500 text-black' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isCurrentPlaying ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-700 dark:text-white'}`}
                                         >
                                             {isCurrentPlaying ? (
                                                 <Pause className="w-4 h-4 fill-current" />
@@ -276,7 +276,7 @@ export default function SoundsPage() {
 
                                     {/* Pack Image */}
                                     <div className="col-span-1">
-                                        <div className="w-8 h-8 rounded bg-white/10 overflow-hidden relative">
+                                        <div className="w-8 h-8 rounded bg-gray-200 dark:bg-white/10 overflow-hidden relative">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img
                                                 src={sample.imageUrl || '/placeholder.jpg'}
@@ -288,12 +288,12 @@ export default function SoundsPage() {
 
                                     {/* Filename & Tags */}
                                     <div className="col-span-3 min-w-0">
-                                        <div className={`font-medium text-sm truncate ${isCurrent ? 'text-green-400' : 'text-white'}`}>
+                                        <div className={`font-medium text-sm truncate ${isCurrent ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                                             {sample.name}
                                         </div>
-                                        <div className="flex gap-1 overflow-hidden mt-1 opacity-60 text-xs text-white/60">
+                                        <div className="flex gap-1 overflow-hidden mt-1 opacity-60 text-xs text-gray-600 dark:text-white/60">
                                             {sample.genres?.slice(0, 2).map((g: string) => (
-                                                <span key={g} className="truncate hover:text-white/80">{g}</span>
+                                                <span key={g} className="truncate hover:text-gray-800 dark:hover:text-white/80">{g}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -310,7 +310,7 @@ export default function SoundsPage() {
                                                     onDurationLoaded={(d) => setLoadedDurations(prev => ({ ...prev, [sample.id]: d }))}
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-xs text-white/20">
+                                                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 dark:text-white/20">
                                                     No Audio
                                                 </div>
                                             )}
@@ -318,7 +318,7 @@ export default function SoundsPage() {
                                     </div>
 
                                     {/* Time */}
-                                    <div className="col-span-1 text-xs text-white/60 font-mono">
+                                    <div className="col-span-1 text-xs text-gray-600 dark:text-white/60 font-mono">
                                         {isCurrent && duration > 0
                                             ? formatTimeSeconds(duration)
                                             : loadedDurations[sample.id]
@@ -328,12 +328,12 @@ export default function SoundsPage() {
                                     </div>
 
                                     {/* Key */}
-                                    <div className="col-span-1 text-sm text-white/80 font-medium">
+                                    <div className="col-span-1 text-sm text-gray-700 dark:text-white/80 font-medium">
                                         {sample.key || '-'}
                                     </div>
 
                                     {/* BPM */}
-                                    <div className="col-span-1 text-sm text-white/80 font-mono">
+                                    <div className="col-span-1 text-sm text-gray-700 dark:text-white/80 font-mono">
                                         {sample.bpm || '-'}
                                     </div>
 
@@ -341,14 +341,14 @@ export default function SoundsPage() {
                                     <div className="col-span-1 flex justify-end gap-2 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={(e) => toggleFav(e, sample)}
-                                            className={`p-1.5 rounded-full transition-colors ${isFavorite(sample.id) ? 'text-red-500 bg-red-500/10' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
+                                            className={`p-1.5 rounded-full transition-colors ${isFavorite(sample.id) ? 'text-red-500 bg-red-500/10' : 'text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10'}`}
                                             title={isFavorite(sample.id) ? "Remove from favorite" : "Add to favorite"}
                                         >
                                             <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />
                                         </button>
                                         <button
                                             onClick={(e) => handleDownload(e, sample)}
-                                            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                                            className="p-1.5 text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10 rounded-full transition-colors"
                                             title="Download"
                                         >
                                             <Download className="w-4 h-4" />
@@ -372,12 +372,12 @@ function FilterSelect({ label, value, onChange, options }: { label: string, valu
         <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className={`appearance-none bg-white/5 border px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors focus:outline-none 
-                ${value ? 'border-green-500/50 text-green-400 bg-green-500/10' : 'border-white/10 text-white/70 hover:border-white/30 hover:text-white'}`}
+            className={`appearance-none bg-gray-100 dark:bg-white/5 border px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors focus:outline-none 
+                ${value ? 'border-green-500/50 text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-500/10' : 'border-gray-300 dark:border-white/10 text-gray-700 dark:text-white/70 hover:border-gray-400 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white'}`}
         >
             <option value="">{label}</option>
             {options.map((opt) => (
-                <option key={opt} value={opt} className="bg-gray-900 text-white">{opt}</option>
+                <option key={opt} value={opt} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">{opt}</option>
             ))}
         </select>
     )

@@ -26,6 +26,7 @@ class AudioSyncEngine {
   private activeSources: AudioBufferSourceNode[] = []
   private currentRecordedGainNode: GainNode | null = null
   private currentSampleGainNode: GainNode | null = null
+  private isLooping: boolean = false
 
   constructor() {
     this.initializeAudioContext()
@@ -43,15 +44,15 @@ class AudioSyncEngine {
     if (!this.audioContext) {
       this.initializeAudioContext()
     }
-    
+
     if (this.audioContext?.state === 'suspended') {
       await this.audioContext.resume()
     }
-    
+
     if (!this.audioContext) {
       throw new Error('Failed to initialize AudioContext')
     }
-    
+
     return this.audioContext
   }
 
@@ -60,16 +61,16 @@ class AudioSyncEngine {
    */
   async loadAudioBuffer(filePath: string): Promise<AudioBuffer> {
     const audioContext = await this.ensureAudioContext()
-    
+
     try {
       const response = await fetch(filePath)
       if (!response.ok) {
         throw new Error(`Failed to load audio file: ${response.statusText}`)
       }
-      
+
       const arrayBuffer = await response.arrayBuffer()
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      
+
       return audioBuffer
     } catch (error) {
       console.error('Error loading audio buffer:', error)
@@ -82,11 +83,11 @@ class AudioSyncEngine {
    */
   async blobToAudioBuffer(blob: Blob): Promise<AudioBuffer> {
     const audioContext = await this.ensureAudioContext()
-    
+
     try {
       const arrayBuffer = await blob.arrayBuffer()
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      
+
       return audioBuffer
     } catch (error) {
       console.error('Error converting blob to audio buffer:', error)
@@ -105,52 +106,52 @@ class AudioSyncEngine {
   private detectBeatPositions(audioBuffer: AudioBuffer): number[] {
     const sampleRate = audioBuffer.sampleRate
     const data = audioBuffer.getChannelData(0)
-    
+
     // Downsample for efficiency
     const downsampleFactor = Math.max(1, Math.floor(sampleRate / 22050))
     const downsampledLength = Math.floor(data.length / downsampleFactor)
     const downsampled = new Float32Array(downsampledLength)
-    
+
     for (let i = 0; i < downsampledLength; i++) {
       downsampled[i] = data[i * downsampleFactor]
     }
-    
+
     // Apply high-pass filter for transient detection
     const filtered = this.highPassFilter(downsampled, 0.1)
-    
+
     // Calculate onset strength (energy difference)
     const onsetStrength = new Float32Array(downsampledLength)
     const windowSize = Math.floor(sampleRate * 0.01 / downsampleFactor) // 10ms window
-    
+
     for (let i = windowSize; i < downsampledLength - windowSize; i++) {
       let energyBefore = 0
       let energyAfter = 0
-      
+
       for (let j = 0; j < windowSize; j++) {
         energyBefore += filtered[i - windowSize + j] * filtered[i - windowSize + j]
         energyAfter += filtered[i + j] * filtered[i + j]
       }
-      
+
       onsetStrength[i] = Math.max(0, energyAfter - energyBefore)
     }
-    
+
     // Find peaks (beat positions)
     const beatPositions: number[] = []
     const threshold = this.calculateThreshold(onsetStrength)
     const minBeatInterval = Math.floor(sampleRate * 0.2 / downsampleFactor) // 200ms minimum
-    
+
     let lastBeat = -minBeatInterval
-    
+
     for (let i = 0; i < downsampledLength; i++) {
       if (onsetStrength[i] > threshold && i - lastBeat > minBeatInterval) {
         beatPositions.push(i * downsampleFactor) // Convert back to original sample rate
         lastBeat = i
       }
     }
-    
+
     return beatPositions
   }
-  
+
   /**
    * Calculate adaptive threshold for beat detection
    */
@@ -158,30 +159,30 @@ class AudioSyncEngine {
     // Calculate mean and standard deviation
     let sum = 0
     let sumSquares = 0
-    
+
     for (let i = 0; i < onsetStrength.length; i++) {
       sum += onsetStrength[i]
       sumSquares += onsetStrength[i] * onsetStrength[i]
     }
-    
+
     const mean = sum / onsetStrength.length
     const variance = (sumSquares / onsetStrength.length) - (mean * mean)
     const stdDev = Math.sqrt(variance)
-    
+
     return mean + (stdDev * 1.5) // Adaptive threshold
   }
-  
+
   /**
    * Find the best beat to align with (closest to start)
    */
   private findAlignmentBeat(beatPositions: number[], sampleRate: number): number {
     if (beatPositions.length === 0) return 0
-    
+
     // Find beat closest to 1 second mark (typical for music)
     const targetTime = sampleRate * 1.0 // 1 second
     let bestBeat = beatPositions[0]
     let minDistance = Math.abs(beatPositions[0] - targetTime)
-    
+
     for (const beat of beatPositions) {
       const distance = Math.abs(beat - targetTime)
       if (distance < minDistance) {
@@ -189,10 +190,10 @@ class AudioSyncEngine {
         bestBeat = beat
       }
     }
-    
+
     return bestBeat
   }
-  
+
   /**
    * Quantize BPM to nearest standard value
    */
@@ -200,7 +201,7 @@ class AudioSyncEngine {
     const standardBPMs = [60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]
     let closestBPM = standardBPMs[0]
     let minDifference = Math.abs(bpm - standardBPMs[0])
-    
+
     for (const standardBPM of standardBPMs) {
       const difference = Math.abs(bpm - standardBPM)
       if (difference < minDifference) {
@@ -208,7 +209,7 @@ class AudioSyncEngine {
         closestBPM = standardBPM
       }
     }
-    
+
     return closestBPM
   }
 
@@ -219,42 +220,42 @@ class AudioSyncEngine {
     const sampleRate = audioBuffer.sampleRate
     const length = audioBuffer.length
     const channels = audioBuffer.numberOfChannels
-    
+
     // Create enhanced buffer
     const enhancedBuffer = this.audioContext!.createBuffer(channels, length, sampleRate)
-    
+
     for (let channel = 0; channel < channels; channel++) {
       const inputData = audioBuffer.getChannelData(channel)
       const outputData = enhancedBuffer.getChannelData(channel)
-      
+
       // Apply professional audio enhancement
       for (let i = 0; i < length; i++) {
         let sample = inputData[i]
-        
+
         // 1. Normalize audio levels
         sample = Math.max(-1, Math.min(1, sample))
-        
+
         // 2. Apply gentle compression (soft limiting)
         if (Math.abs(sample) > 0.8) {
           sample = sample > 0 ? 0.8 + (sample - 0.8) * 0.2 : -0.8 + (sample + 0.8) * 0.2
         }
-        
+
         // 3. Apply subtle high-frequency enhancement
         if (i > 0) {
           const prevSample = inputData[i - 1]
           const diff = sample - prevSample
           sample = sample + diff * 0.1 // Subtle enhancement
         }
-        
+
         // 4. Apply gentle noise gate
         if (Math.abs(sample) < 0.001) {
           sample = 0
         }
-        
+
         outputData[i] = sample
       }
     }
-    
+
     return enhancedBuffer
   }
 
@@ -266,10 +267,10 @@ class AudioSyncEngine {
   async extractBest4Bars(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     const sampleRate = audioBuffer.sampleRate
     const fullLength = audioBuffer.length
-    
+
     // Import backend BPM detection for accurate BPM detection
     const { quickBPMDetection } = await import('@/lib/bpmDetection')
-    
+
     // Detect BPM using Python backend with librosa (accurate method)
     const detectedBPM = await quickBPMDetection(audioBuffer)
     const beatsPerBar = 4
@@ -277,7 +278,7 @@ class AudioSyncEngine {
     const beatsPerSecond = detectedBPM / 60
     const fourBarsDurationSeconds = totalBeats / beatsPerSecond
     const fourBarsSampleLength = Math.floor(fourBarsDurationSeconds * sampleRate)
-    
+
     console.log('Extracting 4 bars from beginning:', {
       detectedBPM,
       fourBarsDurationSeconds: fourBarsDurationSeconds.toFixed(2),
@@ -287,24 +288,24 @@ class AudioSyncEngine {
       startSample: 0,
       endSample: Math.min(fourBarsSampleLength, fullLength)
     })
-    
+
     // If audio is shorter than 4 bars, return the entire audio
     if (fourBarsSampleLength >= fullLength) {
       console.log('Audio shorter than 4 bars, returning full audio')
       return audioBuffer
     }
-    
+
     // Always extract from the beginning (startSample = 0)
     const startSample = 0
     const extractLength = Math.min(fourBarsSampleLength, fullLength)
-    
+
     console.log('Extracting from start:', {
       startSample: 0,
       extractLength,
       extractDurationSeconds: (extractLength / sampleRate).toFixed(2),
       expectedBars: (extractLength / sampleRate) / (fourBarsDurationSeconds / 4)
     })
-    
+
     // Extract exactly 4 bars from the beginning
     return this.extractAudioSlice(audioBuffer, startSample, extractLength)
   }
@@ -315,18 +316,18 @@ class AudioSyncEngine {
   private extractAudioSlice(audioBuffer: AudioBuffer, startSample: number, length: number): AudioBuffer {
     const sampleRate = audioBuffer.sampleRate
     const channels = audioBuffer.numberOfChannels
-    
+
     const newBuffer = this.audioContext!.createBuffer(channels, length, sampleRate)
-    
+
     for (let channel = 0; channel < channels; channel++) {
       const originalData = audioBuffer.getChannelData(channel)
       const newData = newBuffer.getChannelData(channel)
-      
+
       for (let i = 0; i < length; i++) {
         newData[i] = originalData[startSample + i] || 0
       }
     }
-    
+
     return newBuffer
   }
 
@@ -335,11 +336,11 @@ class AudioSyncEngine {
    */
   async fileToAudioBuffer(file: File): Promise<AudioBuffer> {
     const audioContext = await this.ensureAudioContext()
-    
+
     try {
       const arrayBuffer = await file.arrayBuffer()
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-      
+
       return audioBuffer
     } catch (error) {
       console.error('Error converting file to audio buffer:', error)
@@ -354,7 +355,7 @@ class AudioSyncEngine {
     const filtered = new Float32Array(data.length)
     let prevInput = 0
     let prevOutput = 0
-    
+
     for (let i = 0; i < data.length; i++) {
       const input = data[i]
       const output = cutoff * (prevOutput + input - prevInput)
@@ -362,7 +363,7 @@ class AudioSyncEngine {
       prevInput = input
       prevOutput = output
     }
-    
+
     return filtered
   }
 
@@ -370,6 +371,9 @@ class AudioSyncEngine {
    * Stop all currently playing audio
    */
   stopAll(): void {
+    // ✅ Stop looping first
+    this.isLooping = false
+
     this.activeSources.forEach(source => {
       try {
         source.stop()
@@ -387,27 +391,27 @@ class AudioSyncEngine {
    * Play single audio buffer
    */
   async playAudioBuffer(
-    audioBuffer: AudioBuffer, 
+    audioBuffer: AudioBuffer,
     options: SyncPlaybackOptions = {}
   ): Promise<AudioBufferSourceNode> {
     const audioContext = await this.ensureAudioContext()
     const { startTime = 0, loop = false, volume = 1 } = options
-    
+
     const source = audioContext.createBufferSource()
     const gainNode = audioContext.createGain()
-    
+
     source.buffer = audioBuffer
     source.loop = loop
     gainNode.gain.value = volume
-    
+
     source.connect(gainNode)
     gainNode.connect(this.masterGainNode!)
-    
+
     const scheduleTime = audioContext.currentTime + startTime
     source.start(scheduleTime)
-    
+
     this.activeSources.push(source)
-    
+
     // Clean up when finished
     source.onended = () => {
       const index = this.activeSources.indexOf(source)
@@ -415,139 +419,191 @@ class AudioSyncEngine {
         this.activeSources.splice(index, 1)
       }
     }
-    
+
     return source
   }
 
   /**
    * Sync play recorded audio with library sample
+   * ✅ FIXED: Both audios respect the captured audio's duration and loop together
    */
   async syncPlay(
     recordedBuffer: AudioBuffer,
     sampleBuffer: AudioBuffer,
     sampleBPM: number,
     options: SyncPlaybackOptions = {}
-  ): Promise<{ recordedSource: AudioBufferSourceNode; sampleSource: AudioBufferSourceNode }> {
+  ): Promise<{ recordedSource: AudioBufferSourceNode; sampleSource: AudioBufferSourceNode; recordedGainNode: GainNode; sampleGainNode: GainNode }> {
     const audioContext = await this.ensureAudioContext()
-    const { 
-      startTime = 0, 
-      volume = 1, 
-      recordedVolume = 0.5, 
-      sampleVolume = 0.5 
+    const {
+      startTime = 0,
+      volume = 1,
+      recordedVolume = 0.5,
+      sampleVolume = 0.5,
+      loop = false
     } = options
-    
+
     // Use passed BPM - do NOT re-detect (should already be accurately detected via backend)
     if (!options.recordedBPM) {
       console.warn('No recordedBPM provided to syncPlay - this should be set via bpmDetection.ts')
       throw new Error('recordedBPM is required for tempo matching. Please provide the BPM detected via the Python backend.')
     }
     const recordedBPM = options.recordedBPM
-    
+
     // Find the target BPM - use the recorded audio's BPM as the master
     const targetBPM = recordedBPM
-    
+
+    // ✅ FIXED: Calculate the playback rate for the sample
+    const samplePlaybackRate = recordedBPM / sampleBPM
+
+    // ✅ FIXED: Calculate the master duration (captured audio duration is the reference)
+    const masterDuration = recordedBuffer.duration
+
+    // ✅ Calculate how long the sample will take at the adjusted playback rate
+    const adjustedSampleDuration = sampleBuffer.duration / samplePlaybackRate
+
     console.log('Perfect Sync Analysis:', {
       recordedBPM: recordedBPM,
       sampleBPM: sampleBPM,
       targetBPM: targetBPM,
-      recordedDuration: recordedBuffer.duration,
-      sampleDuration: sampleBuffer.duration
+      recordedDuration: recordedBuffer.duration.toFixed(2) + 's',
+      sampleDuration: sampleBuffer.duration.toFixed(2) + 's',
+      samplePlaybackRate: samplePlaybackRate.toFixed(3),
+      adjustedSampleDuration: adjustedSampleDuration.toFixed(2) + 's',
+      loopEnabled: loop,
+      masterDuration: masterDuration.toFixed(2) + 's (captured audio controls duration)'
     })
-    
+
     // Stop any currently playing audio
     this.stopAll()
-    
-    // Create sources
-    const recordedSource = audioContext.createBufferSource()
-    const sampleSource = audioContext.createBufferSource()
-    
+
     // Create gain nodes for volume control
     const recordedGain = audioContext.createGain()
     const sampleGain = audioContext.createGain()
-    
-    // Configure sources - both play at their NATURAL speeds first
-    recordedSource.buffer = recordedBuffer
-    sampleSource.buffer = sampleBuffer
-    
-    // ✅ FIXED: REAL TEMPO MATCHING - Match sample to recorded audio's BPM
-    const recordedPlaybackRate = 1.0  // Keep recorded audio at natural speed (master tempo)
-    const samplePlaybackRate = recordedBPM / sampleBPM  // ✅ FIXED: Inverted calculation
-    
-    console.log('✅ REAL Tempo Matching:', {
-      recordedBPM: recordedBPM,
-      sampleBPM: sampleBPM,
-      'Recorded audio rate': recordedPlaybackRate,
-      'Sample will play': `${samplePlaybackRate.toFixed(3)}x speed ${samplePlaybackRate < 1 ? '(SLOWER)' : '(FASTER)'}`,
-      'Example': sampleBPM > recordedBPM ? `Sample ${sampleBPM} BPM → ${recordedBPM} BPM (slower)` : `Sample ${sampleBPM} BPM → ${recordedBPM} BPM (faster)`,
-      'Result': `Both will beat at ${recordedBPM} BPM exactly!`
-    })
-    
-    // Apply playback rates
-    recordedSource.playbackRate.value = recordedPlaybackRate
-    sampleSource.playbackRate.value = samplePlaybackRate
-    
+
     // Set individual volumes for precise control
-    recordedGain.gain.value = volume * recordedVolume // Individual recorded audio volume
-    sampleGain.gain.value = volume * sampleVolume     // Individual sample audio volume
-    
+    recordedGain.gain.value = volume * recordedVolume
+    sampleGain.gain.value = volume * sampleVolume
+
+    // Connect gain nodes to master
+    recordedGain.connect(this.masterGainNode!)
+    sampleGain.connect(this.masterGainNode!)
+
+    // Store gain nodes for real-time volume control
+    this.currentRecordedGainNode = recordedGain
+    this.currentSampleGainNode = sampleGain
+
     console.log('Volume Settings:', {
       recordedVolume: `Recorded: ${(volume * recordedVolume).toFixed(2)}`,
       sampleVolume: `Sample: ${(volume * sampleVolume).toFixed(2)}`,
       totalVolume: `Master: ${volume.toFixed(2)}`
     })
-    
-    // Connect audio graph
-    recordedSource.connect(recordedGain)
-    sampleSource.connect(sampleGain)
-    recordedGain.connect(this.masterGainNode!)
-    sampleGain.connect(this.masterGainNode!)
-    
-    // Simple alignment - no complex beat detection needed for tempo sync
+
+    // ✅ NEW: Function to create and start synced audio sources
+    const createSyncedSources = () => {
+      const recordedSource = audioContext.createBufferSource()
+      const sampleSource = audioContext.createBufferSource()
+
+      recordedSource.buffer = recordedBuffer
+      sampleSource.buffer = sampleBuffer
+
+      // Apply playback rate to sample (recorded stays at 1.0)
+      recordedSource.playbackRate.value = 1.0
+      sampleSource.playbackRate.value = samplePlaybackRate
+
+      // Connect to gain nodes
+      recordedSource.connect(recordedGain)
+      sampleSource.connect(sampleGain)
+
+      return { recordedSource, sampleSource }
+    }
+
+    // Create initial sources
+    let { recordedSource, sampleSource } = createSyncedSources()
+
+    // ✅ FIXED: If looping is enabled, schedule the next loop when the recorded audio ends
+    if (loop) {
+      this.isLooping = true
+
+      const scheduleNextLoop = () => {
+        // Stop previous sources from activeSources list
+        this.activeSources = this.activeSources.filter(s => s !== recordedSource && s !== sampleSource)
+
+        // Check if we should continue looping (isLooping is set to false by stopAll)
+        if (this.isLooping && this.currentRecordedGainNode === recordedGain) {
+          console.log('🔁 Looping sync playback...')
+
+          // Create new sources for next loop
+          const newSources = createSyncedSources()
+          recordedSource = newSources.recordedSource
+          sampleSource = newSources.sampleSource
+
+          // Track new active sources
+          this.activeSources.push(recordedSource, sampleSource)
+
+          // Schedule next loop based on master duration (recorded audio)
+          recordedSource.onended = scheduleNextLoop
+
+          // Start both sources immediately
+          const now = audioContext.currentTime
+          recordedSource.start(now)
+          // ✅ Stop sample when recorded audio ends (respects captured audio duration)
+          sampleSource.start(now, 0, masterDuration * samplePlaybackRate)
+        }
+      }
+
+      // Set up the loop callback on the recorded source
+      recordedSource.onended = scheduleNextLoop
+    } else {
+      // No looping - just clean up when finished
+      const cleanup = () => {
+        const recordedIndex = this.activeSources.indexOf(recordedSource)
+        const sampleIndex = this.activeSources.indexOf(sampleSource)
+
+        if (recordedIndex > -1) this.activeSources.splice(recordedIndex, 1)
+        if (sampleIndex > -1) this.activeSources.splice(sampleIndex, 1)
+      }
+
+      recordedSource.onended = cleanup
+      sampleSource.onended = cleanup
+    }
+
+    // Track active sources
+    this.activeSources.push(recordedSource, sampleSource)
+
+    // Start both sources at the same time
     const startTimeOffset = audioContext.currentTime + startTime
-    
-    // Start both sources at the same time for perfect tempo alignment
+
     console.log('Starting audio sources...', {
       recordedBufferExists: !!recordedSource.buffer,
       sampleBufferExists: !!sampleSource.buffer,
       audioContextState: audioContext.state,
       currentTime: audioContext.currentTime
     })
-    
+
+    // ✅ FIXED: Start recorded source (plays full duration)
     recordedSource.start(startTimeOffset)
-    sampleSource.start(startTimeOffset)
-    
+
+    // ✅ FIXED: Start sample, but stop it when recorded audio ends
+    // Use the duration parameter to limit sample playback to match recorded audio
+    // The sample plays for (masterDuration * samplePlaybackRate) seconds at samplePlaybackRate speed
+    // This means it will effectively play for masterDuration seconds of "perceived" time
+    sampleSource.start(startTimeOffset, 0, masterDuration * samplePlaybackRate)
+
     console.log('Audio sources started successfully!')
-    
+
     console.log('Perfect Sync Playback Started:', {
-      recordedPlaybackRate: recordedPlaybackRate.toFixed(3),
+      recordedPlaybackRate: '1.0',
       samplePlaybackRate: samplePlaybackRate.toFixed(3),
       targetBPM: targetBPM,
-      startTimeOffset: startTimeOffset.toFixed(3)
+      startTimeOffset: startTimeOffset.toFixed(3),
+      sampleStopsAt: (masterDuration).toFixed(2) + 's (matching captured audio)',
+      looping: loop
     })
-    
-    // Track active sources
-    this.activeSources.push(recordedSource, sampleSource)
-    
-    // Clean up when finished
-    const cleanup = () => {
-      const recordedIndex = this.activeSources.indexOf(recordedSource)
-      const sampleIndex = this.activeSources.indexOf(sampleSource)
-      
-      if (recordedIndex > -1) this.activeSources.splice(recordedIndex, 1)
-      if (sampleIndex > -1) this.activeSources.splice(sampleIndex, 1)
-    }
-    
-    recordedSource.onended = cleanup
-    sampleSource.onended = cleanup
-    
-    // Store gain nodes for real-time volume control
-    this.currentRecordedGainNode = recordedGain
-    this.currentSampleGainNode = sampleGain
-    
-    return { 
-      recordedSource, 
+
+    return {
+      recordedSource,
       sampleSource,
-      recordedGainNode: recordedGain, // Expose gain nodes for real-time control
+      recordedGainNode: recordedGain,
       sampleGainNode: sampleGain
     }
   }
@@ -609,9 +665,9 @@ export const blobToAudioBuffer = (blob: Blob) => syncEngine.blobToAudioBuffer(bl
 // REMOVED: detectBPM export - use quickBPMDetection() or detectBPMFromFile() from bpmDetection.ts (uses Python backend)
 export const extractBest4Bars = (audioBuffer: AudioBuffer) => syncEngine.extractBest4Bars(audioBuffer)
 export const fileToAudioBuffer = (file: File) => syncEngine.fileToAudioBuffer(file)
-export const syncPlay = (recordedBuffer: AudioBuffer, sampleBuffer: AudioBuffer, sampleBPM: number, options?: SyncPlaybackOptions) => 
+export const syncPlay = (recordedBuffer: AudioBuffer, sampleBuffer: AudioBuffer, sampleBPM: number, options?: SyncPlaybackOptions) =>
   syncEngine.syncPlay(recordedBuffer, sampleBuffer, sampleBPM, options)
-export const playAudioBuffer = (audioBuffer: AudioBuffer, options?: SyncPlaybackOptions) => 
+export const playAudioBuffer = (audioBuffer: AudioBuffer, options?: SyncPlaybackOptions) =>
   syncEngine.playAudioBuffer(audioBuffer, options)
 export const stopAll = () => syncEngine.stopAll()
 export const setMasterVolume = (volume: number) => syncEngine.setMasterVolume(volume)

@@ -143,13 +143,13 @@ export default function PackDetailPage({ params }: PageProps) {
   const loading = samplesLoading || packsLoading
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Back Button */}
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-6"
+          className="flex items-center gap-2 text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white transition-colors mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
           Back
@@ -158,9 +158,9 @@ export default function PackDetailPage({ params }: PageProps) {
         {/* Pack Info Header */}
         <div className="flex items-start gap-6 mb-8">
           {/* Pack Image */}
-          <div className="w-64 h-64 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 bg-gradient-to-br from-green-900/50 to-emerald-950/50 relative">
+          <div className="w-64 h-64 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gradient-to-br from-green-100 dark:from-green-900/50 to-emerald-100 dark:to-emerald-950/50 relative">
             {loading ? (
-              <Skeleton className="w-full h-full bg-white/10" />
+              <Skeleton className="w-full h-full bg-gray-200 dark:bg-white/10" />
             ) : (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -179,9 +179,9 @@ export default function PackDetailPage({ params }: PageProps) {
 
           {/* Pack Details */}
           <div className="flex-1">
-            <p className="text-sm text-green-400 mb-2">Sample Pack</p>
-            <h1 className="text-5xl font-bold mb-4">{currentPack?.title || categoryName}</h1>
-            <p className="text-white/60 mb-6">
+            <p className="text-sm text-green-600 dark:text-green-400 mb-2">Sample Pack</p>
+            <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4">{currentPack?.title || categoryName}</h1>
+            <p className="text-gray-600 dark:text-white/60 mb-6">
               {currentPack?.title || categoryName} • {currentPack?.genre ? `${currentPack.genre} • ` : ''} {categorySamples.length} Samples
             </p>
 
@@ -190,12 +190,12 @@ export default function PackDetailPage({ params }: PageProps) {
 
               <button
                 onClick={() => filteredSamples.length > 0 && handlePlayClick(filteredSamples[0])}
-                className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full font-semibold flex items-center gap-2 transition-colors"
+                className="px-6 py-3 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 rounded-full font-semibold flex items-center gap-2 transition-colors text-gray-700 dark:text-white"
               >
                 <Play className="w-5 h-5" />
                 Preview
               </button>
-              <button className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <button className="w-12 h-12 rounded-full bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 flex items-center justify-center transition-colors text-gray-700 dark:text-white">
                 <Heart className="w-5 h-5" />
               </button>
             </div>
@@ -204,32 +204,32 @@ export default function PackDetailPage({ params }: PageProps) {
 
         {/* Description */}
         <div className="mb-8 max-w-4xl">
-          <p className="text-white/60 leading-relaxed whitespace-pre-wrap">
+          <p className="text-gray-600 dark:text-white/60 leading-relaxed whitespace-pre-wrap">
             {currentPack?.description || `Dive into the vibrant world of ${categoryName} with this meticulously curated pack for enthusiasts and producers alike. This dynamic collection features ${categorySamples.length} carefully selected samples.`}
           </p>
         </div>
 
         {/* Samples Section */}
         <div>
-          <h2 className="text-3xl font-bold mb-6">Samples</h2>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Samples</h2>
 
           {/* Filters */}
           {/* Filters Removed */}
 
           {/* Search and Sort */}
           <div className="flex items-center justify-between mb-4">
-            <p className="text-white/60">{filteredSamples.length} results</p>
+            <p className="text-gray-600 dark:text-white/60">{filteredSamples.length} results</p>
 
             <div className="flex items-center gap-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/40" />
                 <input
                   type="text"
                   placeholder="Search samples..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm outline-none focus:border-green-500/50 transition-colors"
+                  className="pl-10 pr-4 py-2 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-sm outline-none focus:border-green-500/50 transition-colors text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/40"
                 />
               </div>
 
@@ -241,29 +241,29 @@ export default function PackDetailPage({ params }: PageProps) {
           {loading ? (
             <div className="space-y-2">
               {/* Skeleton Header */}
-              <div className="grid grid-cols-12 gap-4 px-4 py-2 border-b border-white/5">
-                <div className="col-span-1 bg-white/5 h-4 rounded animate-pulse"></div>
-                <div className="col-span-11 bg-white/5 h-4 rounded animate-pulse w-1/4"></div>
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 border-b border-gray-200 dark:border-white/5">
+                <div className="col-span-1 bg-gray-200 dark:bg-white/5 h-4 rounded animate-pulse"></div>
+                <div className="col-span-11 bg-gray-200 dark:bg-white/5 h-4 rounded animate-pulse w-1/4"></div>
               </div>
 
               {/* Skeleton Rows */}
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-4 py-3 rounded-lg bg-white/5 animate-pulse">
+                <div key={i} className="grid grid-cols-12 gap-4 px-4 py-3 rounded-lg bg-gray-100 dark:bg-white/5 animate-pulse">
                   <div className="col-span-1">
-                    <div className="w-12 h-12 bg-white/10 rounded"></div>
+                    <div className="w-12 h-12 bg-gray-200 dark:bg-white/10 rounded"></div>
                   </div>
                   <div className="col-span-5 flex flex-col justify-center gap-2">
-                    <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                    <div className="h-3 bg-white/10 rounded w-1/2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 dark:bg-white/10 rounded w-1/2"></div>
                   </div>
                   <div className="col-span-2 flex items-center justify-center">
-                    <div className="h-4 bg-white/10 rounded w-10"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-10"></div>
                   </div>
                   <div className="col-span-1 flex items-center justify-center">
-                    <div className="h-4 bg-white/10 rounded w-8"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-8"></div>
                   </div>
                   <div className="col-span-2 flex items-center justify-center">
-                    <div className="h-4 bg-white/10 rounded w-8"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-8"></div>
                   </div>
                   <div className="col-span-1"></div>
                 </div>
@@ -271,12 +271,12 @@ export default function PackDetailPage({ params }: PageProps) {
             </div>
           ) : filteredSamples.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-white/40">No samples found</p>
+              <p className="text-gray-500 dark:text-white/40">No samples found</p>
             </div>
           ) : (
             <div className="space-y-2">
               {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-white/40 font-medium border-b border-white/5">
+              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-gray-500 dark:text-white/40 font-medium border-b border-gray-200 dark:border-white/5">
                 <div className="col-span-1"></div>
                 <div className="col-span-5">Filename</div>
                 <div className="col-span-2 text-center">Time</div>
@@ -296,13 +296,13 @@ export default function PackDetailPage({ params }: PageProps) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.02 }}
-                    className={`grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer ${isCurrent ? 'bg-white/10' : ''
+                    className={`grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors group cursor-pointer ${isCurrent ? 'bg-green-50 dark:bg-white/10' : ''
                       }`}
                     onClick={() => handlePlayClick(sample)}
                   >
                     {/* Pack Image + Play Button */}
                     <div className="col-span-1 flex items-center">
-                      <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800">
+                      <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-200 dark:bg-gray-800">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={packImage}
@@ -329,7 +329,7 @@ export default function PackDetailPage({ params }: PageProps) {
                     {/* Filename & Waveform */}
                     <div className="col-span-5 flex flex-col justify-center gap-1 min-w-0">
                       <div className="flex items-baseline justify-between">
-                        <p className={`text-sm font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
+                        <p className={`text-sm font-medium truncate ${isCurrentPlaying ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                           {sample.name}
                         </p>
                       </div>
@@ -347,7 +347,7 @@ export default function PackDetailPage({ params }: PageProps) {
 
                     {/* Time */}
                     <div className="col-span-2 flex items-center justify-center">
-                      <p className="text-sm text-white/60">
+                      <p className="text-sm text-gray-600 dark:text-white/60">
                         {isCurrent && duration > 0
                           ? formatTimeSeconds(duration)
                           : loadedDurations[sample.id]
@@ -359,26 +359,26 @@ export default function PackDetailPage({ params }: PageProps) {
 
                     {/* Key */}
                     <div className="col-span-1 flex items-center justify-center">
-                      <p className="text-sm text-white/60">{formatKey(sample.key)}</p>
+                      <p className="text-sm text-gray-600 dark:text-white/60">{formatKey(sample.key)}</p>
                     </div>
 
                     {/* BPM */}
                     <div className="col-span-2 flex items-center justify-center">
-                      <p className="text-sm text-white/60">{sample.bpm || '--'}</p>
+                      <p className="text-sm text-gray-600 dark:text-white/60">{sample.bpm || '--'}</p>
                     </div>
 
                     {/* Actions */}
                     <div className="col-span-1 flex items-center justify-end gap-2 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => handleDownload(e, sample)}
-                        className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors text-white/60 hover:text-white"
+                        className="w-8 h-8 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white"
                         title="Download"
                       >
                         <Download className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => toggleFavorite(e, sample)}
-                        className={`w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors ${isFavorite(sample.id) ? 'text-green-500' : 'text-white/60 hover:text-white'}`}
+                        className={`w-8 h-8 rounded-full hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors ${isFavorite(sample.id) ? 'text-green-500' : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white'}`}
                         title="Toogle Favorite"
                       >
                         <Heart className={`w-4 h-4 ${isFavorite(sample.id) ? 'fill-current' : ''}`} />

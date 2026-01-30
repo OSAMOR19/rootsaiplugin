@@ -14,12 +14,12 @@ interface SyncPlaybackProps {
   sampleName: string
 }
 
-export default function SyncPlayback({ 
-  recordedAudioBuffer, 
-  recordedBPM, 
-  sampleUrl, 
-  sampleBPM, 
-  sampleName 
+export default function SyncPlayback({
+  recordedAudioBuffer,
+  recordedBPM,
+  sampleUrl,
+  sampleBPM,
+  sampleName
 }: SyncPlaybackProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [sampleBuffer, setSampleBuffer] = useState<AudioBuffer | null>(null)
@@ -27,7 +27,12 @@ export default function SyncPlayback({
   const [recordedVolume, setRecordedVolume] = useState(0.5) // Volume for recorded audio
   const [sampleVolume, setSampleVolume] = useState(0.5) // Volume for sample audio
   const [uploadedOnlyPlaying, setUploadedOnlyPlaying] = useState(false) // For uploaded-only toggle
-  const [activeSources, setActiveSources] = useState<{recorded: any, sample: any} | null>(null)
+  const [activeSources, setActiveSources] = useState<{
+    recordedSource: AudioBufferSourceNode;
+    sampleSource: AudioBufferSourceNode;
+    recordedGainNode: GainNode;
+    sampleGainNode: GainNode;
+  } | null>(null)
 
   // Load sample buffer
   useEffect(() => {
@@ -52,10 +57,10 @@ export default function SyncPlayback({
         recorded: recordedVolume * 0.8,
         sample: sampleVolume * 0.8
       })
-      
+
       // Update recorded audio gain in real-time
       activeSources.recordedGainNode.gain.value = recordedVolume * 0.8
-      
+
       // Update sample audio gain in real-time
       activeSources.sampleGainNode.gain.value = sampleVolume * 0.8
     }
@@ -78,29 +83,29 @@ export default function SyncPlayback({
 
     try {
       setIsPlaying(true)
-      
+
       // Calculate playback rate for tempo matching
       const playbackRate = recordedBPM ? recordedBPM / sampleBPM : 1
-      
+
       console.log('Setting volumes for sync playback:', {
         recordedVolume: recordedVolume.toFixed(2),
         sampleVolume: sampleVolume.toFixed(2)
       })
-      
+
       // Sync play both audio sources with precise BPM matching and individual volumes
       const sources = await syncEngine.syncPlay(
         recordedAudioBuffer,
         sampleBuffer,
         sampleBPM,
-        { 
+        {
           recordedBPM: recordedBPM, // Pass the accurate BPM for perfect sync
           recordedVolume: recordedVolume * 0.8, // Individual volume for recorded audio (master volume)
           sampleVolume: sampleVolume * 0.8 // Individual volume for sample audio (master volume)
         }
       )
-      
+
       setActiveSources(sources)
-      
+
       console.log(`Sync playing: ${sampleName} at ${playbackRate.toFixed(2)}x speed`)
     } catch (error) {
       console.error('Error in sync playback:', error)
@@ -159,69 +164,69 @@ export default function SyncPlayback({
 
       {/* Hide Volume Controls for Now - Too Much Space */}
       {false && (
-      <div className="mb-4 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg backdrop-blur-sm">
-        <div className="space-y-3">
-          {/* Volume Controls */}
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Uploaded Audio
-            </span>
-            <div className="flex items-center space-x-2 w-40">
-              <Volume2 className="w-4 h-4 text-gray-500" />
-              <div className="flex-1 relative">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={Math.round(recordedVolume * 100)}
-                  onChange={(e) => setRecordedVolume(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
-                  style={{
-                    background: `linear-gradient(to right, #10b981 0%, #10b981 ${recordedVolume * 100}%, #e5e7eb ${recordedVolume * 100}%, #e5e7eb 100%)`,
-                    WebkitAppearance: 'none',
-                    appearance: 'none'
-                  }}
-                />
-              </div>
-              <span className="text-xs text-gray-500 w-8 text-right">
-                {Math.round(recordedVolume * 100)}%
+        <div className="mb-4 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg backdrop-blur-sm">
+          <div className="space-y-3">
+            {/* Volume Controls */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Uploaded Audio
               </span>
+              <div className="flex items-center space-x-2 w-40">
+                <Volume2 className="w-4 h-4 text-gray-500" />
+                <div className="flex-1 relative">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(recordedVolume * 100)}
+                    onChange={(e) => setRecordedVolume(parseInt(e.target.value) / 100)}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
+                    style={{
+                      background: `linear-gradient(to right, #10b981 0%, #10b981 ${recordedVolume * 100}%, #e5e7eb ${recordedVolume * 100}%, #e5e7eb 100%)`,
+                      WebkitAppearance: 'none',
+                      appearance: 'none'
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500 w-8 text-right">
+                  {Math.round(recordedVolume * 100)}%
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Sample Audio
+              </span>
+              <div className="flex items-center space-x-2 w-40">
+                <Volume2 className="w-4 h-4 text-gray-500" />
+                <div className="flex-1 relative">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(sampleVolume * 100)}
+                    onChange={(e) => setSampleVolume(parseInt(e.target.value) / 100)}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${sampleVolume * 100}%, #e5e7eb ${sampleVolume * 100}%, #e5e7eb 100%)`,
+                      WebkitAppearance: 'none',
+                      appearance: 'none'
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500 w-8 text-right">
+                  {Math.round(sampleVolume * 100)}%
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Sample Audio
-            </span>
-            <div className="flex items-center space-x-2 w-40">
-              <Volume2 className="w-4 h-4 text-gray-500" />
-              <div className="flex-1 relative">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={Math.round(sampleVolume * 100)}
-                  onChange={(e) => setSampleVolume(parseInt(e.target.value) / 100)}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer volume-slider"
-                  style={{
-                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${sampleVolume * 100}%, #e5e7eb ${sampleVolume * 100}%, #e5e7eb 100%)`,
-                    WebkitAppearance: 'none',
-                    appearance: 'none'
-                  }}
-                />
-              </div>
-              <span className="text-xs text-gray-500 w-8 text-right">
-                {Math.round(sampleVolume * 100)}%
-              </span>
-            </div>
+          {/* Info Text */}
+          <div className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400">
+            Adjust volumes to isolate each audio and verify sync timing
           </div>
         </div>
-        
-        {/* Info Text */}
-        <div className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400">
-          Adjust volumes to isolate each audio and verify sync timing
-        </div>
-      </div>
       )}
 
       {/* Micro Volume Controls */}
@@ -237,7 +242,7 @@ export default function SyncPlayback({
             className="w-12 h-1 accent-green-500 cursor-pointer"
           />
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <span className="text-blue-600 dark:text-blue-400">🔊</span>
           <input
@@ -255,11 +260,10 @@ export default function SyncPlayback({
         <motion.button
           onClick={isPlaying ? handleStop : handleSyncPlay}
           disabled={!recordedAudioBuffer || !sampleBuffer || isLoading}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
-            isPlaying
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${isPlaying
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-green-500 hover:bg-green-600 text-white'
-          } ${(!recordedAudioBuffer || !sampleBuffer || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${(!recordedAudioBuffer || !sampleBuffer || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -301,11 +305,10 @@ export default function SyncPlayback({
         <motion.button
           onClick={isPlaying ? handleStop : handlePlaySampleOnly}
           disabled={!sampleBuffer || isLoading}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
-            isPlaying
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${isPlaying
               ? 'bg-gray-500 hover:bg-gray-600 text-white'
               : 'bg-blue-500 hover:bg-blue-600 text-white'
-          } ${(!sampleBuffer || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${(!sampleBuffer || isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -336,19 +339,18 @@ export default function SyncPlayback({
                 setIsPlaying(false)
                 await syncEngine.stopAll()
                 setUploadedOnlyPlaying(true)
-                await syncEngine.playAudioBuffer(recordedAudioBuffer, { 
+                await syncEngine.playAudioBuffer(recordedAudioBuffer, {
                   volume: recordedVolume,
-                  recordedBPM: recordedBPM 
+                  recordedBPM: recordedBPM
                 })
               }
             }
           }}
           disabled={!recordedAudioBuffer || isLoading}
-          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs disabled:opacity-50 ${
-            uploadedOnlyPlaying 
-              ? 'bg-red-500 hover:bg-red-600 text-white' 
+          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs disabled:opacity-50 ${uploadedOnlyPlaying
+              ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-purple-500 hover:bg-purple-600 text-white'
-          }`}
+            }`}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >

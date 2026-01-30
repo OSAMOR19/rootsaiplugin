@@ -7,7 +7,7 @@ import SampleGroupSection from "@/components/SampleGroupSection"
 
 export default function BrowsePage() {
   return (
-    <div className="w-full h-full p-6 text-white bg-black">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300 p-6">
       <BrowseHeader />
 
       {/* CURATED FOR YOU */}

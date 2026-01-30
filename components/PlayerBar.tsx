@@ -38,22 +38,22 @@ export default function PlayerBar() {
     if (!currentTrack) return null
 
     return (
-        <div className="h-24 bg-black/90 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-6 fixed bottom-0 left-0 right-0 z-50">
+        <div className="h-24 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-200 dark:border-white/10 flex items-center justify-between px-6 fixed bottom-0 left-0 right-0 z-50 transition-colors duration-300">
             {/* Track Info */}
             <div className="flex items-center gap-4 w-[30%]">
-                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-gray-800 to-gray-700 flex-shrink-0 overflow-hidden relative group">
+                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-gray-200 dark:from-gray-800 to-gray-300 dark:to-gray-700 flex-shrink-0 overflow-hidden relative group">
                     {currentTrack.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={currentTrack.imageUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-green-900 to-emerald-900" />
+                        <div className="w-full h-full bg-gradient-to-br from-green-100 dark:from-green-900 to-emerald-200 dark:to-emerald-900" />
                     )}
                 </div>
                 <div className="min-w-0">
-                    <h4 className="text-white font-medium truncate hover:underline cursor-pointer">{currentTrack.title}</h4>
-                    <p className="text-xs text-white/60 truncate hover:text-white cursor-pointer transition-colors">{currentTrack.artist}</p>
+                    <h4 className="text-gray-900 dark:text-white font-medium truncate hover:underline cursor-pointer">{currentTrack.title}</h4>
+                    <p className="text-xs text-gray-600 dark:text-white/60 truncate hover:text-gray-900 dark:hover:text-white cursor-pointer transition-colors">{currentTrack.artist}</p>
                 </div>
-                <button className="text-white/40 hover:text-green-500 transition-colors ml-2">
+                <button className="text-gray-400 dark:text-white/40 hover:text-green-500 transition-colors ml-2">
                     <Heart className="w-4 h-4" />
                 </button>
             </div>
@@ -63,35 +63,35 @@ export default function PlayerBar() {
                 <div className="flex items-center gap-6">
                     <button
                         onClick={toggleShuffle}
-                        className={`transition-colors ${isShuffle ? 'text-green-500' : 'text-white/40 hover:text-white'}`}
+                        className={`transition-colors ${isShuffle ? 'text-green-500' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white'}`}
                     >
                         <Shuffle className="w-4 h-4" />
                     </button>
                     <button
                         onClick={playPrevious}
-                        className="text-white/60 hover:text-white transition-colors"
+                        className="text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                         <SkipBack className="w-5 h-5 fill-current" />
                     </button>
                     <button
                         onClick={togglePlay}
-                        className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-105 transition-transform"
+                        className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white flex items-center justify-center hover:scale-105 transition-transform"
                     >
                         {isPlaying ? (
-                            <Pause className="w-5 h-5 text-black fill-current" />
+                            <Pause className="w-5 h-5 text-white dark:text-black fill-current" />
                         ) : (
-                            <Play className="w-5 h-5 text-black fill-current ml-1" />
+                            <Play className="w-5 h-5 text-white dark:text-black fill-current ml-1" />
                         )}
                     </button>
                     <button
                         onClick={playNext}
-                        className="text-white/60 hover:text-white transition-colors"
+                        className="text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                         <SkipForward className="w-5 h-5 fill-current" />
                     </button>
                     <button
                         onClick={toggleRepeat}
-                        className={`transition-colors ${repeatMode !== 'off' ? 'text-green-500' : 'text-white/40 hover:text-white'}`}
+                        className={`transition-colors ${repeatMode !== 'off' ? 'text-green-500' : 'text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white'}`}
                         title={`Repeat: ${repeatMode}`}
                     >
                         <Repeat className="w-4 h-4" />
@@ -99,9 +99,9 @@ export default function PlayerBar() {
                     </button>
                 </div>
 
-                <div className="w-full flex items-center gap-2 text-xs text-white/40 font-medium font-mono">
+                <div className="w-full flex items-center gap-2 text-xs text-gray-500 dark:text-white/40 font-medium font-mono">
                     <span className="w-10 text-right">{formatTime(currentTime)}</span>
-                    <div className="flex-1 h-1 bg-white/10 rounded-full relative group">
+                    <div className="flex-1 h-1 bg-gray-200 dark:bg-white/10 rounded-full relative group">
                         <div
                             className="absolute top-0 left-0 h-full bg-green-500 rounded-full group-hover:bg-green-400 transition-colors"
                             style={{ width: `${(currentTime / duration) * 100}%` }}
@@ -122,10 +122,10 @@ export default function PlayerBar() {
             {/* Volume & Options */}
             <div className="flex items-center justify-end gap-4 w-[30%]">
                 <div className="flex items-center gap-2 group">
-                    <Volume2 className="w-5 h-5 text-white/60 group-hover:text-white transition-colors" />
-                    <div className="w-24 h-1 bg-white/10 rounded-full relative group/vol">
+                    <Volume2 className="w-5 h-5 text-gray-500 dark:text-white/60 group-hover:text-gray-900 dark:group-hover:text-white transition-colors" />
+                    <div className="w-24 h-1 bg-gray-200 dark:bg-white/10 rounded-full relative group/vol">
                         <div
-                            className="absolute top-0 left-0 h-full bg-white/60 group-hover/vol:bg-green-500 transition-colors rounded-full"
+                            className="absolute top-0 left-0 h-full bg-gray-500 dark:bg-white/60 group-hover/vol:bg-green-500 transition-colors rounded-full"
                             style={{ width: `${volume * 100}%` }}
                         />
                         <input
@@ -141,7 +141,7 @@ export default function PlayerBar() {
                 </div>
                 <button
                     onClick={closePlayer}
-                    className="text-white/40 hover:text-white transition-colors ml-4"
+                    className="text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white transition-colors ml-4"
                 >
                     <X className="w-5 h-5" />
                 </button>

@@ -108,7 +108,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-50"
           />
 
           {/* Modal Container */}
@@ -118,25 +118,25 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               initial={{ opacity: 0, scale: 0.95, y: -20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              className="pointer-events-auto w-full max-w-3xl bg-gradient-to-b from-gray-900 to-black border border-white/10 rounded-2xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col"
+              className="pointer-events-auto w-full max-w-3xl bg-gradient-to-b from-gray-50 dark:from-gray-900 to-white dark:to-black border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col"
             >
               {/* Search Header */}
-              <div className="p-6 border-b border-white/10">
+              <div className="p-6 border-b border-gray-200 dark:border-white/10">
                 <div className="flex items-center gap-4">
-                  <Search className="w-6 h-6 text-white/40" />
+                  <Search className="w-6 h-6 text-gray-400 dark:text-white/40" />
                   <input
                     ref={inputRef}
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search for samples, categories, moods, keys..."
-                    className="flex-1 bg-transparent text-white text-lg placeholder-white/40 outline-none"
+                    className="flex-1 bg-transparent text-gray-900 dark:text-white text-lg placeholder-gray-400 dark:placeholder-white/40 outline-none"
                   />
                   <button
                     onClick={onClose}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-white/60" />
+                    <X className="w-5 h-5 text-gray-500 dark:text-white/60" />
                   </button>
                 </div>
               </div>
@@ -146,18 +146,18 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="w-8 h-8 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-white/40">Loading samples...</p>
+                    <p className="text-gray-500 dark:text-white/40">Loading samples...</p>
                   </div>
                 ) : query.trim() === "" ? (
                   // Show trending when no search
                   <div>
                     <div className="flex items-center gap-2 mb-4">
-                      <TrendingUp className="w-5 h-5 text-green-400" />
-                      <h3 className="text-white font-semibold">Trending Samples</h3>
+                      <TrendingUp className="w-5 h-5 text-green-500 dark:text-green-400" />
+                      <h3 className="text-gray-900 dark:text-white font-semibold">Trending Samples</h3>
                     </div>
 
                     {trendingSamples.length === 0 ? (
-                      <p className="text-white/40 text-center py-8">
+                      <p className="text-gray-500 dark:text-white/40 text-center py-8">
                         No samples available. Upload some to get started!
                       </p>
                     ) : (
@@ -169,11 +169,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                           return (
                             <div
                               key={sample.id}
-                              className="flex items-center gap-4 p-3 hover:bg-white/5 rounded-lg transition-colors group cursor-pointer"
+                              className="flex items-center gap-4 p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors group cursor-pointer"
                               onClick={() => handleSampleClick(sample)}
                             >
                               {/* Image */}
-                              <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gray-800">
+                              <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-800">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={getSampleImage(sample, index)}
@@ -199,10 +199,10 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
                               {/* Info */}
                               <div className="flex-1 min-w-0">
-                                <p className={`font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
+                                <p className={`font-medium truncate ${isCurrentPlaying ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                                   {sample.name}
                                 </p>
-                                <p className="text-sm text-white/60 truncate">
+                                <p className="text-sm text-gray-600 dark:text-white/60 truncate">
                                   {sample.category} • {sample.bpm} BPM
                                 </p>
                               </div>
@@ -210,12 +210,12 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                               {/* Tags */}
                               <div className="flex items-center gap-2">
                                 {sample.key && (
-                                  <span className="px-2 py-1 bg-white/5 rounded text-xs text-white/60">
+                                  <span className="px-2 py-1 bg-gray-100 dark:bg-white/5 rounded text-xs text-gray-600 dark:text-white/60">
                                     {sample.key}
                                   </span>
                                 )}
                                 {sample.moodTag && (
-                                  <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs">
+                                  <span className="px-2 py-1 bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs">
                                     {sample.moodTag}
                                   </span>
                                 )}
@@ -229,14 +229,14 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 ) : searchResults.length === 0 ? (
                   // No results
                   <div className="text-center py-12">
-                    <Search className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                    <p className="text-white/60 mb-2">No samples found for "{query}"</p>
-                    <p className="text-white/40 text-sm">Try searching for categories, keys, or moods</p>
+                    <Search className="w-12 h-12 text-gray-300 dark:text-white/20 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-white/60 mb-2">No samples found for "{query}"</p>
+                    <p className="text-gray-500 dark:text-white/40 text-sm">Try searching for categories, keys, or moods</p>
                   </div>
                 ) : (
                   // Search results
                   <div>
-                    <p className="text-white/60 mb-4 text-sm">
+                    <p className="text-gray-600 dark:text-white/60 mb-4 text-sm">
                       Found {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
                     </p>
 
@@ -248,11 +248,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                         return (
                           <div
                             key={sample.id}
-                            className="flex items-center gap-4 p-3 hover:bg-white/5 rounded-lg transition-colors group cursor-pointer"
+                            className="flex items-center gap-4 p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors group cursor-pointer"
                             onClick={() => handleSampleClick(sample)}
                           >
                             {/* Image */}
-                            <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gray-800">
+                            <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-800">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={getSampleImage(sample, index)}
@@ -278,10 +278,10 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                              <p className={`font-medium truncate ${isCurrentPlaying ? 'text-green-400' : 'text-white'}`}>
+                              <p className={`font-medium truncate ${isCurrentPlaying ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                                 {sample.name}
                               </p>
-                              <p className="text-sm text-white/60 truncate">
+                              <p className="text-sm text-gray-600 dark:text-white/60 truncate">
                                 {sample.category} • {sample.bpm} BPM
                               </p>
                             </div>
@@ -289,12 +289,12 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                             {/* Tags */}
                             <div className="flex items-center gap-2 mr-2">
                               {sample.key && (
-                                <span className="px-2 py-1 bg-white/5 rounded text-xs text-white/60 hidden sm:inline-block">
+                                <span className="px-2 py-1 bg-gray-100 dark:bg-white/5 rounded text-xs text-gray-600 dark:text-white/60 hidden sm:inline-block">
                                   {sample.key}
                                 </span>
                               )}
                               {sample.moodTag && (
-                                <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs hidden sm:inline-block">
+                                <span className="px-2 py-1 bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs hidden sm:inline-block">
                                   {sample.moodTag}
                                 </span>
                               )}
@@ -304,8 +304,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                               <SampleActionsMenu
                                 sample={sample}
-                                iconColor="text-white/40"
-                                buttonClass="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                                iconColor="text-gray-400 dark:text-white/40"
+                                buttonClass="p-1.5 rounded-full text-gray-400 dark:text-white/40 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                               />
                             </div>
                           </div>

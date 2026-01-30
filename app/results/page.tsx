@@ -87,6 +87,93 @@ function ResultsContent() {
 
       console.log('✅ Valid loops (with filename & URL):', validLoops.length)
 
+      // === IMPROVED SEARCH ALGORITHM ===
+
+      // Synonym mapping for common drum/music terms
+      const synonymMap: { [key: string]: string[] } = {
+        'hihat': ['hi-hat', 'hi hat', 'hh', 'hats', 'hat'],
+        'hi-hat': ['hihat', 'hi hat', 'hh', 'hats', 'hat'],
+        'kick': ['bass drum', 'bd', 'kick drum', 'bass'],
+        'snare': ['sd', 'snare drum'],
+        'percussion': ['perc', 'percs', 'percussive'],
+        'perc': ['percussion', 'percussive'],
+        'shaker': ['shakers', 'shake'],
+        'afrobeat': ['afro', 'afrobeats', 'african'],
+        'afro': ['afrobeat', 'afrobeats', 'african'],
+        'energetic': ['energy', 'upbeat', 'fast', 'dynamic', 'powerful'],
+        'chill': ['mellow', 'relaxed', 'calm', 'soft', 'slow'],
+        'fast': ['quick', 'speedy', 'upbeat', 'energetic'],
+        'slow': ['chill', 'mellow', 'relaxed'],
+        'talking drum': ['talking', 'talkingdrum'],
+        'djembe': ['djembes', 'jembe'],
+        'conga': ['congas', 'congo'],
+        'bongo': ['bongos'],
+        'cowbell': ['cowbells', 'bell'],
+        'clap': ['claps', 'handclap'],
+        'tom': ['toms', 'tom-tom'],
+        'fill': ['fills', 'drum fill'],
+        'loop': ['loops', 'sample', 'pattern'],
+      }
+
+      // Extract BPM from search query (e.g., "120 bpm afrobeat" -> 120)
+      const extractBPMFromQuery = (query: string): number | null => {
+        // Match patterns like "120 bpm", "120bpm", "bpm 120", "bpm120", "at 120", "tempo 120"
+        const bpmPatterns = [
+          /(\d{2,3})\s*bpm/i,
+          /bpm\s*(\d{2,3})/i,
+          /at\s+(\d{2,3})/i,
+          /tempo\s*(\d{2,3})/i,
+          /(\d{2,3})\s*tempo/i,
+        ]
+
+        for (const pattern of bpmPatterns) {
+          const match = query.match(pattern)
+          if (match) {
+            const bpm = parseInt(match[1])
+            if (bpm >= 60 && bpm <= 200) return bpm
+          }
+        }
+        return null
+      }
+
+      // Fuzzy match function - checks if query term matches with variations
+      const fuzzyMatch = (searchTerm: string, targetText: string): { matched: boolean; score: number } => {
+        const lowerTarget = targetText.toLowerCase()
+        const lowerSearch = searchTerm.toLowerCase()
+
+        // Exact match = highest score
+        if (lowerTarget.includes(lowerSearch)) {
+          return { matched: true, score: 20 }
+        }
+
+        // Check synonyms
+        const synonyms = synonymMap[lowerSearch] || []
+        for (const synonym of synonyms) {
+          if (lowerTarget.includes(synonym)) {
+            return { matched: true, score: 15 }
+          }
+        }
+
+        // Partial match (at least 3 chars matching)
+        if (lowerSearch.length >= 3 && lowerTarget.includes(lowerSearch.substring(0, 3))) {
+          return { matched: true, score: 8 }
+        }
+
+        // Word start match
+        const words = lowerTarget.split(/[\s\-_]+/)
+        for (const word of words) {
+          if (word.startsWith(lowerSearch) || lowerSearch.startsWith(word)) {
+            return { matched: true, score: 10 }
+          }
+        }
+
+        return { matched: false, score: 0 }
+      }
+
+      // Extract query BPM if present
+      const queryBPM = searchQuery ? extractBPMFromQuery(searchQuery) : null
+      const effectiveBPM = queryBPM || bpm
+
       // Calculate compatibility scores (same algorithm as handleViewMore)
       const scoredLoops = validLoops.map((loop: any) => {
         // ✅ Handle both 'filename' and 'fileName' fields
@@ -103,49 +190,95 @@ function ResultsContent() {
 
         let score = 0
 
-        // Text Search Scoring (Keyword based)
+        // Text Search Scoring (Enhanced keyword-based)
         if (searchQuery) {
           const lowerName = fileName.toLowerCase() || ''
           const lowerCat = (loop.category || '').toLowerCase()
           const loopGenres = (loop.genres || []).map((g: string) => g.toLowerCase())
           const loopKeywords = (loop.keywords || []).map((k: string) => k.toLowerCase())
 
-          const stopWords = ['i', 'need', 'a', 'want', 'the', 'of', 'for', 'with', 'sound', 'loop', 'sample', 'drums', 'drum', 'beat', 'me', 'get', 'find', 'show', 'please']
-          const keywords = searchQuery.toLowerCase()
-            .replace(/[^\w\s]/g, '')
-            .split(' ')
+          // Combine all searchable text
+          const allSearchableText = `${lowerName} ${lowerCat} ${loopGenres.join(' ')} ${loopKeywords.join(' ')}`
+
+          // Improved stop words list
+          const stopWords = ['i', 'need', 'a', 'want', 'the', 'of', 'for', 'with', 'sound', 'loop', 'sample', 'drums', 'drum', 'beat', 'me', 'get', 'find', 'show', 'please', 'some', 'give', 'looking', 'like', 'that', 'and', 'or', 'is', 'are', 'have', 'has']
+
+          // Remove BPM references from query for keyword extraction
+          const cleanedQuery = searchQuery.toLowerCase()
+            .replace(/\d{2,3}\s*bpm/gi, '')
+            .replace(/bpm\s*\d{2,3}/gi, '')
+            .replace(/tempo\s*\d{2,3}/gi, '')
+            .replace(/at\s+\d{2,3}/gi, '')
+
+          const keywords = cleanedQuery
+            .replace(/[^\w\s-]/g, ' ')
+            .split(/\s+/)
             .filter(w => w.length > 2 && !stopWords.includes(w))
 
           if (keywords.length > 0) {
+            let totalMatchScore = 0
             let matchCount = 0
-            keywords.forEach(k => {
-              if (lowerName.includes(k) || lowerCat.includes(k) || loopGenres.some((g: string) => g.includes(k)) || loopKeywords.some((kw: string) => kw.includes(k))) {
+
+            keywords.forEach(keyword => {
+              // Try fuzzy match against all searchable content
+              const nameMatch = fuzzyMatch(keyword, lowerName)
+              const catMatch = fuzzyMatch(keyword, lowerCat)
+
+              // Best match from genres
+              let bestGenreMatch = { matched: false, score: 0 }
+              for (const genre of loopGenres) {
+                const match = fuzzyMatch(keyword, genre)
+                if (match.score > bestGenreMatch.score) bestGenreMatch = match
+              }
+
+              // Best match from keywords
+              let bestKeywordMatch = { matched: false, score: 0 }
+              for (const kw of loopKeywords) {
+                const match = fuzzyMatch(keyword, kw)
+                if (match.score > bestKeywordMatch.score) bestKeywordMatch = match
+              }
+
+              // Use the best match score
+              const bestScore = Math.max(nameMatch.score, catMatch.score, bestGenreMatch.score, bestKeywordMatch.score)
+              if (bestScore > 0) {
+                totalMatchScore += bestScore
                 matchCount++
               }
             })
 
-            // Boost score significantly for matches
+            // Boost score based on match quality
             if (matchCount > 0) {
-              score += 50 + (matchCount * 10) // Base 50 + 10 per extra keyword
+              // Base score of 40 + match quality bonus
+              score += 40 + totalMatchScore
+
+              // Bonus for matching multiple keywords (relevance boost)
+              if (matchCount >= 2) score += 15
+              if (matchCount >= 3) score += 10
+
+              // Bonus if ALL keywords matched
+              if (matchCount === keywords.length) score += 20
             }
-          } else {
-            // Fallback exact substring match
-            const lowerQuery = searchQuery.toLowerCase()
-            if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery) || loopGenres.some((g: string) => g.includes(lowerQuery))) {
-              score += 50
+          } else if (searchQuery.trim().length > 0) {
+            // Fallback: simple substring match for short queries
+            const lowerQuery = searchQuery.toLowerCase().trim()
+            const simpleMatch = fuzzyMatch(lowerQuery, allSearchableText)
+            if (simpleMatch.matched) {
+              score += 30 + simpleMatch.score
             }
           }
         }
 
-        // BPM matching
-        if (bpm) {
-          const bpmRatio = loopBPM / bpm
+        // BPM matching (use query BPM if specified, otherwise detected BPM)
+        if (effectiveBPM) {
+          const bpmRatio = loopBPM / effectiveBPM
           if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
-            score += 40
-          } else if (Math.abs(bpm - loopBPM) <= 5) {
-            score += 30
-          } else if (Math.abs(bpm - loopBPM) <= 10) {
-            score += 20
+            score += 45 // Exact match is very important
+          } else if (Math.abs(effectiveBPM - loopBPM) <= 5) {
+            score += 35
+          } else if (Math.abs(effectiveBPM - loopBPM) <= 10) {
+            score += 25
+          } else if (Math.abs(effectiveBPM - loopBPM) <= 15) {
+            score += 15
           }
         }
 
@@ -154,7 +287,7 @@ function ResultsContent() {
           score += 25
         }
 
-        // Rhythmic complexity
+        // Rhythmic complexity bonus
         const fileNameLower = fileName.toLowerCase()
         if (fileNameLower.includes('kick') || fileNameLower.includes('bass')) {
           score += 15
@@ -364,10 +497,10 @@ function ResultsContent() {
     setCurrentlyPlaying(currentlyPlaying === sampleId ? null : sampleId)
   }
 
-  // ✅ NEW: Handle sync play (play captured audio + sample together)
+  // ✅ Handle sync play (play captured audio + sample together)
   const handleSyncPlay = async (sampleId: string, sampleBPM: number, sampleUrl: string) => {
     if (syncPlayingSampleId === sampleId) {
-      // Stop sync playback
+      // Stop sync playback for the same sample
       syncEngine.stopAll()
       setSyncPlayingSampleId(null)
       setCurrentlyPlaying(null)
@@ -378,15 +511,13 @@ function ResultsContent() {
         duration: 2000,
       })
     } else {
-      // Check if another sample is currently sync playing
+      // ✅ FIXED: Auto-stop previous sync when clicking a new one
       if (syncPlayingSampleId) {
-        toast({
-          title: "Already Syncing! 🎵",
-          description: "Please stop the current sync playback before starting a new one.",
-          variant: "destructive",
-          duration: 3000,
-        })
-        return
+        // Stop the current sync playback first
+        syncEngine.stopAll()
+        setSyncPlayingSampleId(null)
+        setCurrentlyPlaying(null)
+        console.log('🔄 Stopped previous sync, starting new one...')
       }
 
       // Start sync playback
@@ -409,7 +540,7 @@ function ResultsContent() {
         // Load sample audio
         const sampleBuffer = await loadAudioBuffer(sampleUrl)
 
-        // Start sync playback
+        // ✅ FIXED: Start sync playback with looping enabled
         await syncEngine.syncPlay(
           recordedAudioBuffer,
           sampleBuffer,
@@ -417,7 +548,8 @@ function ResultsContent() {
           {
             recordedBPM: recordedBPM,
             recordedVolume: recordedVolume / 100, // Convert 0-100 to 0-1
-            sampleVolume: sampleVolume / 100 // Convert 0-100 to 0-1
+            sampleVolume: sampleVolume / 100, // Convert 0-100 to 0-1
+            loop: true // ✅ Enable looping
           }
         )
 
@@ -426,7 +558,7 @@ function ResultsContent() {
 
         toast({
           title: "Synced! 🎧",
-          description: "Your audio is now playing with the drum sample.",
+          description: "Your audio is now playing with the drum sample (looping).",
           duration: 2000,
         })
       } catch (error) {
@@ -475,87 +607,87 @@ function ResultsContent() {
 
         // 0. Text Search Scoring (if query exists)
         if (query) {
-           const lowerName = loopFilename.toLowerCase()
-           const lowerCat = loopCategory.toLowerCase()
-           const lGenres = loopGenres.map(g => g.toLowerCase())
-           const lKeywords = loopKeywords.map(k => k.toLowerCase())
-           const lowerQuery = query.toLowerCase()
-           
-           if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery) || lGenres.some(g => g.includes(lowerQuery)) || lKeywords.some(k => k.includes(lowerQuery))) {
-             totalScore += 50
-           }
+          const lowerName = loopFilename.toLowerCase()
+          const lowerCat = loopCategory.toLowerCase()
+          const lGenres = loopGenres.map(g => g.toLowerCase())
+          const lKeywords = loopKeywords.map(k => k.toLowerCase())
+          const lowerQuery = query.toLowerCase()
+
+          if (lowerName.includes(lowerQuery) || lowerCat.includes(lowerQuery) || lGenres.some(g => g.includes(lowerQuery)) || lKeywords.some(k => k.includes(lowerQuery))) {
+            totalScore += 50
+          }
         }
 
         if (detectedBPM && detectedKey) {
-            // 1. Musical Compatibility
-            let musicalScore = 0
-            if (detectedKey === loopKey) {
+          // 1. Musical Compatibility
+          let musicalScore = 0
+          if (detectedKey === loopKey) {
             musicalScore += 25
-            } else {
+          } else {
             const harmonicRelationships: { [key: string]: { [relatedKey: string]: number } } = {
-                'C': { 'Am': 35, 'F': 30, 'G': 32, 'Dm': 25, 'Em': 20 },
-                'Am': { 'C': 35, 'F': 32, 'G': 28, 'Dm': 30, 'Em': 25 },
-                'F': { 'C': 30, 'Am': 32, 'Dm': 35, 'Bb': 25, 'G': 20 },
-                'G': { 'C': 32, 'Am': 28, 'Em': 35, 'D': 30, 'F': 20 },
-                'Dm': { 'F': 35, 'Am': 30, 'Bb': 32, 'C': 25, 'G': 18 },
-                'F#m': { 'A': 35, 'D': 32, 'E': 30, 'Bm': 25, 'C#m': 20 }
+              'C': { 'Am': 35, 'F': 30, 'G': 32, 'Dm': 25, 'Em': 20 },
+              'Am': { 'C': 35, 'F': 32, 'G': 28, 'Dm': 30, 'Em': 25 },
+              'F': { 'C': 30, 'Am': 32, 'Dm': 35, 'Bb': 25, 'G': 20 },
+              'G': { 'C': 32, 'Am': 28, 'Em': 35, 'D': 30, 'F': 20 },
+              'Dm': { 'F': 35, 'Am': 30, 'Bb': 32, 'C': 25, 'G': 18 },
+              'F#m': { 'A': 35, 'D': 32, 'E': 30, 'Bm': 25, 'C#m': 20 }
             }
             musicalScore += harmonicRelationships[detectedKey]?.[loopKey] || 10
-            }
+          }
 
-            const bpmRatio = loopBPM / detectedBPM
-            if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
+          const bpmRatio = loopBPM / detectedBPM
+          if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
             musicalScore += 15
-            } else if (bpmRatio >= 0.5 && bpmRatio <= 0.52 || bpmRatio >= 1.98 && bpmRatio <= 2.02) {
+          } else if (bpmRatio >= 0.5 && bpmRatio <= 0.52 || bpmRatio >= 1.98 && bpmRatio <= 2.02) {
             musicalScore += 25
-            } else if (Math.abs(detectedBPM - loopBPM) <= 5) {
+          } else if (Math.abs(detectedBPM - loopBPM) <= 5) {
             musicalScore += 18
-            } else if (Math.abs(detectedBPM - loopBPM) <= 10) {
+          } else if (Math.abs(detectedBPM - loopBPM) <= 10) {
             musicalScore += 12
-            } else {
+          } else {
             musicalScore += Math.max(0, 15 - Math.abs(detectedBPM - loopBPM) / 2)
-            }
+          }
 
-            totalScore += musicalScore
+          totalScore += musicalScore
 
-            // 2. Rhythmic Complexity
-            const filename = loopFilename.toLowerCase()
-            let rhythmScore = 0
-            if (filename.includes('fill') || filename.includes('roll')) {
+          // 2. Rhythmic Complexity
+          const filename = loopFilename.toLowerCase()
+          let rhythmScore = 0
+          if (filename.includes('fill') || filename.includes('roll')) {
             rhythmScore += 20
-            } else if (filename.includes('kick') || filename.includes('bass')) {
+          } else if (filename.includes('kick') || filename.includes('bass')) {
             rhythmScore += 25
-            } else if (filename.includes('shaker') || filename.includes('hi') || filename.includes('perc')) {
+          } else if (filename.includes('shaker') || filename.includes('hi') || filename.includes('perc')) {
             rhythmScore += 30
-            } else if (filename.includes('full') || filename.includes('complete')) {
+          } else if (filename.includes('full') || filename.includes('complete')) {
             rhythmScore += 15
-            } else if (filename.includes('top') || filename.includes('melody')) {
+          } else if (filename.includes('top') || filename.includes('melody')) {
             rhythmScore += 22
-            }
-            totalScore += rhythmScore
+          }
+          totalScore += rhythmScore
 
-            // 3. Timbral Compatibility
-            let timbreScore = 0
-            if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
+          // 3. Timbral Compatibility
+          let timbreScore = 0
+          if (filename.includes('manifxtsounds') || filename.includes('afrobeat')) {
             timbreScore += 15
-            }
-            if (filename.includes('kick') || filename.includes('bass') || filename.includes('low')) {
+          }
+          if (filename.includes('kick') || filename.includes('bass') || filename.includes('low')) {
             timbreScore += 10
-            } else if (filename.includes('hi') || filename.includes('cymbal') || filename.includes('shaker')) {
+          } else if (filename.includes('hi') || filename.includes('cymbal') || filename.includes('shaker')) {
             timbreScore += 12
-            } else if (filename.includes('mid') || filename.includes('tom') || filename.includes('snare')) {
+          } else if (filename.includes('mid') || filename.includes('tom') || filename.includes('snare')) {
             timbreScore += 8
-            }
-            totalScore += timbreScore
+          }
+          totalScore += timbreScore
 
-            // 4. Cultural/Stylistic Coherence
-            let styleScore = 15
-            if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
+          // 4. Cultural/Stylistic Coherence
+          let styleScore = 15
+          if ((filename.includes('talking') && (detectedKey === 'Am' || detectedKey === 'Dm')) ||
             (filename.includes('djembe') && (detectedKey === 'F' || detectedKey === 'C')) ||
             (filename.includes('shekere') && filename.includes('perc'))) {
             styleScore += 10
-            }
-            totalScore += styleScore
+          }
+          totalScore += styleScore
         }
 
         const finalScore = Math.min(100, totalScore)
@@ -755,10 +887,10 @@ function ResultsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
       {/* VST-Style Header */}
       <motion.header
-        className="bg-black/90 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40"
+        className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >

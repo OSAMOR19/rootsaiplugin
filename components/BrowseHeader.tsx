@@ -39,7 +39,7 @@ export default function BrowseHeader() {
 
     return (
         <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Explore</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Explore</h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {EXPLORE_CATEGORIES.map((cat) => (

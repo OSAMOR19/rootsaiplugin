@@ -28,6 +28,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
   const [mode, setMode] = useState<'capture' | 'upload'>('capture')
   const [uploadedFileName, setUploadedFileName] = useState<string>('')
   const [isExtracting, setIsExtracting] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   // Real BPM Detection Hook
   const {
@@ -624,6 +625,137 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     fileInputRef.current?.click()
   }
 
+  // Drag and Drop Handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (disabled || isRecording || isProcessing || isExtracting || isBPMAnalyzing) return
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if leaving the main container
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setIsDragging(false)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    if (disabled || isRecording || isProcessing || isExtracting || isBPMAnalyzing) return
+
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+
+    const file = files[0]
+
+    // Validate file type
+    if (!file.type.startsWith('audio/')) {
+      toast.error('Please drop a valid audio file (MP3, WAV, etc.)')
+      return
+    }
+
+    // Check file size (100MB limit)
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error('File too large. Please upload files smaller than 100MB.')
+      return
+    }
+
+    // Process the dropped file using the same logic as handleFileUpload
+    let toastId: any = null
+    try {
+      setIsExtracting(true)
+      toast.info('Processing dropped audio file...')
+
+      console.log('Dropped file processing:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      })
+
+      // Show persistent loading toast
+      toastId = toast.loading('🎵 Analyzing BPM...', {
+        duration: Infinity
+      })
+
+      // Convert file to AudioBuffer
+      const audioBuffer = await fileToAudioBuffer(file)
+      console.log('Audio buffer created:', {
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate
+      })
+
+      // Reset and detect BPM
+      resetAnalysis()
+      const bpmResult = await analyzeAudioBuffer(audioBuffer)
+
+      console.log('⚡ Fast BPM Detection:', {
+        detectedBPM: bpmResult.bpm,
+        confidence: bpmResult.confidence
+      })
+
+      // Store results
+      setRecordedAudioBuffer(audioBuffer)
+      setRecordedAudioBlob(new Blob([await file.arrayBuffer()], { type: file.type }))
+      setRecordedBPM(bpmResult.bpm)
+      setUploadedFileName(file.name)
+
+      // Dismiss loading and show success
+      toast.dismiss(toastId)
+      toast.success(`✅ BPM detected: ${bpmResult.bpm}`, {
+        duration: 15000
+      })
+
+      // Mark as listened
+      onListen()
+
+      // Call onAnalysisComplete
+      if (onAnalysisComplete) {
+        onAnalysisComplete({
+          detectedBPM: bpmResult.bpm,
+          detectedKey: 'C',
+          recommendations: [],
+          recordedAudioBuffer: audioBuffer
+        })
+      }
+
+      toast.dismiss(toastId)
+      toast.success('✅ Audio analyzed!', { duration: 3000 })
+
+    } catch (error) {
+      console.error('Error processing dropped file:', error)
+
+      if (toastId !== null) {
+        toast.dismiss(toastId)
+      }
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      if (errorMessage.includes('Failed to fetch')) {
+        toast.error('Cannot connect to BPM detection API. Please check your internet connection and try again.', {
+          duration: 8000
+        })
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        toast.error('BPM detection timed out. Try again with a shorter audio clip.', {
+          duration: 10000
+        })
+      } else {
+        toast.error(`Failed to process audio: ${errorMessage}`)
+      }
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
   const toggleMode = () => {
     if (isRecording || isProcessing || isExtracting) return
     setMode(mode === 'capture' ? 'upload' : 'capture')
@@ -781,12 +913,19 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         )}
       </motion.button>
 
-      {/* Main button container */}
+      {/* Main button container with drag & drop support */}
       <motion.button
-        className="relative w-64 h-64 rounded-full group overflow-hidden"
+        className={`relative w-64 h-64 rounded-full group overflow-hidden transition-all duration-300 ${isDragging
+          ? 'ring-4 ring-green-500 ring-opacity-75 scale-105'
+          : ''
+          }`}
         onClick={handleMainClick}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         disabled={disabled || isProcessing || isExtracting || isBPMAnalyzing}
-        whileHover={!disabled && !isProcessing && !isExtracting && !isBPMAnalyzing ? { scale: 1.02 } : {}}
+        whileHover={!disabled && !isProcessing && !isExtracting && !isBPMAnalyzing && !isDragging ? { scale: 1.02 } : {}}
         whileTap={!disabled && !isProcessing && !isExtracting && !isBPMAnalyzing ? { scale: 0.98 } : {}}
         style={{
           background: `
@@ -813,6 +952,19 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
               className="pointer-events-none"
             />
           </div>
+        )}
+
+        {/* Drag overlay indicator */}
+        {isDragging && (
+          <motion.div
+            className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 backdrop-blur-sm rounded-full z-20"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Upload className="w-12 h-12 text-green-500 mb-2" />
+            <span className="text-green-600 font-semibold text-sm">Drop Audio File</span>
+          </motion.div>
         )}
 
         {/* Center icon - Only show when not processing */}
