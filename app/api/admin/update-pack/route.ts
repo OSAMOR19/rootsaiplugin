@@ -38,6 +38,7 @@ export async function POST(request: Request) {
 
         if (packUpdateError) {
             console.error("[API] Error updating pack:", packUpdateError)
+            throw packUpdateError
         }
 
         // 2. Fetch Existing Samples (to handle deletions and diffs)
@@ -76,6 +77,11 @@ export async function POST(request: Request) {
         const samplesToUpsert = samples.map((sample: any) => {
             const isNew = sample.id && sample.id.toString().startsWith('new-')
 
+            // Generate unique filename with timestamp to prevent constraint violations
+            const timestamp = Date.now()
+            const baseFilename = sample.fileName || sample.name
+            const uniqueFilename = `${timestamp}_${baseFilename}`
+
             return {
                 id: isNew ? undefined : sample.id,
                 name: sample.name,
@@ -92,7 +98,7 @@ export async function POST(request: Request) {
                 image_url: packDetails.cover_image || sample.image_url,
                 duration: sample.duration || '0:00',
                 stems: sample.stems || [],
-                filename: sample.fileName || sample.name
+                filename: uniqueFilename
             }
         })
 
