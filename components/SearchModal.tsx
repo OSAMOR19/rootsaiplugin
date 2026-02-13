@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Search, X, Play, Pause, TrendingUp } from "lucide-react"
 import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
+import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
 
 import SampleActionsMenu from "./SampleActionsMenu"
 
@@ -64,10 +65,28 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   }, [isOpen, onClose])
 
   const handleSampleClick = (sample: any) => {
-    // Navigate to pack page for this sample's category
-    if (sample.category) {
-      onClose() // Close modal first
-      router.push(`/pack/${encodeURIComponent(sample.category)}`)
+    // If there's a search query, navigate to results with extracted filters
+    if (query.trim()) {
+      const filters = extractFiltersFromQuery(query)
+      const params = buildFilterParams(filters, query)
+      onClose()
+      router.push(`/results?${params.toString()}`)
+    } else {
+      // Otherwise, navigate to pack page for this sample's category
+      if (sample.category) {
+        onClose()
+        router.push(`/pack/${encodeURIComponent(sample.category)}`)
+      }
+    }
+  }
+
+  // Handle Enter key to submit search
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && query.trim()) {
+      const filters = extractFiltersFromQuery(query)
+      const params = buildFilterParams(filters, query)
+      onClose()
+      router.push(`/results?${params.toString()}`)
     }
   }
 
@@ -129,6 +148,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
                     placeholder="Search for samples, categories, moods, keys..."
                     className="flex-1 bg-transparent text-gray-900 dark:text-white text-lg placeholder-gray-400 dark:placeholder-white/40 outline-none"
                   />

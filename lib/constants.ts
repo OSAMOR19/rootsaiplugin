@@ -13,11 +13,15 @@ export const GENRE_OPTIONS = [
     'Reggae', 'World'
 ];
 
-export const INSTRUMENT_OPTIONS = [
-    'Drums', 'Kicks', 'Snares', 'Hats', 'Percussion', 'Shakers',
-    'Bass', 'Synth', 'Keys', 'Piano', 'Guitar', 'Strings',
-    'Brass', 'Woodwinds', 'Vocals', 'FX', 'Pads', 'Leads'
+// African Instruments
+export const AFRICAN_INSTRUMENT_OPTIONS = [
+    'Djembe', 'Talking Drum', 'Shekere', 'Udu', 'Bata',
+    'Conga', 'Bongo', 'Kpanlogo', 'Dunun', 'Bougarabou',
+    'Tama', 'Sabar', 'Ashiko', 'Kenkeni', 'Sangban'
 ];
+
+// Keep legacy name for backwards compatibility in code
+export const INSTRUMENT_OPTIONS = AFRICAN_INSTRUMENT_OPTIONS;
 
 export const DRUM_TYPE_OPTIONS = [
     "Kick Loop", "Snare Loop", "Hat Loop", "Percussion Loop",

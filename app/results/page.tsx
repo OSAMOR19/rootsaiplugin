@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useMemo } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music, Heart } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music, Heart, Filter } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
@@ -12,12 +12,15 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
 import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as updateRecordedVolume, setSampleVolume as updateSampleVolume } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
+import { shuffleArray } from "@/lib/searchUtils"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { supabase } from "@/lib/supabase"
 import PlayerBar from "@/components/PlayerBar"
+import FilterSelect from "@/components/FilterSelect"
+import { DRUM_TYPE_OPTIONS, INSTRUMENT_OPTIONS, GENRE_OPTIONS, KEYWORD_OPTIONS, KEY_OPTIONS } from "@/lib/constants"
 
 function ResultsContent() {
   const { toast } = useToast()
@@ -30,6 +33,14 @@ function ResultsContent() {
   const detectedBPM = searchParams.get("bpm")
   const detectedKey = searchParams.get("detectedKey")
   const recommendationsParam = searchParams.get("recommendations")
+
+  // Filter params from URL
+  const urlLoopType = searchParams.get("loopType") || ""
+  const urlInstrument = searchParams.get("instrument") || ""
+  const urlGenre = searchParams.get("genre") || ""
+  const urlKeyword = searchParams.get("keyword") || ""
+  const urlKey = searchParams.get("filterKey") || ""
+  const urlTimeSignature = searchParams.get("timeSignature") || ""
 
   const [samples, setSamples] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,6 +58,14 @@ function ResultsContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [syncPlayingSampleId, setSyncPlayingSampleId] = useState<string | null>(null) // Track which sample is sync playing
+
+  // Filter states
+  const [selectedLoopType, setSelectedLoopType] = useState(urlLoopType)
+  const [selectedInstrument, setSelectedInstrument] = useState(urlInstrument)
+  const [selectedGenre, setSelectedGenre] = useState(urlGenre)
+  const [selectedKeyword, setSelectedKeyword] = useState(urlKeyword)
+  const [selectedFilterKey, setSelectedFilterKey] = useState(urlKey)
+  const [selectedTimeSignature, setSelectedTimeSignature] = useState(urlTimeSignature)
 
   const categories = ["All", "Kick & Snare", "Talking Drum", "Djembe", "Conga & Bongo", "Shekere & Cowbell", "Hi-Hat", "Bata", "Tom Fills", "Kpanlogo", "Clave", "Polyrhythms"]
 
@@ -417,7 +436,26 @@ function ResultsContent() {
           console.log('🎯 Got initialCompatibleSounds:', initialCompatibleSounds.length, 'sounds')
           console.log('📋 Setting samples to:', finalSamples.length, 'total samples')
 
-          setSamples(finalSamples)
+          // 🎲 Dynamic Result Variation - Shuffle for unpredictable AI feel
+          // BUT: Keep "YOUR AUDIO" at the top if it exists
+          let samplesToSet = finalSamples
+
+          if (detectedBPM && finalSamples.length > 1) {
+            // YOUR AUDIO is at index 0, shuffle only the rest
+            const yourAudio = finalSamples[0]
+            const otherSamples = finalSamples.slice(1)
+            const sessionSeed = Date.now() % 10000
+            const shuffledOthers = shuffleArray(otherSamples, sessionSeed)
+            samplesToSet = [yourAudio, ...shuffledOthers]
+            console.log('✨ Shuffled recommendations (keeping YOUR AUDIO first)')
+          } else if (!detectedBPM && finalSamples.length > 0) {
+            // No audio uploaded, shuffle all samples
+            const sessionSeed = Date.now() % 10000
+            samplesToSet = shuffleArray(finalSamples, sessionSeed)
+            console.log('✨ Shuffled all results for AI variation')
+          }
+
+          setSamples(samplesToSet)
 
           // ✅ NEW: Load audio buffer from React Context (NOT localStorage!)
           try {
@@ -785,22 +823,44 @@ function ResultsContent() {
     router.push("/")
   }
 
-  const filteredSamples = samples.filter((sample) => {
-    // First filter by search query
-    const matchesSearch =
-      sample.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      sample.artist.toLowerCase().includes(searchFilter.toLowerCase())
+  // Comprehensive filtering logic
+  const filteredSamples = useMemo(() => {
+    return samples.filter((sample) => {
+      // Search filter
+      if (searchFilter) {
+        const matchesSearch =
+          sample.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+          sample.artist?.toLowerCase().includes(searchFilter.toLowerCase())
+        if (!matchesSearch) return false
+      }
 
-    // Then filter by selected category
-    if (selectedCategory === "all") {
-      return matchesSearch
-    }
+      // Loop Type filter
+      if (selectedLoopType && sample.drumType !== selectedLoopType) return false
 
-    // Check if sample category matches selected category
-    const matchesCategory = sample.category === selectedCategory
+      // Instrument filter
+      if (selectedInstrument && !sample.instruments?.includes(selectedInstrument)) return false
 
-    return matchesSearch && matchesCategory
-  })
+      // Genre filter
+      if (selectedGenre && !sample.genres?.includes(selectedGenre)) return false
+
+      // Keyword/Style filter
+      if (selectedKeyword && !sample.keywords?.includes(selectedKeyword)) return false
+
+      // Key filter
+      if (selectedFilterKey && sample.key !== selectedFilterKey) return false
+
+      // Time Signature filter
+      if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
+
+      // Legacy category filter (keep for backwards compatibility)
+      if (selectedCategory !== "all") {
+        const matchesCategory = sample.category === selectedCategory
+        if (!matchesCategory) return false
+      }
+
+      return true
+    })
+  }, [samples, searchFilter, selectedLoopType, selectedInstrument, selectedGenre, selectedKeyword, selectedFilterKey, selectedTimeSignature, selectedCategory])
 
   if (loading) {
     return (
@@ -1107,6 +1167,116 @@ function ResultsContent() {
 
       </motion.header>
 
+      {/* Filter Navigation Bar - Sticky */}
+      <div className="sticky top-[72px] z-30 bg-white/90 dark:bg-black/90 backdrop-blur-md pb-4 pt-4 px-6 border-b border-gray-200 dark:border-white/10 space-y-4">
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/40" />
+          <input
+            type="text"
+            placeholder="Search in results..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="w-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-green-500 dark:focus:border-white/30 transition-colors"
+          />
+        </div>
+
+        {/* Filter Dropdowns */}
+        <div className="flex flex-wrap gap-2">
+          <FilterSelect
+            label="Loop Type"
+            value={selectedLoopType}
+            onChange={setSelectedLoopType}
+            options={DRUM_TYPE_OPTIONS}
+          />
+          <FilterSelect
+            label="African Instruments"
+            value={selectedInstrument}
+            onChange={setSelectedInstrument}
+            options={INSTRUMENT_OPTIONS}
+          />
+          <FilterSelect
+            label="Genres"
+            value={selectedGenre}
+            onChange={setSelectedGenre}
+            options={GENRE_OPTIONS}
+          />
+          <FilterSelect
+            label="Styles"
+            value={selectedKeyword}
+            onChange={setSelectedKeyword}
+            options={KEYWORD_OPTIONS}
+          />
+          <FilterSelect
+            label="Key"
+            value={selectedFilterKey}
+            onChange={setSelectedFilterKey}
+            options={KEY_OPTIONS}
+          />
+          <FilterSelect
+            label="Time Sig"
+            value={selectedTimeSignature}
+            onChange={setSelectedTimeSignature}
+            options={['4/4', '3/4', '6/8', '5/4', '7/8']}
+          />
+
+          {/* Reset Button */}
+          {(selectedLoopType || selectedInstrument || selectedGenre || selectedKeyword || selectedFilterKey || selectedTimeSignature || searchFilter) && (
+            <button
+              onClick={() => {
+                setSearchFilter("")
+                setSelectedLoopType("")
+                setSelectedInstrument("")
+                setSelectedGenre("")
+                setSelectedKeyword("")
+                setSelectedFilterKey("")
+                setSelectedTimeSignature("")
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
+        {/* Active Filter Tags */}
+        {(selectedLoopType || selectedInstrument || selectedGenre || selectedKeyword || selectedFilterKey || selectedTimeSignature) && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            <span className="text-xs text-gray-500 dark:text-white/40">Active filters:</span>
+            {selectedLoopType && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs">
+                {selectedLoopType}
+              </span>
+            )}
+            {selectedInstrument && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded text-xs">
+                {selectedInstrument}
+              </span>
+            )}
+            {selectedGenre && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded text-xs">
+                {selectedGenre}
+              </span>
+            )}
+            {selectedKeyword && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded text-xs">
+                {selectedKeyword}
+              </span>
+            )}
+            {selectedFilterKey && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 rounded text-xs">
+                {selectedFilterKey}
+              </span>
+            )}
+            {selectedTimeSignature && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded text-xs">
+                {selectedTimeSignature}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Mobile Volume Controls - Show only when sync playing */}
       {syncPlayingSampleId && (
         <motion.div
@@ -1214,8 +1384,8 @@ function ResultsContent() {
                 ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                 : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
                 }`}
-              whileHover={!isLoadingMore && recordedAudioBuffer ? { scale: 1.05 } : {}}
-              whileTap={!isLoadingMore && recordedAudioBuffer ? { scale: 0.95 } : {}}
+              whileHover={!isLoadingMore && (recordedAudioBuffer || query) ? { scale: 1.05 } : {}}
+              whileTap={!isLoadingMore && (recordedAudioBuffer || query) ? { scale: 0.95 } : {}}
             >
               {isLoadingMore ? (
                 <>

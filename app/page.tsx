@@ -12,6 +12,7 @@ import GradientButton from "@/components/GradientButton"
 import ThemeToggle from "@/components/ThemeToggle"
 import { useRouter } from "next/navigation"
 import { useAudio } from "@/contexts/AudioContext"
+import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
 
 export default function CapturePage() {
   const [isListening, setIsListening] = useState(false)
@@ -118,10 +119,14 @@ export default function CapturePage() {
       hasAudio: hasListened
     });
 
-    // Navigate to results with text query
-    router.push(
-      `/results?query=${encodeURIComponent(query)}&key=${encodeURIComponent(sessionKey)}`,
-    )
+    // Extract filters from query and navigate to results
+    const filters = extractFiltersFromQuery(query)
+    const params = buildFilterParams(filters, query)
+    const paramString = params.toString()
+    const urlWithFilters = paramString ? `/results?${paramString}` : `/results?query=${encodeURIComponent(query)}`
+
+    console.log('🎯 Navigating with extracted filters:', filters, 'URL:', urlWithFilters)
+    router.push(urlWithFilters)
   }
 
   const handleBrowse = () => {
@@ -195,6 +200,15 @@ export default function CapturePage() {
 
           <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
             <ThemeToggle />
+            {/* Login/Signup Button */}
+            <motion.button
+              onClick={() => router.push('/auth/login')}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Login
+            </motion.button>
             {/* <SessionKeyButton value={sessionKey} onClick={() => setIsKeyModalOpen(true)} /> */}
             <motion.button
               onClick={handleSettings}
@@ -224,7 +238,7 @@ export default function CapturePage() {
                 value={searchQuery}
                 onChange={setSearchQuery}
                 onEnter={handleSearch}
-                placeholder="e.g., 'energetic 120 BPM afrobeat', 'mellow percussion loop', 'fast hi-hat pattern'..."
+                placeholder="Style, Genre, Loop Type = Energetic Afrobeats Full Drums"
                 disabled={isListening}
               />
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
