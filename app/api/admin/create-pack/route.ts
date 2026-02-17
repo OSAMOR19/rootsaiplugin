@@ -41,30 +41,43 @@ export async function POST(request: NextRequest) {
 
         // 2. Insert Samples into DB
         // samples array already contains audio_url and stems with urls
-        const processedSamples = samples.map((sample: any) => ({
-            name: sample.name,
-            filename: sample.filename,
-            category: packDetails.title,
-            bpm: sample.bpm,
-            key: sample.key,
-            time_signature: sample.time_signature,
-            genres: sample.genres,
-            instruments: sample.instruments,
-            drum_type: sample.drum_type,
-            keywords: sample.keywords,
-            audio_url: sample.audio_url, // URL from client
-            image_url: packDetails.cover_image,
-            is_featured: sample.is_featured,
-            duration: sample.duration,
-            stems: sample.stems // Array of {name, url, size, filename} from client
-        }))
+        const processedSamples = samples.map((sample: any) => {
+            // Add timestamp to filename to prevent unique constraint violations
+            // This allows uploading the same sound file multiple times
+            const timestamp = Date.now() + Math.floor(Math.random() * 1000)
+            const baseFilename = sample.filename || sample.name
+            const uniqueFilename = `${timestamp}_${baseFilename}`
+
+            return {
+                name: sample.name,
+                filename: uniqueFilename,
+                category: packDetails.title,
+                bpm: sample.bpm,
+                key: sample.key,
+                time_signature: sample.time_signature,
+                genres: sample.genres,
+                instruments: sample.instruments,
+                drum_type: sample.drum_type,
+                keywords: sample.keywords,
+                audio_url: sample.audio_url, // URL from client
+                image_url: packDetails.cover_image,
+                is_featured: sample.is_featured,
+                duration: sample.duration,
+                stems: sample.stems // Array of {name, url, size, filename} from client
+            }
+        })
 
         if (processedSamples.length > 0) {
             const { error: samplesError } = await supabaseAdmin
                 .from('samples')
                 .insert(processedSamples)
 
-            if (samplesError) throw samplesError
+            if (samplesError) {
+                // Rollback: delete the pack we just created to prevent orphan data
+                console.error('[API] Sample insert failed, rolling back pack:', packData.id)
+                await supabaseAdmin.from('packs').delete().eq('id', packData.id)
+                throw samplesError
+            }
         }
 
         return NextResponse.json({

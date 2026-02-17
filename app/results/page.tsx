@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
 import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as updateRecordedVolume, setSampleVolume as updateSampleVolume } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
-import { shuffleArray } from "@/lib/searchUtils"
+import { shuffleArray, extractFiltersFromQuery } from "@/lib/searchUtils"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -353,15 +353,21 @@ function ResultsContent() {
             name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
             artist: item.loop.category || 'Compatible Match', // Use category if no artist
             category: item.loop.category || 'audio-analysis',
-            bpm: bpm,
+            bpm: bpm || originalBpm, // Use detected BPM if available, otherwise loop's own BPM
             originalBpm: originalBpm,
             key: loopKey,
             audioUrl: audioUrl,
-            imageUrl: item.loop.image_url || item.loop.imageUrl || '/placeholder.jpg', // Try both snake_case and camelCase
-            duration: '4 bars', // This might need update if we have duration
+            imageUrl: item.loop.image_url || item.loop.imageUrl || '/placeholder.jpg',
+            duration: item.loop.duration || '4 bars',
             tags: ['compatible', 'matching-bpm'],
             waveform: Array.from({ length: 50 }, () => Math.random() * 100),
-            compatibilityScore: item.score
+            compatibilityScore: item.score,
+            // Filterable properties from database
+            drumType: item.loop.drum_type || '',
+            instruments: item.loop.instruments || [],
+            genres: item.loop.genres || [],
+            keywords: item.loop.keywords || [],
+            timeSignature: item.loop.time_signature || '4/4',
           }
         })
 
@@ -402,7 +408,7 @@ function ResultsContent() {
             setEditedBPM(initialBPM) // Initialize edited BPM
             setBpmInputValue(initialBPM.toString()) // Initialize input value
           } else {
-            console.error('❌ NO detectedBPM in URL params!')
+            console.log('ℹ️ No BPM detected (text-only search mode)')
           }
 
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
@@ -825,8 +831,16 @@ function ResultsContent() {
 
   // Comprehensive filtering logic
   const filteredSamples = useMemo(() => {
+    // Determine which filters were auto-extracted from the query text
+    // so we can skip those (search scoring already handles them)
+    // but still apply any filters the user manually changed via dropdowns
+    let autoExtracted: Record<string, string> = {}
+    if (query) {
+      autoExtracted = extractFiltersFromQuery(query) as Record<string, string>
+    }
+
     return samples.filter((sample) => {
-      // Search filter
+      // Search filter (local text filter within results)
       if (searchFilter) {
         const matchesSearch =
           sample.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -834,23 +848,35 @@ function ResultsContent() {
         if (!matchesSearch) return false
       }
 
-      // Loop Type filter
-      if (selectedLoopType && sample.drumType !== selectedLoopType) return false
+      // Loop Type filter — skip if it matches auto-extracted value
+      if (selectedLoopType && selectedLoopType !== autoExtracted.loopType) {
+        if (sample.drumType !== selectedLoopType) return false
+      }
 
-      // Instrument filter
-      if (selectedInstrument && !sample.instruments?.includes(selectedInstrument)) return false
+      // Instrument filter — skip if it matches auto-extracted value
+      if (selectedInstrument && selectedInstrument !== autoExtracted.instrument) {
+        if (!sample.instruments?.includes(selectedInstrument)) return false
+      }
 
-      // Genre filter
-      if (selectedGenre && !sample.genres?.includes(selectedGenre)) return false
+      // Genre filter — skip if it matches auto-extracted value
+      if (selectedGenre && selectedGenre !== autoExtracted.genre) {
+        if (!sample.genres?.includes(selectedGenre)) return false
+      }
 
-      // Keyword/Style filter
-      if (selectedKeyword && !sample.keywords?.includes(selectedKeyword)) return false
+      // Keyword/Style filter — skip if it matches auto-extracted value
+      if (selectedKeyword && selectedKeyword !== autoExtracted.keyword) {
+        if (!sample.keywords?.includes(selectedKeyword)) return false
+      }
 
-      // Key filter
-      if (selectedFilterKey && sample.key !== selectedFilterKey) return false
+      // Key filter — skip if it matches auto-extracted value
+      if (selectedFilterKey && selectedFilterKey !== autoExtracted.key) {
+        if (sample.key !== selectedFilterKey) return false
+      }
 
-      // Time Signature filter
-      if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
+      // Time Signature filter — skip if it matches auto-extracted value
+      if (selectedTimeSignature && selectedTimeSignature !== autoExtracted.timeSignature) {
+        if (sample.timeSignature !== selectedTimeSignature) return false
+      }
 
       // Legacy category filter (keep for backwards compatibility)
       if (selectedCategory !== "all") {
@@ -860,7 +886,7 @@ function ResultsContent() {
 
       return true
     })
-  }, [samples, searchFilter, selectedLoopType, selectedInstrument, selectedGenre, selectedKeyword, selectedFilterKey, selectedTimeSignature, selectedCategory])
+  }, [samples, searchFilter, selectedLoopType, selectedInstrument, selectedGenre, selectedKeyword, selectedFilterKey, selectedTimeSignature, selectedCategory, query])
 
   if (loading) {
     return (

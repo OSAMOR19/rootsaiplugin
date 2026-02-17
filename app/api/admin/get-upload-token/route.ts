@@ -3,7 +3,16 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
     try {
-        const { bucket, path } = await request.json()
+        let body: any = {}
+        try {
+            body = await request.json()
+        } catch {
+            return NextResponse.json(
+                { success: false, error: 'Invalid or empty request body' },
+                { status: 400 }
+            )
+        }
+        const { bucket, path } = body
 
         if (!bucket || !path) {
             return NextResponse.json(
