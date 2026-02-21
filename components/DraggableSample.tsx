@@ -194,6 +194,7 @@ export default function DraggableSample({
           // Load audio if URL is available or if it's the recent song with recorded buffer
           if (audioUrl) {
             ws.load(audioUrl).catch((error) => {
+              if (error?.name === 'AbortError') return // Ignore abort errors (React Strict Mode cleanup)
               console.error('Error loading audio:', error)
             })
           } else if (sample.isRecentSong && recordedAudioBuffer) {
@@ -324,7 +325,8 @@ export default function DraggableSample({
             }
           })
 
-          ws.on('error', (error) => {
+          ws.on('error', (error: any) => {
+            if (error?.name === 'AbortError' || (typeof error === 'string' && error.includes('AbortError'))) return
             console.error('WaveSurfer error:', error)
           })
 

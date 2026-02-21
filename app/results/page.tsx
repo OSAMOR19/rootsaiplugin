@@ -10,9 +10,9 @@ import { extractBPMFromString } from "@/lib/utils"
 import DragDropZone from "@/components/DragDropZone"
 import { Skeleton } from "@/components/ui/skeleton"
 import { mockSamples } from "@/lib/mockData"
-import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as updateRecordedVolume, setSampleVolume as updateSampleVolume } from "@/lib/syncEngine"
+import { blobToAudioBuffer, syncEngine, loadAudioBuffer, setRecordedVolume as updateRecordedVolume, setSampleVolume as updateSampleVolume, updateSyncTempo } from "@/lib/syncEngine"
 import { quickBPMDetection } from "@/lib/bpmDetection"
-import { shuffleArray, extractFiltersFromQuery } from "@/lib/searchUtils"
+import { shuffleArray } from "@/lib/searchUtils"
 import { getFavoritesCount } from "@/lib/favorites"
 import { useAudio } from "@/contexts/AudioContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -56,6 +56,7 @@ function ResultsContent() {
   const [editedBPM, setEditedBPM] = useState<number | null>(null) // User-edited BPM
   const [bpmInputValue, setBpmInputValue] = useState<string>("") // Temporary input value for typing
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [displayLimit, setDisplayLimit] = useState(20) // Cap displayed samples to prevent WaveSurfer overload
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [syncPlayingSampleId, setSyncPlayingSampleId] = useState<string | null>(null) // Track which sample is sync playing
 
@@ -330,10 +331,10 @@ function ResultsContent() {
         highestScore: sortedScores[0]?.score || 0
       })
 
-      // Sort by compatibility score and take top N
+      // Sort by compatibility score and return larger set for filtering
       const topLoops = scoredLoops
         .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
+        .filter((item: any) => item.score > 0) // Only include samples that actually matched
         .map((item: any, index: number) => {
           // ✅ Handle both 'filename' and 'fileName' fields
           const fileName = item.loop.filename || item.loop.name || 'Unknown'
@@ -350,7 +351,7 @@ function ResultsContent() {
 
           return {
             id: item.loop.id || `compatible-${index}`,
-            name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
+            name: fileName.replace(/^\d+_/, '').replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
             artist: item.loop.category || 'Compatible Match', // Use category if no artist
             category: item.loop.category || 'audio-analysis',
             bpm: bpm || originalBpm, // Use detected BPM if available, otherwise loop's own BPM
@@ -413,7 +414,7 @@ function ResultsContent() {
 
           // ✅ NEW: Load REAL compatible sounds from local library immediately!
           console.log('📞 Calling loadInitialCompatibleSounds with BPM:', universalBPM, 'Query:', query)
-          const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 10, query)
+          const initialCompatibleSounds = await loadInitialCompatibleSounds(universalBPM, detectedKey || 'C', 100, query)
 
           let finalSamples = [...initialCompatibleSounds]
 
@@ -433,7 +434,12 @@ function ResultsContent() {
               waveform: Array.from({ length: 50 }, () => Math.random() * 100),
               isRecentSong: true,
               originalBpm: universalBPM,
-              compatibilityScore: 100
+              compatibilityScore: 100,
+              drumType: '',
+              instruments: [],
+              genres: [],
+              keywords: [],
+              timeSignature: '4/4',
             }
             finalSamples = [recentSong, ...finalSamples]
             console.log('🎸 Added Your Audio card (Audio Mode)')
@@ -525,6 +531,11 @@ function ResultsContent() {
 
       // Also update recordedBPM so playback uses the new BPM
       setRecordedBPM(editedBPM)
+
+      // ✅ Update sync engine tempo in real-time if sync playback is active
+      if (syncPlayingSampleId) {
+        syncEngine.updateTempo(editedBPM)
+      }
     }
   }, [editedBPM])
 
@@ -794,7 +805,7 @@ function ResultsContent() {
 
         return {
           id: `additional-${Date.now()}-${index}`,
-          name: fileName.replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
+          name: fileName.replace(/^\d+_/, '').replace('Manifxtsounds - ', '').replace('Manifxtsounds___', '').replace('.wav', ''),
           artist: 'Audio Library Match',
           category: loop.category?.toLowerCase() || 'matching',
           bpm: universalBPMForAdditional, // Use detected BPM for display
@@ -829,64 +840,43 @@ function ResultsContent() {
     router.push("/")
   }
 
-  // Comprehensive filtering logic
+  // Comprehensive filtering logic — matches sounds page approach
   const filteredSamples = useMemo(() => {
-    // Determine which filters were auto-extracted from the query text
-    // so we can skip those (search scoring already handles them)
-    // but still apply any filters the user manually changed via dropdowns
-    let autoExtracted: Record<string, string> = {}
-    if (query) {
-      autoExtracted = extractFiltersFromQuery(query) as Record<string, string>
-    }
-
-    return samples.filter((sample) => {
+    return samples.filter(sample => {
       // Search filter (local text filter within results)
       if (searchFilter) {
-        const matchesSearch =
-          sample.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-          sample.artist?.toLowerCase().includes(searchFilter.toLowerCase())
-        if (!matchesSearch) return false
+        const q = searchFilter.toLowerCase()
+        const matchName = sample.name?.toLowerCase().includes(q)
+        const matchArtist = sample.artist?.toLowerCase().includes(q)
+        if (!matchName && !matchArtist) return false
       }
 
-      // Loop Type filter — skip if it matches auto-extracted value
-      if (selectedLoopType && selectedLoopType !== autoExtracted.loopType) {
-        if (sample.drumType !== selectedLoopType) return false
-      }
+      // Loop Type / Drum Type filter (case-insensitive, same as sounds page)
+      if (selectedLoopType && sample.drumType?.toLowerCase() !== selectedLoopType.toLowerCase()) return false
 
-      // Instrument filter — skip if it matches auto-extracted value
-      if (selectedInstrument && selectedInstrument !== autoExtracted.instrument) {
-        if (!sample.instruments?.includes(selectedInstrument)) return false
-      }
+      // Instrument filter
+      if (selectedInstrument && !sample.instruments?.some((i: string) => i.toLowerCase() === selectedInstrument.toLowerCase())) return false
 
-      // Genre filter — skip if it matches auto-extracted value
-      if (selectedGenre && selectedGenre !== autoExtracted.genre) {
-        if (!sample.genres?.includes(selectedGenre)) return false
-      }
+      // Genre filter
+      if (selectedGenre && !sample.genres?.some((g: string) => g.toLowerCase() === selectedGenre.toLowerCase())) return false
 
-      // Keyword/Style filter — skip if it matches auto-extracted value
-      if (selectedKeyword && selectedKeyword !== autoExtracted.keyword) {
-        if (!sample.keywords?.includes(selectedKeyword)) return false
-      }
+      // Keyword/Style filter (case-insensitive, same as sounds page)
+      if (selectedKeyword && !sample.keywords?.some((k: string) => k.toLowerCase() === selectedKeyword.toLowerCase())) return false
 
-      // Key filter — skip if it matches auto-extracted value
-      if (selectedFilterKey && selectedFilterKey !== autoExtracted.key) {
-        if (sample.key !== selectedFilterKey) return false
-      }
+      // Key filter
+      if (selectedFilterKey && sample.key !== selectedFilterKey) return false
 
-      // Time Signature filter — skip if it matches auto-extracted value
-      if (selectedTimeSignature && selectedTimeSignature !== autoExtracted.timeSignature) {
-        if (sample.timeSignature !== selectedTimeSignature) return false
-      }
+      // Time Signature filter
+      if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
 
-      // Legacy category filter (keep for backwards compatibility)
+      // Legacy category filter
       if (selectedCategory !== "all") {
-        const matchesCategory = sample.category === selectedCategory
-        if (!matchesCategory) return false
+        if (sample.category !== selectedCategory) return false
       }
 
       return true
     })
-  }, [samples, searchFilter, selectedLoopType, selectedInstrument, selectedGenre, selectedKeyword, selectedFilterKey, selectedTimeSignature, selectedCategory, query])
+  }, [samples, searchFilter, selectedLoopType, selectedInstrument, selectedGenre, selectedKeyword, selectedFilterKey, selectedTimeSignature, selectedCategory])
 
   if (loading) {
     return (
@@ -1365,8 +1355,15 @@ function ResultsContent() {
       {/* Sample List - Row Layout */}
       <div className="p-3 sm:p-4 lg:p-6">
 
+        {/* Results count */}
+        {filteredSamples.length > 0 && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Showing {Math.min(displayLimit, filteredSamples.length)} of {filteredSamples.length} results
+          </div>
+        )}
+
         <div className="space-y-2 sm:space-y-3">
-          {filteredSamples.map((sample, index) => (
+          {filteredSamples.slice(0, displayLimit).map((sample, index) => (
             <DraggableSample
               key={sample.id}
               sample={sample}
@@ -1384,6 +1381,18 @@ function ResultsContent() {
             />
           ))}
         </div>
+
+        {/* Load More button */}
+        {filteredSamples.length > displayLimit && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setDisplayLimit(prev => prev + 20)}
+              className="px-6 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 rounded-full text-sm font-medium transition-colors border border-green-500/20"
+            >
+              Load More ({filteredSamples.length - displayLimit} remaining)
+            </button>
+          </div>
+        )}
 
         {filteredSamples.length === 0 && !loading && (
           <motion.div className="text-center py-12" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

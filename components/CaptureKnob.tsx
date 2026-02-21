@@ -142,27 +142,26 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       setIsRecording(true)
       setRecordingProgress(0)
 
-      // Check if getDisplayMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        throw new Error('Screen sharing not supported in this browser')
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone access not supported in this browser')
       }
 
-      // ONLY capture internal audio - NO external sounds allowed
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: false, // We only want audio
+      // Capture external audio via microphone (standard web audio capture)
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-          sampleRate: 48000, // Higher sample rate
-          channelCount: 2, // Stereo
-          sampleSize: 16 // 16-bit depth
+          sampleRate: 48000,
+          channelCount: 2,
+          sampleSize: 16
         }
       })
 
-      console.log('Using INTERNAL audio capture only - No external sounds')
+      console.log('🎤 Using microphone audio capture')
 
-      // Verify this is internal audio (not microphone)
+      // Verify audio tracks
       const audioTracks = stream.getAudioTracks()
       if (audioTracks.length === 0) {
         throw new Error('No audio track available')
@@ -175,12 +174,6 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
         enabled: audioTrack.enabled
       })
 
-      // If it's a microphone track, reject it
-      if (audioTrack.label.toLowerCase().includes('microphone') ||
-        audioTrack.label.toLowerCase().includes('mic') ||
-        audioTrack.label.toLowerCase().includes('default')) {
-        throw new Error('Microphone detected - internal audio only')
-      }
       // Try different codecs for maximum quality
       let mediaRecorder: MediaRecorder
 
@@ -301,7 +294,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           }
         }
 
-        // Stop all tracks to release audio capture
+        // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop())
       }
 
@@ -334,19 +327,21 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
       }, 10000)
 
     } catch (error) {
-      console.error('Error accessing internal audio:', error)
+      console.error('Error accessing microphone:', error)
 
       let errorMessage = ''
       if (error instanceof Error) {
-        if (error.message.includes('Screen sharing not supported')) {
-          errorMessage = 'Screen sharing is not supported in your browser.\n\nPlease try:\n\n1. Use Chrome or Edge browser\n2. Make sure you\'re using HTTPS (https://)\n3. Update your browser to the latest version\n4. Try a different browser'
-        } else if (error.message.includes('NotSupportedError')) {
-          errorMessage = 'Screen sharing is not available.\n\nPlease try:\n\n1. Use Chrome or Edge browser\n2. Make sure you\'re using HTTPS (https://)\n3. Update your browser to the latest version\n4. Try a different browser'
+        if (error.message.includes('Microphone access not supported')) {
+          errorMessage = 'Microphone access is not supported in your browser.\n\nPlease try:\n\n1. Use Chrome, Edge, or Firefox\n2. Make sure you\'re using HTTPS (https://)\n3. Update your browser to the latest version'
+        } else if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
+          errorMessage = 'Microphone permission was denied.\n\nPlease:\n\n1. Click the microphone icon in your browser\'s address bar\n2. Allow microphone access for this site\n3. Refresh the page and try again'
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No microphone found.\n\nPlease:\n\n1. Connect a microphone or headset\n2. Check your audio settings\n3. Try again'
         } else {
-          errorMessage = 'Could not access INTERNAL audio only. Please:\n\n1. Make sure you select "Share audio" (not microphone)\n2. Choose "Entire screen" or "Application window" with audio\n3. Do NOT select microphone or external audio\n4. Refresh the page and try again\n\nThis will ONLY capture sounds playing on your laptop (like Spotify), not external sounds.'
+          errorMessage = 'Could not access microphone.\n\nPlease:\n\n1. Allow microphone permission when prompted\n2. Make sure a microphone is connected\n3. Check your browser\'s site permissions\n4. Refresh the page and try again'
         }
       } else {
-        errorMessage = 'Could not access INTERNAL audio only. Please:\n\n1. Make sure you select "Share audio" (not microphone)\n2. Choose "Entire screen" or "Application window" with audio\n3. Do NOT select microphone or external audio\n4. Refresh the page and try again\n\nThis will ONLY capture sounds playing on your laptop (like Spotify), not external sounds.'
+        errorMessage = 'Could not access microphone.\n\nPlease:\n\n1. Allow microphone permission when prompted\n2. Make sure a microphone is connected\n3. Check your browser\'s site permissions\n4. Refresh the page and try again'
       }
 
       alert(errorMessage)
@@ -852,7 +847,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
   // Status toast notifications
   useEffect(() => {
     if (isRecording) {
-      toast.info("Capturing INTERNAL audio only...", {
+      toast.info("🎤 Recording from microphone...", {
         duration: 2000,
         position: "bottom-left"
       })
@@ -1017,7 +1012,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                   : hasListened
                     ? `BPM DETECTED: ${recordedBPM ? recordedBPM : '...'} • SAMPLES READY • BPM DETECTED: ${recordedBPM ? recordedBPM : '...'} • SAMPLES READY • `
                     : isRecording
-                      ? "RECORDING • LISTENING TO INTERNAL AUDIO • RECORDING • "
+                      ? "RECORDING • LISTENING VIA MICROPHONE • RECORDING • "
                       : isProcessing
                         ? "ANALYZING AUDIO • PROCESSING • ANALYZING AUDIO • "
                         : isExtracting
@@ -1026,7 +1021,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
                             ? "BPM DETECTION • ANALYZING TEMPO • BPM DETECTION • "
                             : mode === 'upload'
                               ? "CLICK TO UPLOAD • CHOOSE AUDIO FILE • CLICK TO UPLOAD • "
-                              : "CLICK TO LISTEN • ANALYZE INTERNAL AUDIO • CLICK TO LISTEN • "}
+                              : "CLICK TO LISTEN • RECORD AUDIO • CLICK TO LISTEN • "}
               </textPath>
             </text>
           </svg>

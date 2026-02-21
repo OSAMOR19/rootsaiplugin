@@ -20,6 +20,63 @@ export interface SyncPlaybackOptions {
   sampleVolume?: number // Individual volume for sample audio (0.0 to 1.0)
 }
 
+/**
+ * Convert an AudioBuffer to a WAV Blob for use with HTMLMediaElement
+ * This enables pitch-preserving tempo changes via mediaElement.preservesPitch
+ */
+function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
+  const numChannels = buffer.numberOfChannels
+  const sampleRate = buffer.sampleRate
+  const length = buffer.length
+
+  // Interleave channels
+  const interleaved = new Float32Array(length * numChannels)
+  for (let ch = 0; ch < numChannels; ch++) {
+    const channelData = buffer.getChannelData(ch)
+    for (let i = 0; i < length; i++) {
+      interleaved[i * numChannels + ch] = channelData[i]
+    }
+  }
+
+  // WAV file structure
+  const dataLength = interleaved.length * 2 // 16-bit PCM
+  const headerLength = 44
+  const arrayBuffer = new ArrayBuffer(headerLength + dataLength)
+  const view = new DataView(arrayBuffer)
+
+  // Helper to write ASCII string
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i))
+    }
+  }
+
+  // WAV header
+  writeStr(0, 'RIFF')
+  view.setUint32(4, 36 + dataLength, true)
+  writeStr(8, 'WAVE')
+  writeStr(12, 'fmt ')
+  view.setUint32(16, 16, true)                    // subchunk1 size
+  view.setUint16(20, 1, true)                     // PCM format
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * numChannels * 2, true) // byte rate
+  view.setUint16(32, numChannels * 2, true)       // block align
+  view.setUint16(34, 16, true)                    // bits per sample
+  writeStr(36, 'data')
+  view.setUint32(40, dataLength, true)
+
+  // Convert float samples to 16-bit PCM
+  let offset = 44
+  for (let i = 0; i < interleaved.length; i++) {
+    const s = Math.max(-1, Math.min(1, interleaved[i]))
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+    offset += 2
+  }
+
+  return new Blob([arrayBuffer], { type: 'audio/wav' })
+}
+
 class AudioSyncEngine {
   private audioContext: AudioContext | null = null
   private masterGainNode: GainNode | null = null
@@ -27,6 +84,14 @@ class AudioSyncEngine {
   private currentRecordedGainNode: GainNode | null = null
   private currentSampleGainNode: GainNode | null = null
   private isLooping: boolean = false
+  // Track active sources and BPM for real-time tempo updates
+  private currentSampleSource: AudioBufferSourceNode | null = null
+  private currentAudioElement: HTMLAudioElement | null = null
+  private currentBlobUrl: string | null = null
+  private currentMediaSource: MediaElementAudioSourceNode | null = null
+  private currentRecordedBPM: number = 0
+  private currentSampleBPM: number = 0
+  private originalRecordedBPM: number = 0 // The BPM detected when syncPlay was first called
 
   constructor() {
     this.initializeAudioContext()
@@ -371,9 +436,10 @@ class AudioSyncEngine {
    * Stop all currently playing audio
    */
   stopAll(): void {
-    // ✅ Stop looping first
+    // Stop looping first
     this.isLooping = false
 
+    // Stop AudioBufferSourceNodes (sample)
     this.activeSources.forEach(source => {
       try {
         source.stop()
@@ -382,9 +448,27 @@ class AudioSyncEngine {
       }
     })
     this.activeSources = []
-    // Clear gain node references
+
+    // Stop HTMLMediaElement (recorded audio with preservesPitch)
+    if (this.currentAudioElement) {
+      this.currentAudioElement.pause()
+      this.currentAudioElement.removeAttribute('src')
+      this.currentAudioElement.load()
+      this.currentAudioElement = null
+    }
+    if (this.currentMediaSource) {
+      try { this.currentMediaSource.disconnect() } catch (e) { /* already disconnected */ }
+      this.currentMediaSource = null
+    }
+    if (this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl)
+      this.currentBlobUrl = null
+    }
+
+    // Clear all references
     this.currentRecordedGainNode = null
     this.currentSampleGainNode = null
+    this.currentSampleSource = null
   }
 
   /**
@@ -432,7 +516,7 @@ class AudioSyncEngine {
     sampleBuffer: AudioBuffer,
     sampleBPM: number,
     options: SyncPlaybackOptions = {}
-  ): Promise<{ recordedSource: AudioBufferSourceNode; sampleSource: AudioBufferSourceNode; recordedGainNode: GainNode; sampleGainNode: GainNode }> {
+  ): Promise<{ recordedGainNode: GainNode; sampleGainNode: GainNode }> {
     const audioContext = await this.ensureAudioContext()
     const {
       startTime = 0,
@@ -449,28 +533,17 @@ class AudioSyncEngine {
     }
     const recordedBPM = options.recordedBPM
 
-    // Find the target BPM - use the recorded audio's BPM as the master
-    const targetBPM = recordedBPM
-
-    // ✅ FIXED: Calculate the playback rate for the sample
+    // Calculate the playback rate for the sample to match the recorded audio's tempo
     const samplePlaybackRate = recordedBPM / sampleBPM
-
-    // ✅ FIXED: Calculate the master duration (captured audio duration is the reference)
-    const masterDuration = recordedBuffer.duration
-
-    // ✅ Calculate how long the sample will take at the adjusted playback rate
-    const adjustedSampleDuration = sampleBuffer.duration / samplePlaybackRate
 
     console.log('Perfect Sync Analysis:', {
       recordedBPM: recordedBPM,
       sampleBPM: sampleBPM,
-      targetBPM: targetBPM,
       recordedDuration: recordedBuffer.duration.toFixed(2) + 's',
       sampleDuration: sampleBuffer.duration.toFixed(2) + 's',
       samplePlaybackRate: samplePlaybackRate.toFixed(3),
-      adjustedSampleDuration: adjustedSampleDuration.toFixed(2) + 's',
       loopEnabled: loop,
-      masterDuration: masterDuration.toFixed(2) + 's (captured audio controls duration)'
+      pitchPreserved: 'YES - using HTMLMediaElement.preservesPitch for recorded audio'
     })
 
     // Stop any currently playing audio
@@ -492,117 +565,75 @@ class AudioSyncEngine {
     this.currentRecordedGainNode = recordedGain
     this.currentSampleGainNode = sampleGain
 
+    // Store BPM values for real-time tempo updates
+    this.currentRecordedBPM = recordedBPM
+    this.currentSampleBPM = sampleBPM
+    this.originalRecordedBPM = recordedBPM
+
+    // =====================================================
+    // RECORDED AUDIO: Use HTMLMediaElement with preservesPitch
+    // This allows tempo changes WITHOUT pitch/key changes
+    // =====================================================
+    const wavBlob = audioBufferToWavBlob(recordedBuffer)
+    const blobUrl = URL.createObjectURL(wavBlob)
+    this.currentBlobUrl = blobUrl
+
+    const audioElement = new Audio(blobUrl)
+    audioElement.preservesPitch = true
+      ; (audioElement as any).mozPreservesPitch = true   // Firefox
+      ; (audioElement as any).webkitPreservesPitch = true // Safari/older Chrome
+    audioElement.loop = loop
+    audioElement.playbackRate = 1.0 // Start at natural speed
+    this.currentAudioElement = audioElement
+
+    // Connect Audio element to Web Audio graph for gain control
+    const mediaSource = audioContext.createMediaElementSource(audioElement)
+    mediaSource.connect(recordedGain)
+    this.currentMediaSource = mediaSource
+
+    // =====================================================
+    // SAMPLE AUDIO: Use AudioBufferSourceNode (pitch shift for matching is expected)
+    // =====================================================
+    const sampleSource = audioContext.createBufferSource()
+    sampleSource.buffer = sampleBuffer
+    sampleSource.playbackRate.value = samplePlaybackRate
+    sampleSource.loop = true // Loop sample continuously
+    sampleSource.connect(sampleGain)
+    this.currentSampleSource = sampleSource
+
+    // Track sample source for cleanup
+    this.activeSources.push(sampleSource)
+    this.isLooping = loop
+
     console.log('Volume Settings:', {
       recordedVolume: `Recorded: ${(volume * recordedVolume).toFixed(2)}`,
       sampleVolume: `Sample: ${(volume * sampleVolume).toFixed(2)}`,
       totalVolume: `Master: ${volume.toFixed(2)}`
     })
 
-    // ✅ NEW: Function to create and start synced audio sources
-    const createSyncedSources = () => {
-      const recordedSource = audioContext.createBufferSource()
-      const sampleSource = audioContext.createBufferSource()
-
-      recordedSource.buffer = recordedBuffer
-      sampleSource.buffer = sampleBuffer
-
-      // Apply playback rate to sample (recorded stays at 1.0)
-      recordedSource.playbackRate.value = 1.0
-      sampleSource.playbackRate.value = samplePlaybackRate
-
-      // Connect to gain nodes
-      recordedSource.connect(recordedGain)
-      sampleSource.connect(sampleGain)
-
-      return { recordedSource, sampleSource }
-    }
-
-    // Create initial sources
-    let { recordedSource, sampleSource } = createSyncedSources()
-
-    // ✅ FIXED: If looping is enabled, schedule the next loop when the recorded audio ends
-    if (loop) {
-      this.isLooping = true
-
-      const scheduleNextLoop = () => {
-        // Stop previous sources from activeSources list
-        this.activeSources = this.activeSources.filter(s => s !== recordedSource && s !== sampleSource)
-
-        // Check if we should continue looping (isLooping is set to false by stopAll)
-        if (this.isLooping && this.currentRecordedGainNode === recordedGain) {
-          console.log('🔁 Looping sync playback...')
-
-          // Create new sources for next loop
-          const newSources = createSyncedSources()
-          recordedSource = newSources.recordedSource
-          sampleSource = newSources.sampleSource
-
-          // Track new active sources
-          this.activeSources.push(recordedSource, sampleSource)
-
-          // Schedule next loop based on master duration (recorded audio)
-          recordedSource.onended = scheduleNextLoop
-
-          // Start both sources immediately
-          const now = audioContext.currentTime
-          recordedSource.start(now)
-          // ✅ Stop sample when recorded audio ends (respects captured audio duration)
-          sampleSource.start(now, 0, masterDuration * samplePlaybackRate)
-        }
-      }
-
-      // Set up the loop callback on the recorded source
-      recordedSource.onended = scheduleNextLoop
-    } else {
-      // No looping - just clean up when finished
-      const cleanup = () => {
-        const recordedIndex = this.activeSources.indexOf(recordedSource)
-        const sampleIndex = this.activeSources.indexOf(sampleSource)
-
-        if (recordedIndex > -1) this.activeSources.splice(recordedIndex, 1)
-        if (sampleIndex > -1) this.activeSources.splice(sampleIndex, 1)
-      }
-
-      recordedSource.onended = cleanup
-      sampleSource.onended = cleanup
-    }
-
-    // Track active sources
-    this.activeSources.push(recordedSource, sampleSource)
-
-    // Start both sources at the same time
-    const startTimeOffset = audioContext.currentTime + startTime
-
-    console.log('Starting audio sources...', {
-      recordedBufferExists: !!recordedSource.buffer,
-      sampleBufferExists: !!sampleSource.buffer,
-      audioContextState: audioContext.state,
-      currentTime: audioContext.currentTime
+    // Start both sources together
+    // Small delay to ensure Audio element is ready
+    await new Promise<void>((resolve, reject) => {
+      audioElement.addEventListener('canplaythrough', () => resolve(), { once: true })
+      audioElement.addEventListener('error', (e) => reject(new Error('Failed to load recorded audio: ' + e.message)), { once: true })
+      // Fallback if already loaded
+      if (audioElement.readyState >= 4) resolve()
     })
 
-    // ✅ FIXED: Start recorded source (plays full duration)
-    recordedSource.start(startTimeOffset)
-
-    // ✅ FIXED: Start sample, but stop it when recorded audio ends
-    // Use the duration parameter to limit sample playback to match recorded audio
-    // The sample plays for (masterDuration * samplePlaybackRate) seconds at samplePlaybackRate speed
-    // This means it will effectively play for masterDuration seconds of "perceived" time
-    sampleSource.start(startTimeOffset, 0, masterDuration * samplePlaybackRate)
-
-    console.log('Audio sources started successfully!')
+    // Start both at the same time
+    const now = audioContext.currentTime + startTime
+    sampleSource.start(now)
+    audioElement.play()
 
     console.log('Perfect Sync Playback Started:', {
-      recordedPlaybackRate: '1.0',
+      recordedPlaybackRate: '1.0 (preservesPitch enabled)',
       samplePlaybackRate: samplePlaybackRate.toFixed(3),
-      targetBPM: targetBPM,
-      startTimeOffset: startTimeOffset.toFixed(3),
-      sampleStopsAt: (masterDuration).toFixed(2) + 's (matching captured audio)',
-      looping: loop
+      targetBPM: recordedBPM,
+      looping: loop,
+      pitchPreserved: true
     })
 
     return {
-      recordedSource,
-      sampleSource,
       recordedGainNode: recordedGain,
       sampleGainNode: sampleGain
     }
@@ -645,6 +676,35 @@ class AudioSyncEngine {
   }
 
   /**
+   * Update tempo in real-time during sync playback
+   * Recorded audio uses HTMLMediaElement.preservesPitch - tempo changes WITHOUT pitch/key changes
+   * Sample uses AudioBufferSourceNode - slight pitch shift is expected for BPM matching
+   */
+  updateTempo(newBPM: number): void {
+    if (!this.currentSampleSource || !this.currentSampleBPM || !this.originalRecordedBPM) {
+      console.warn('⚠️ Cannot update tempo - no active sync playback')
+      return
+    }
+
+    // Calculate new playback rates
+    const recordedRate = newBPM / this.originalRecordedBPM
+    const sampleRate = newBPM / this.currentSampleBPM
+
+    // Update recorded audio via HTMLMediaElement (pitch preserved!)
+    if (this.currentAudioElement) {
+      this.currentAudioElement.playbackRate = recordedRate
+    }
+
+    // Update sample via AudioBufferSourceNode
+    this.currentSampleSource.playbackRate.value = sampleRate
+
+    // Store the new BPM for future reference
+    this.currentRecordedBPM = newBPM
+
+    console.log(`🎛️ Tempo updated to ${newBPM} BPM (recorded: ${recordedRate.toFixed(3)}x [PITCH PRESERVED], sample: ${sampleRate.toFixed(3)}x)`)
+  }
+
+  /**
    * Dispose of audio context
    */
   dispose(): void {
@@ -673,3 +733,4 @@ export const stopAll = () => syncEngine.stopAll()
 export const setMasterVolume = (volume: number) => syncEngine.setMasterVolume(volume)
 export const setRecordedVolume = (volume: number) => syncEngine.setRecordedVolume(volume)
 export const setSampleVolume = (volume: number) => syncEngine.setSampleVolume(volume)
+export const updateSyncTempo = (newBPM: number) => syncEngine.updateTempo(newBPM)
