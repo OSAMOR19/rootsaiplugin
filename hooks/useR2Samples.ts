@@ -37,7 +37,7 @@ export interface UploadResult {
  * @returns Files, loading state, and utility functions
  */
 export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesResult {
-  const { prefix, maxKeys = 1000, autoFetch = true } = options;
+  const { prefix, maxKeys = 5000, autoFetch = true } = options;
 
   const [files, setFiles] = useState<R2FileInfo[]>([]);
   const [count, setCount] = useState<number>(0);
@@ -57,7 +57,7 @@ export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesRes
       if (maxKeys) params.append('maxKeys', maxKeys.toString());
 
       const response = await fetch(`/api/samples/list?${params.toString()}`);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch files: ${response.statusText}`);
       }

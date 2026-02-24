@@ -30,7 +30,6 @@ const r2Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
-  signatureVersion: 'v4',
   forcePathStyle: true, // Required for R2
 });
 
@@ -155,30 +154,54 @@ export async function getPresignedUrl(
 }
 
 /**
- * List all files in the R2 bucket
+ * List all files in the R2 bucket, automatically paginating through all results.
+ * R2 (like S3) returns at most 1000 items per request — this function follows
+ * ContinuationToken to fetch every page until all objects are returned.
+ *
  * @param prefix - Optional prefix to filter files
- * @param maxKeys - Maximum number of files to return (default: 1000)
+ * @param maxKeys - Maximum total files to return (default: 10000, max safe value)
  * @returns List of files with metadata
  */
 export async function listFiles(
   prefix?: string,
-  maxKeys: number = 1000
+  maxKeys: number = 10000
 ): Promise<ListFilesResult> {
   try {
-    const command = new ListObjectsV2Command({
-      Bucket: BUCKET_NAME,
-      Prefix: prefix,
-      MaxKeys: maxKeys,
-    });
+    const allFiles: FileInfo[] = [];
+    let continuationToken: string | undefined;
+    // R2/S3 caps each response at 1000 objects — paginate until we have everything
+    const pageSize = Math.min(1000, maxKeys);
 
-    const response = await r2Client.send(command);
+    while (true) {
+      const cmd = new ListObjectsV2Command({
+        Bucket: BUCKET_NAME,
+        Prefix: prefix,
+        MaxKeys: pageSize,
+        ContinuationToken: continuationToken,
+      });
 
-    const files: FileInfo[] = (response.Contents || []).map((item) => ({
-      key: item.Key!,
-      size: item.Size || 0,
-      lastModified: item.LastModified || new Date(),
-      url: getPublicFileUrl(item.Key!),
-    }));
+      // eslint-disable-next-line no-await-in-loop
+      const page = await r2Client.send(cmd) as import('@aws-sdk/client-s3').ListObjectsV2CommandOutput;
+
+      const pageFiles: FileInfo[] = (page.Contents || []).map((item) => ({
+        key: item.Key!,
+        size: item.Size || 0,
+        lastModified: item.LastModified || new Date(),
+        url: getPublicFileUrl(item.Key!),
+      }));
+
+      allFiles.push(...pageFiles);
+
+      // Stop if there are no more pages or we've reached the requested limit
+      if (!page.IsTruncated || allFiles.length >= maxKeys) {
+        break;
+      }
+
+      continuationToken = page.NextContinuationToken;
+    }
+
+    // Trim to maxKeys if we somehow over-fetched
+    const files = allFiles.slice(0, maxKeys);
 
     return {
       success: true,

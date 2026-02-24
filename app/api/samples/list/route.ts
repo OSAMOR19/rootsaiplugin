@@ -6,14 +6,14 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const prefix = searchParams.get('prefix') || undefined;
-    const maxKeys = parseInt(searchParams.get('maxKeys') || '1000', 10);
+    const maxKeys = parseInt(searchParams.get('maxKeys') || '5000', 10);
 
-    // Validate maxKeys
-    if (isNaN(maxKeys) || maxKeys < 1 || maxKeys > 1000) {
+    // Validate maxKeys — allow up to 10,000 to support large sample libraries
+    if (isNaN(maxKeys) || maxKeys < 1 || maxKeys > 10000) {
       return NextResponse.json(
         {
           success: false,
-          error: 'maxKeys must be between 1 and 1000',
+          error: 'maxKeys must be between 1 and 10000',
         },
         { status: 400 }
       );
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('List files error:', error);
-    
+
     return NextResponse.json(
       {
         success: false,
