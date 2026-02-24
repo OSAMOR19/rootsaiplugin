@@ -68,9 +68,28 @@ export async function POST(request: NextRequest) {
         })
 
         if (processedSamples.length > 0) {
+            // Filter out samples where the audio upload failed (null audio_url)
+            // These would create invisible ghost rows that can never be played
+            const validSamples = processedSamples.filter((s: any) => {
+                if (!s.audio_url) {
+                    console.warn(`[API] Skipping sample "${s.name}" — audio_url is null (upload may have failed)`)
+                    return false
+                }
+                return true
+            })
+
+            if (validSamples.length === 0) {
+                // Rollback pack if no valid samples
+                await supabaseAdmin.from('packs').delete().eq('id', packData.id)
+                return NextResponse.json(
+                    { success: false, error: 'All sample uploads failed — no audio files were saved. Please try again.' },
+                    { status: 422 }
+                )
+            }
+
             const { error: samplesError } = await supabaseAdmin
                 .from('samples')
-                .insert(processedSamples)
+                .insert(validSamples)
 
             if (samplesError) {
                 // Rollback: delete the pack we just created to prevent orphan data

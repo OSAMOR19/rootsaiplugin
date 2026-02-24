@@ -52,7 +52,11 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
     setLoading(true)
     setError(null)
     try {
-      let query = supabase.from('samples').select('*').order('created_at', { ascending: false })
+      let query = supabase
+        .from('samples')
+        .select('*')
+        .not('audio_url', 'is', null)   // Exclude ghost rows with no audio upload
+        .order('created_at', { ascending: false })
 
       // Optional category filter at database level
       if (category) {

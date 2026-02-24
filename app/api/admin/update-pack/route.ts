@@ -74,13 +74,35 @@ export async function POST(request: Request) {
         }
 
         // 4. Update Existing & Insert New Samples
-        const samplesToUpsert = samples.map((sample: any) => {
-            const isNew = sample.id && sample.id.toString().startsWith('new-')
+        // Build a lookup for existing sample filenames so we don't regenerate them on every save
+        // — regenerating causes a UNIQUE constraint violation on the filename column.
+        const existingFilenameById: Record<string, string> = {}
+        for (const s of (existingSamples || [])) {
+            if (s.id && s.filename) {
+                existingFilenameById[s.id] = s.filename
+            }
+        }
 
-            // Generate unique filename with timestamp to prevent constraint violations
-            const timestamp = Date.now()
-            const baseFilename = sample.fileName || sample.name
-            const uniqueFilename = `${timestamp}_${baseFilename}`
+        const samplesToUpsert = samples.map((sample: any) => {
+            const isNew = !sample.id || sample.id.toString().startsWith('new-')
+
+            // For NEW samples: generate a unique timestamped filename
+            // For EXISTING samples: reuse the filename already in the DB to avoid UNIQUE constraint violations
+            let filename: string
+            if (isNew) {
+                const timestamp = Date.now() + Math.floor(Math.random() * 1000)
+                const baseFilename = sample.fileName || sample.name || 'sample'
+                filename = `${timestamp}_${baseFilename}`
+            } else {
+                // Preserve the existing filename from DB — only generate a new one if there genuinely isn't one
+                filename = existingFilenameById[sample.id] || `${Date.now()}_${sample.fileName || sample.name || 'sample'}`
+            }
+
+            // Skip samples with no audio URL — they'd be invisible to users anyway
+            if (!sample.audio_url) {
+                console.warn(`[API] Sample "${sample.name}" has no audio_url — skipping to prevent invisible entry`)
+                return null
+            }
 
             return {
                 id: isNew ? undefined : sample.id,
@@ -98,9 +120,9 @@ export async function POST(request: Request) {
                 image_url: packDetails.cover_image || sample.image_url,
                 duration: sample.duration || '0:00',
                 stems: sample.stems || [],
-                filename: uniqueFilename
+                filename
             }
-        })
+        }).filter(Boolean) // Remove null entries (skipped samples)
 
         console.log(`[API] Upserting ${samplesToUpsert.length} samples`)
 
