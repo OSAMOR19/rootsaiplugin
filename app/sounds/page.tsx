@@ -142,8 +142,21 @@ export default function SoundsPage() {
                     </button>
                     <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Sounds</h1>
                     <p className="text-gray-600 dark:text-white/60">
-                        {filteredSamples.length} results
-                        {loading && <span className="ml-2 animate-pulse">Loading...</span>}
+                        {loading
+                            ? <span className="animate-pulse">Loading...</span>
+                            : <>
+                                <span className="font-semibold text-gray-900 dark:text-white">{filteredSamples.length.toLocaleString()}</span>
+                                {filteredSamples.length !== samples.length && (
+                                    <span className="text-gray-500 dark:text-white/40"> of {samples.length.toLocaleString()}</span>
+                                )}
+                                <span className="ml-1">samples</span>
+                                {samples.filter(s => !s.audioUrl).length > 0 && (
+                                    <span className="ml-3 text-xs text-amber-500 dark:text-amber-400">
+                                        ⚠ {samples.filter(s => !s.audioUrl).length} missing audio
+                                    </span>
+                                )}
+                            </>
+                        }
                     </p>
                 </div>
             </div>

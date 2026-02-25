@@ -52,46 +52,64 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
     setLoading(true)
     setError(null)
     try {
-      let query = supabase
-        .from('samples')
-        .select('*')
-        .not('audio_url', 'is', null)   // Exclude ghost rows with no audio upload
-        .order('created_at', { ascending: false })
+      // Supabase silently caps queries at 1,000 rows.
+      // We paginate in batches of 1,000 until we get a partial page (= end of data).
+      const PAGE_SIZE = 1000
+      let allData: any[] = []
+      let from = 0
+      let keepFetching = true
 
-      // Optional category filter at database level
-      if (category) {
-        query = query.eq('category', category)
+      while (keepFetching) {
+        let query = supabase
+          .from('samples')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+
+        // Optional category filter
+        if (category) {
+          query = query.eq('category', category)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          allData = allData.concat(data)
+        }
+
+        // If we got fewer rows than PAGE_SIZE, we've reached the end
+        if (!data || data.length < PAGE_SIZE) {
+          keepFetching = false
+        } else {
+          from += PAGE_SIZE
+        }
       }
 
-      const { data, error } = await query
+      const mappedSamples: Sample[] = allData.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        filename: s.filename,
+        bpm: s.bpm,
+        key: s.key,
+        category: s.category,
+        audioUrl: s.audio_url,
+        url: s.audio_url, // Alias for legacy support
+        imageUrl: s.image_url,
+        duration: s.duration,
+        timeSignature: s.time_signature,
+        uploadedAt: s.created_at,
+        featured: s.is_featured,
+        genres: s.genres || [],
+        instruments: s.instruments || [],
+        drumType: s.drum_type,
+        keywords: s.keywords || [],
+        storage: 'supabase',
+        moodTag: s.mood_tag || s.mood,
+        stems: s.stems || []
+      }))
 
-      if (error) throw error
-
-      if (data) {
-        const mappedSamples: Sample[] = data.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          filename: s.filename,
-          bpm: s.bpm,
-          key: s.key,
-          category: s.category,
-          audioUrl: s.audio_url,
-          url: s.audio_url, // Alias for legacy support
-          imageUrl: s.image_url,
-          duration: s.duration,
-          timeSignature: s.time_signature,
-          uploadedAt: s.created_at,
-          featured: s.is_featured,
-          genres: s.genres || [],
-          instruments: s.instruments || [],
-          drumType: s.drum_type,
-          keywords: s.keywords || [],
-          storage: 'supabase', // Mark as supabase source
-          moodTag: s.mood_tag || s.mood, // Try to find mood tag
-          stems: s.stems || []
-        }))
-        setSamples(mappedSamples)
-      }
+      setSamples(mappedSamples)
     } catch (err) {
       console.error("Failed to fetch samples:", err)
       setError(err instanceof Error ? err.message : "Failed to fetch samples")
