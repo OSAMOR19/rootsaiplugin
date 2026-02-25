@@ -7,7 +7,13 @@ import Link from "next/link"
 import Image from "next/image"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 
-const CAROUSEL_IMAGES = ["/images/slideshow1.png", "/images/slideshow2.png", "/images/slideshow3.png"]
+const CAROUSEL_IMAGES = [
+    "/images/RiddimsV4Artwork.jpeg",
+    "/images/RIDDIMSV5Artwork.png",
+    "/images/RIDDIMSV7Artwork.png",
+    "/images/RIDDIMSV8Artwork.png",
+    "/images/RIDDIMSV9Artwork.png",
+]
 
 // Google Logo SVG Component
 const GoogleIcon = () => (
@@ -59,44 +65,39 @@ export default function LoginPage() {
             <div className="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="flex flex-col lg:flex-row">
                     {/* Left Side - Image Carousel */}
-                    <div className="hidden lg:flex lg:w-1/2 bg-gray-50 dark:bg-gray-900 relative overflow-hidden p-6">
-                        {/* Carousel Content - Images Only with Glassmorphism */}
-                        <div className="relative z-10 flex flex-col items-center justify-center w-full">
-                            <AnimatePresence mode="wait">
-                                <motion.div
-                                    key={currentSlide}
-                                    className="w-full h-full flex flex-col items-center justify-center"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.5 }}
-                                >
-                                    {/* Slideshow Image with Glassmorphism Padding */}
-                                    <div className="mb-6 rounded-2xl p-2 bg-white/40 dark:bg-white/10 backdrop-blur-lg shadow-2xl max-w-2xl w-full border border-white/20">
-                                        <Image
-                                            src={CAROUSEL_IMAGES[currentSlide]}
-                                            alt="ROOTS Feature"
-                                            width={600}
-                                            height={400}
-                                            className="w-full h-auto object-cover rounded-xl"
-                                        />
-                                    </div>
+                    <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+                        {/* Carousel — full bleed, no padding */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentSlide}
+                                className="absolute inset-0"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.5 }}
+                            >
+                                <Image
+                                    src={CAROUSEL_IMAGES[currentSlide]}
+                                    alt="ROOTS Feature"
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                />
+                            </motion.div>
+                        </AnimatePresence>
 
-                                    {/* Carousel Dots */}
-                                    <div className="flex justify-center space-x-2">
-                                        {CAROUSEL_IMAGES.map((_, index) => (
-                                            <button
-                                                key={index}
-                                                onClick={() => setCurrentSlide(index)}
-                                                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentSlide
-                                                    ? "bg-green-600 w-8"
-                                                    : "bg-gray-400 dark:bg-gray-600 hover:bg-gray-600 dark:hover:bg-gray-500"
-                                                    }`}
-                                            />
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            </AnimatePresence>
+                        {/* Carousel Dots — overlaid at bottom */}
+                        <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 z-10">
+                            {CAROUSEL_IMAGES.map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentSlide(index)}
+                                    className={`h-2 rounded-full transition-all duration-300 ${index === currentSlide
+                                        ? "bg-white w-8"
+                                        : "bg-white/50 w-2 hover:bg-white/80"
+                                        }`}
+                                />
+                            ))}
                         </div>
                     </div>
 

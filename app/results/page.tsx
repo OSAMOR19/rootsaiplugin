@@ -1113,8 +1113,9 @@ function ResultsContent() {
       </motion.header>
 
       {/* Filter Navigation Bar - Sticky */}
+      {/* Commented out — no longer needed */}
+      {/*
       <div className="sticky top-[72px] z-30 bg-white/90 dark:bg-black/90 backdrop-blur-md pb-4 pt-4 px-6 border-b border-gray-200 dark:border-white/10 space-y-4">
-        {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-white/40" />
           <input
@@ -1125,102 +1126,30 @@ function ResultsContent() {
             className="w-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg pl-10 pr-4 py-2 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:outline-none focus:border-green-500 dark:focus:border-white/30 transition-colors"
           />
         </div>
-
-        {/* Filter Dropdowns */}
         <div className="flex flex-wrap gap-2">
-          <FilterSelect
-            label="Loop Type"
-            value={selectedLoopType}
-            onChange={setSelectedLoopType}
-            options={DRUM_TYPE_OPTIONS}
-          />
-          <FilterSelect
-            label="African Instruments"
-            value={selectedInstrument}
-            onChange={setSelectedInstrument}
-            options={INSTRUMENT_OPTIONS}
-          />
-          <FilterSelect
-            label="Genres"
-            value={selectedGenre}
-            onChange={setSelectedGenre}
-            options={GENRE_OPTIONS}
-          />
-          <FilterSelect
-            label="Styles"
-            value={selectedKeyword}
-            onChange={setSelectedKeyword}
-            options={KEYWORD_OPTIONS}
-          />
-          <FilterSelect
-            label="Key"
-            value={selectedFilterKey}
-            onChange={setSelectedFilterKey}
-            options={KEY_OPTIONS}
-          />
-          <FilterSelect
-            label="Time Sig"
-            value={selectedTimeSignature}
-            onChange={setSelectedTimeSignature}
-            options={['4/4', '3/4', '6/8', '5/4', '7/8']}
-          />
-
-          {/* Reset Button */}
+          <FilterSelect label="Loop Type" value={selectedLoopType} onChange={setSelectedLoopType} options={DRUM_TYPE_OPTIONS} />
+          <FilterSelect label="African Instruments" value={selectedInstrument} onChange={setSelectedInstrument} options={INSTRUMENT_OPTIONS} />
+          <FilterSelect label="Genres" value={selectedGenre} onChange={setSelectedGenre} options={GENRE_OPTIONS} />
+          <FilterSelect label="Styles" value={selectedKeyword} onChange={setSelectedKeyword} options={KEYWORD_OPTIONS} />
+          <FilterSelect label="Key" value={selectedFilterKey} onChange={setSelectedFilterKey} options={KEY_OPTIONS} />
+          <FilterSelect label="Time Sig" value={selectedTimeSignature} onChange={setSelectedTimeSignature} options={['4/4', '3/4', '6/8', '5/4', '7/8']} />
           {(selectedLoopType || selectedInstrument || selectedGenre || selectedKeyword || selectedFilterKey || selectedTimeSignature || searchFilter) && (
-            <button
-              onClick={() => {
-                setSearchFilter("")
-                setSelectedLoopType("")
-                setSelectedInstrument("")
-                setSelectedGenre("")
-                setSelectedKeyword("")
-                setSelectedFilterKey("")
-                setSelectedTimeSignature("")
-              }}
-              className="px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-            >
-              Reset Filters
-            </button>
+            <button onClick={() => { setSearchFilter(""); setSelectedLoopType(""); setSelectedInstrument(""); setSelectedGenre(""); setSelectedKeyword(""); setSelectedFilterKey(""); setSelectedTimeSignature(""); }} className="px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors">Reset Filters</button>
           )}
         </div>
-
-        {/* Active Filter Tags */}
         {(selectedLoopType || selectedInstrument || selectedGenre || selectedKeyword || selectedFilterKey || selectedTimeSignature) && (
           <div className="flex flex-wrap gap-2 pt-2">
             <span className="text-xs text-gray-500 dark:text-white/40">Active filters:</span>
-            {selectedLoopType && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs">
-                {selectedLoopType}
-              </span>
-            )}
-            {selectedInstrument && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded text-xs">
-                {selectedInstrument}
-              </span>
-            )}
-            {selectedGenre && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded text-xs">
-                {selectedGenre}
-              </span>
-            )}
-            {selectedKeyword && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded text-xs">
-                {selectedKeyword}
-              </span>
-            )}
-            {selectedFilterKey && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 rounded text-xs">
-                {selectedFilterKey}
-              </span>
-            )}
-            {selectedTimeSignature && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded text-xs">
-                {selectedTimeSignature}
-              </span>
-            )}
+            {selectedLoopType && <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400 rounded text-xs">{selectedLoopType}</span>}
+            {selectedInstrument && <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded text-xs">{selectedInstrument}</span>}
+            {selectedGenre && <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded text-xs">{selectedGenre}</span>}
+            {selectedKeyword && <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded text-xs">{selectedKeyword}</span>}
+            {selectedFilterKey && <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 rounded text-xs">{selectedFilterKey}</span>}
+            {selectedTimeSignature && <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded text-xs">{selectedTimeSignature}</span>}
           </div>
         )}
       </div>
+      */}
 
       {/* Mobile Volume Controls - Show only when sync playing */}
       {syncPlayingSampleId && (
@@ -1333,7 +1262,8 @@ function ResultsContent() {
           </motion.div>
         )}
 
-        {/* View More Button - Only show for AI-matched results or text search results */}
+        {/* View More Button - Commented out, using Load More button instead */}
+        {/*
         {(recommendationsParam || query) && filteredSamples.length > 0 && (
           <motion.div
             className="flex justify-center mt-8 mb-6"
@@ -1365,6 +1295,7 @@ function ResultsContent() {
             </motion.button>
           </motion.div>
         )}
+        */}
       </div>
 
       {/* Drag Drop Instructions */}
