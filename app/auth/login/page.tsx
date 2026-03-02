@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 const CAROUSEL_IMAGES = [
     "/images/RiddimsV4Artwork.jpeg",
@@ -28,6 +29,9 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectTo = searchParams.get("redirect") || "/"
+
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
@@ -47,26 +51,32 @@ export default function LoginPage() {
         e.preventDefault()
         setError("")
         setIsLoading(true)
-
-        // TODO: Implement Supabase auth login
-        setTimeout(() => {
+        try {
+            const { error } = await supabase.auth.signInWithPassword({ email, password })
+            if (error) throw error
+            router.push(redirectTo)
+        } catch (err: any) {
+            setError(err.message || "Invalid email or password")
+        } finally {
             setIsLoading(false)
-            router.push("/")
-        }, 1000)
+        }
     }
 
     const handleGoogleLogin = async () => {
-        // TODO: Implement Supabase Google OAuth
-        console.log("Google login")
+        setError("")
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: `${window.location.origin}${redirectTo}` },
+        })
+        if (error) setError(error.message)
     }
 
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900">
             <div className="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="flex flex-col lg:flex-row">
-                    {/* Left Side - Image Carousel */}
-                    <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-                        {/* Carousel — full bleed, no padding */}
+                    {/* Left Side — Full-bleed Image Carousel */}
+                    <div className="hidden lg:block lg:w-1/2 relative overflow-hidden" style={{ minHeight: 560 }}>
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={currentSlide}
@@ -86,7 +96,7 @@ export default function LoginPage() {
                             </motion.div>
                         </AnimatePresence>
 
-                        {/* Carousel Dots — overlaid at bottom */}
+                        {/* Dots — overlaid at bottom */}
                         <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 z-10">
                             {CAROUSEL_IMAGES.map((_, index) => (
                                 <button
@@ -108,7 +118,7 @@ export default function LoginPage() {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.6 }}
                         >
-                            {/* Back to Home - Top */}
+                            {/* Back to Home */}
                             <Link href="/">
                                 <div className="mb-6 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors cursor-pointer">
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,22 +130,12 @@ export default function LoginPage() {
 
                             {/* Logo for mobile */}
                             <div className="lg:hidden flex justify-center mb-6">
-                                <Image
-                                    src="/rootslogo.png"
-                                    alt="ROOTS"
-                                    width={48}
-                                    height={48}
-                                    className="h-12 w-auto object-contain"
-                                />
+                                <Image src="/rootslogo.png" alt="ROOTS" width={48} height={48} className="h-12 w-auto object-contain" />
                             </div>
 
                             <div className="mb-6">
-                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                                    Welcome Back
-                                </h1>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                    Sign in to continue to ROOTS
-                                </p>
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Welcome Back</h1>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">Sign in to continue to ROOTS</p>
                             </div>
 
                             {/* Error Message */}
@@ -149,7 +149,7 @@ export default function LoginPage() {
                                 </motion.div>
                             )}
 
-                            {/* Google Login Button */}
+                            {/* Google Login */}
                             <motion.button
                                 onClick={handleGoogleLogin}
                                 className="w-full py-2.5 px-4 mb-5 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-650 transition-all duration-300 flex items-center justify-center space-x-3"
@@ -166,19 +166,14 @@ export default function LoginPage() {
                                     <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
                                 </div>
                                 <div className="relative flex justify-center text-xs">
-                                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                                        Or continue with email
-                                    </span>
+                                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with email</span>
                                 </div>
                             </div>
 
                             {/* Login Form */}
                             <form onSubmit={handleLogin} className="space-y-4">
-                                {/* Email Input */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Email
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                                     <div className="relative">
                                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                         <input
@@ -192,16 +187,10 @@ export default function LoginPage() {
                                     </div>
                                 </div>
 
-                                {/* Password Input */}
                                 <div>
                                     <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Password
-                                        </label>
-                                        <Link
-                                            href="/auth/forgot-password"
-                                            className="text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
-                                        >
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                                        <Link href="/auth/forgot-password" className="text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300">
                                             Forgot?
                                         </Link>
                                     </div>
@@ -225,7 +214,6 @@ export default function LoginPage() {
                                     </div>
                                 </div>
 
-                                {/* Login Button */}
                                 <motion.button
                                     type="submit"
                                     disabled={isLoading}
@@ -237,13 +225,9 @@ export default function LoginPage() {
                                 </motion.button>
                             </form>
 
-                            {/* Signup Link */}
                             <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
                                 Don't have an account?{" "}
-                                <Link
-                                    href="/auth/signup"
-                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold"
-                                >
+                                <Link href="/auth/signup" className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold">
                                     Sign up
                                 </Link>
                             </p>

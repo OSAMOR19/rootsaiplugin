@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Package, LogOut, ChevronRight, Upload } from "lucide-react"
+import { LayoutDashboard, Package, LogOut, ChevronRight, Upload, Users } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -73,6 +73,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         label="Packs"
                         isActive={pathname === "/admin/packs"}
                     />
+                    <NavLink
+                        href="/admin/users"
+                        icon={Users}
+                        label="Users"
+                        isActive={pathname === "/admin/users"}
+                    />
                 </nav>
 
                 <div className="p-4 border-t border-white/5">
@@ -98,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         {pathname === '/admin/dashboard' && <span>Overview</span>}
                         {pathname === '/admin/packs' && <span>Manage your sound library</span>}
                         {pathname === '/admin/upload' && <span>Create New Pack</span>}
+                        {pathname === '/admin/users' && <span>Manage users &amp; plans</span>}
                     </div>
 
                     <div className="flex items-center gap-4">

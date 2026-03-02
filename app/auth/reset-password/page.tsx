@@ -5,29 +5,36 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react"
+import { Lock, ArrowLeft, CheckCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
-export default function ForgotPasswordPage() {
+export default function ResetPasswordPage() {
     const router = useRouter()
-    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState(false)
 
-    const handleResetPassword = async (e: React.FormEvent) => {
+    const handleUpdatePassword = async (e: React.FormEvent) => {
         e.preventDefault()
         setError("")
         setIsLoading(true)
 
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters")
+            setIsLoading(false)
+            return
+        }
+
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/reset-password`,
+            const { error } = await supabase.auth.updateUser({
+                password: password
             })
+
             if (error) throw error
             setSuccess(true)
         } catch (err: any) {
-            setError(err.message || "Failed to send reset link")
+            setError(err.message || "Failed to update password")
         } finally {
             setIsLoading(false)
         }
@@ -41,7 +48,6 @@ export default function ForgotPasswordPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
             >
-                {/* Back button */}
                 <Link href="/auth/login">
                     <button className="mb-6 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
                         <ArrowLeft className="w-4 h-4 mr-2" />
@@ -49,7 +55,6 @@ export default function ForgotPasswordPage() {
                     </button>
                 </Link>
 
-                {/* Logo */}
                 <div className="flex justify-center mb-8">
                     <Image
                         src="/rootslogo.png"
@@ -64,14 +69,13 @@ export default function ForgotPasswordPage() {
                     <>
                         <div className="mb-8 text-center">
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                                Reset Password
+                                Set New Password
                             </h1>
                             <p className="text-gray-600 dark:text-gray-400">
-                                Enter your email and we'll send you a reset link
+                                Enter your new password below
                             </p>
                         </div>
 
-                        {/* Error Message */}
                         {error && (
                             <motion.div
                                 className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm"
@@ -82,23 +86,23 @@ export default function ForgotPasswordPage() {
                             </motion.div>
                         )}
 
-                        {/* Reset Form */}
-                        <form onSubmit={handleResetPassword} className="space-y-4">
+                        <form onSubmit={handleUpdatePassword} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Email
+                                    New Password
                                 </label>
                                 <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                     <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="you@example.com"
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="••••••••"
                                         required
                                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all duration-300 text-gray-900 dark:text-white"
                                     />
                                 </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">At least 8 characters</p>
                             </div>
 
                             <motion.button
@@ -108,12 +112,11 @@ export default function ForgotPasswordPage() {
                                 whileHover={!isLoading ? { scale: 1.02 } : {}}
                                 whileTap={!isLoading ? { scale: 0.98 } : {}}
                             >
-                                {isLoading ? "Sending..." : "Send Reset Link"}
+                                {isLoading ? "Updating..." : "Update Password"}
                             </motion.button>
                         </form>
                     </>
                 ) : (
-                    /* Success Message */
                     <motion.div
                         className="text-center py-8"
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -121,30 +124,22 @@ export default function ForgotPasswordPage() {
                     >
                         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                            Check Your Email
+                            Password Updated
                         </h2>
                         <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            We've sent a password reset link to<br />
-                            <span className="font-medium text-gray-900 dark:text-white">{email}</span>
+                            Your password has been changed successfully.
                         </p>
                         <Link href="/auth/login">
                             <motion.button
-                                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-colors"
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                             >
-                                Back to Login
+                                Go to Login
                             </motion.button>
                         </Link>
                     </motion.div>
                 )}
-
-                {/* Back to Home */}
-                <Link href="/">
-                    <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-400">
-                        ← Back to home
-                    </p>
-                </Link>
             </motion.div>
         </div>
     )
