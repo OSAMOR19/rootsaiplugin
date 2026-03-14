@@ -1,6 +1,4 @@
-"use client"
-
-const FAVORITES_STORAGE_KEY = 'rootsai_favorites'
+import { supabase } from './supabase'
 
 export interface FavoriteSample {
   id: string
@@ -15,21 +13,38 @@ export interface FavoriteSample {
   tags?: string[]
   waveform?: number[]
   originalBpm?: number
-  timestamp: number // When it was favorited
+  timestamp?: number
 }
 
 /**
- * Get all favorites from localStorage
+ * Helper to dispatch window events safely
  */
-export function getFavorites(): FavoriteSample[] {
-  if (typeof window === 'undefined') return []
-  
+const notifyUpdate = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('favoritesUpdated'))
+  }
+}
+
+/**
+ * Get all favorites from Supabase for the authenticated user
+ */
+export async function getFavorites(): Promise<FavoriteSample[]> {
   try {
-    const stored = localStorage.getItem(FAVORITES_STORAGE_KEY)
-    if (!stored) return []
-    return JSON.parse(stored)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return [] // Unauthenticated users have no favorites
+
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('sample_data')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    
+    // Extract the JSON payload back into the FavoriteSample format
+    return data.map(row => row.sample_data as FavoriteSample)
   } catch (error) {
-    console.error('Error reading favorites:', error)
+    console.error('Error fetching favorites from Supabase:', error)
     return []
   }
 }
@@ -37,26 +52,37 @@ export function getFavorites(): FavoriteSample[] {
 /**
  * Check if a sample is favorited
  */
-export function isFavorite(sampleId: string): boolean {
-  const favorites = getFavorites()
-  return favorites.some(fav => fav.id === sampleId)
+export async function isFavorite(sampleId: string): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return false
+
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('sample_id', sampleId)
+      .single()
+
+    // .single() throws if no rows are found, which means it isn't favorited
+    return !!data
+  } catch (error) {
+    return false // Not favorited or error
+  }
 }
 
 /**
  * Add a sample to favorites
  */
-export function addFavorite(sample: any): void {
-  if (typeof window === 'undefined') return
-  
+export async function addFavorite(sample: any): Promise<void> {
   try {
-    const favorites = getFavorites()
-    
-    // Check if already favorited
-    if (favorites.some(fav => fav.id === sample.id)) {
-      return // Already favorited
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) {
+      console.warn('User must be logged in to favorite samples')
+      return 
     }
-    
-    // Create favorite object
+
+    // Standardize object format
     const favorite: FavoriteSample = {
       id: sample.id,
       name: sample.name || sample.filename || 'Unknown',
@@ -72,45 +98,58 @@ export function addFavorite(sample: any): void {
       originalBpm: sample.originalBpm,
       timestamp: Date.now()
     }
-    
-    favorites.push(favorite)
-    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites))
-    
-    // Dispatch custom event for other components to listen
-    window.dispatchEvent(new CustomEvent('favoritesUpdated'))
+
+    const { error } = await supabase
+      .from('favorites')
+      .insert({
+        user_id: session.user.id,
+        sample_id: sample.id,
+        sample_data: favorite
+      })
+
+    if (error && error.code !== '23505') { 
+      // Ignored code 23505 (unique constraint violation) = already favorited
+      throw error
+    }
+
+    notifyUpdate()
   } catch (error) {
-    console.error('Error adding favorite:', error)
+    console.error('Error adding favorite to Supabase:', error)
   }
 }
 
 /**
  * Remove a sample from favorites
  */
-export function removeFavorite(sampleId: string): void {
-  if (typeof window === 'undefined') return
-  
+export async function removeFavorite(sampleId: string): Promise<void> {
   try {
-    const favorites = getFavorites()
-    const filtered = favorites.filter(fav => fav.id !== sampleId)
-    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(filtered))
-    
-    // Dispatch custom event for other components to listen
-    window.dispatchEvent(new CustomEvent('favoritesUpdated'))
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
+
+    const { error } = await supabase
+      .from('favorites')
+      .delete()
+      .match({ user_id: session.user.id, sample_id: sampleId })
+
+    if (error) throw error
+
+    notifyUpdate()
   } catch (error) {
-    console.error('Error removing favorite:', error)
+    console.error('Error removing favorite from Supabase:', error)
   }
 }
 
 /**
  * Toggle favorite status
+ * Returns a boolean indicating if it is NOW favorited
  */
-export function toggleFavorite(sample: any): boolean {
-  const isFav = isFavorite(sample.id)
+export async function toggleFavorite(sample: any): Promise<boolean> {
+  const isFav = await isFavorite(sample.id)
   if (isFav) {
-    removeFavorite(sample.id)
+    await removeFavorite(sample.id)
     return false
   } else {
-    addFavorite(sample)
+    await addFavorite(sample)
     return true
   }
 }
@@ -118,7 +157,20 @@ export function toggleFavorite(sample: any): boolean {
 /**
  * Get favorites count
  */
-export function getFavoritesCount(): number {
-  return getFavorites().length
+export async function getFavoritesCount(): Promise<number> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return 0
+
+    const { count, error } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+
+    if (error) throw error
+    return count || 0
+  } catch (error) {
+    return 0
+  }
 }
 

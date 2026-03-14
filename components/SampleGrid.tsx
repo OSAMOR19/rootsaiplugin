@@ -7,12 +7,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import SampleActionsMenu from "./SampleActionsMenu"
 
-// Import drum images
-import kickDrumImage from "./images/kickdrum.jpg"
-import talkingDrumImage from "./images/talkingdrum.jpg"
-import tomImage from "./images/tomimage.jpg"
-import shekereImage from "./images/shekere.jpg"
-import hihatImage from "./images/hihat.png"
+// Removed static image imports to prevent sharp build error
 
 interface SampleGridProps {
   viewMode: "grid" | "list"
@@ -81,23 +76,23 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
     switch (category?.toLowerCase()) {
       case "full-drums":
       case "full drum loops":
-        return kickDrumImage
+        return "/images/kickdrum.jpg"
       case "kick-loops":
       case "kick loops":
-        return kickDrumImage
+        return "/images/kickdrum.jpg"
       case "top-loops":
       case "top loops":
-        return hihatImage
+        return "/images/hihat.png"
       case "shaker-loops":
       case "shaker loops":
-        return shekereImage
+        return "/images/shekere.jpg"
       case "fills-rolls":
       case "fills & rolls":
-        return tomImage
+        return "/images/tomimage.jpg"
       case "percussions":
-        return talkingDrumImage
+        return "/images/talkingdrum.jpg"
       default:
-        return kickDrumImage // Default fallback
+        return "/images/kickdrum.jpg" // Default fallback
     }
   }
 

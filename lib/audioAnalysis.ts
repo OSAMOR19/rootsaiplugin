@@ -53,14 +53,19 @@ export async function analyzeAudioBuffer(
 
     // Try to use Essentia.js analysis
     try {
-      const analysis = await analyzeTrack(audioBuffer)
+      // Convert Buffer to Float32Array for Essentia (Mock conversion for now since this is Node)
+      // Actual implementation would need standard AudioContext or wav decoder
+      const float32Array = new Float32Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 4)
+      const sampleRate = 44100 // Default Essentia sample rate expectations
+      
+      const analysis = await analyzeTrack(float32Array, sampleRate)
       
       const result: AudioAnalysisResult = {
-        bpm: analysis.bpm,
-        key: analysis.key,
-        energy: analysis.energy,
-        danceability: analysis.danceability,
-        valence: analysis.valence,
+        bpm: analysis.bpm ?? undefined,
+        key: analysis.key.tonic ? `${analysis.key.tonic} ${analysis.key.scale || ''}`.trim() : undefined,
+        energy: analysis.energy ?? undefined,
+        danceability: analysis.danceability ?? undefined,
+        valence: analysis.valence ?? undefined,
       }
 
       // Generate mood tag

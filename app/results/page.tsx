@@ -502,8 +502,9 @@ function ResultsContent() {
 
   // Load favorites count and listen for updates
   useEffect(() => {
-    const updateFavoritesCount = () => {
-      setFavoritesCount(getFavoritesCount())
+    const updateFavoritesCount = async () => {
+      const count = await getFavoritesCount()
+      setFavoritesCount(count)
     }
 
     updateFavoritesCount()

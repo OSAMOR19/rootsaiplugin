@@ -7,11 +7,12 @@ import { useRouter, useParams } from "next/navigation"
 import WaveformVisualizer from "@/components/WaveformVisualizer"
 import RelatedSamples from "@/components/RelatedSamples"
 import { mockFeaturedSamples } from "@/lib/mockData"
+import { isFavorite, toggleFavorite } from "@/lib/favorites"
 
 export default function SampleDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const [sample, setSample] = useState(null)
+  const [sample, setSample] = useState<any>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isLiked, setIsLiked] = useState(false)
@@ -20,6 +21,11 @@ export default function SampleDetailPage() {
     // Find sample by ID
     const foundSample = mockFeaturedSamples.find((s) => s.id === params.id)
     setSample(foundSample)
+
+    // Check favorite status if sample exists
+    if (foundSample) {
+      isFavorite(foundSample.id).then(setIsLiked)
+    }
   }, [params.id])
 
   const handleBack = () => {
@@ -67,7 +73,18 @@ export default function SampleDetailPage() {
 
           <div className="flex items-center space-x-2">
             <motion.button
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={async () => {
+                if (!sample) return
+                // Optimistic UI update
+                setIsLiked(!isLiked)
+                try {
+                  const newLikedState = await toggleFavorite(sample)
+                  setIsLiked(newLikedState)
+                } catch (e) {
+                  // Revert on error
+                  setIsLiked(isLiked)
+                }
+              }}
               className={`p-2 rounded-lg transition-colors ${
                 isLiked ? "text-red-500 bg-red-50" : "text-gray-400 hover:text-red-500 hover:bg-red-50"
               }`}

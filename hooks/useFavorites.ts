@@ -3,22 +3,47 @@ import { getFavorites, removeFavorite, addFavorite, FavoriteSample } from '@/lib
 
 export function useFavorites() {
     const [favorites, setFavorites] = useState<FavoriteSample[]>([])
+    const [isLoading, setIsLoading] = useState(true)
 
-    const refreshFavorites = () => {
-        setFavorites(getFavorites())
+    const refreshFavorites = async () => {
+        setIsLoading(true)
+        try {
+            const favs = await getFavorites()
+            setFavorites(favs)
+        } catch (error) {
+            console.error("Failed to load favorites in hook", error)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     useEffect(() => {
-        refreshFavorites()
+        let mounted = true
+        
+        const load = async () => {
+            setIsLoading(true)
+            try {
+                const favs = await getFavorites()
+                if (mounted) setFavorites(favs)
+            } finally {
+                if (mounted) setIsLoading(false)
+            }
+        }
+        
+        load()
 
-        const handleUpdate = () => refreshFavorites()
+        const handleUpdate = () => load()
 
         window.addEventListener('favoritesUpdated', handleUpdate)
-        return () => window.removeEventListener('favoritesUpdated', handleUpdate)
+        return () => {
+            mounted = false
+            window.removeEventListener('favoritesUpdated', handleUpdate)
+        }
     }, [])
 
     return {
         favorites,
+        isLoading,
         refreshFavorites,
         removeFavorite,
         addFavorite,

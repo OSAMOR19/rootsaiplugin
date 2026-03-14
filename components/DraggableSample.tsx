@@ -13,12 +13,7 @@ import WaveSurfer from "wavesurfer.js"
 import SampleActionsMenu from "./SampleActionsMenu"
 
 
-// Import drum images
-import kickDrumImage from "@/public/images/kickdrum.jpg"
-import talkingDrumImage from "@/public/images/talkingdrum.jpg"
-import tomImage from "@/public/images/tomimage.jpg"
-import shekereImage from "@/public/images/shekere.jpg"
-import hihatImage from "@/public/images/hihat.png"
+// Remove static image imports to avoid Sharp dependency issues during build
 
 
 interface DraggableSampleProps {
@@ -54,17 +49,24 @@ export default function DraggableSample({
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
 
-  // Load favorite status from localStorage on mount
+  // Load favorite status from Supabase on mount
   useEffect(() => {
-    setIsLiked(isFavorite(sample.id))
+    let mounted = true
+    const checkFavorite = async () => {
+      const isFav = await isFavorite(sample.id)
+      if (mounted) setIsLiked(isFav)
+    }
+    
+    checkFavorite()
 
     // Listen for favorites updates from other components
     const handleFavoritesUpdate = () => {
-      setIsLiked(isFavorite(sample.id))
+      checkFavorite()
     }
     window.addEventListener('favoritesUpdated', handleFavoritesUpdate)
 
     return () => {
+      mounted = false
       window.removeEventListener('favoritesUpdated', handleFavoritesUpdate)
     }
   }, [sample.id])
@@ -503,23 +505,23 @@ export default function DraggableSample({
     switch (category?.toLowerCase()) {
       case "full-drums":
       case "full drum loops":
-        return kickDrumImage
+        return "/images/kickdrum.jpg"
       case "kick-loops":
       case "kick loops":
-        return kickDrumImage
+        return "/images/kickdrum.jpg"
       case "top-loops":
       case "top loops":
-        return hihatImage
+        return "/images/hihat.png"
       case "shaker-loops":
       case "shaker loops":
-        return shekereImage
+        return "/images/shekere.jpg"
       case "fills-rolls":
       case "fills & rolls":
-        return tomImage
+        return "/images/tomimage.jpg"
       case "percussions":
-        return talkingDrumImage
+        return "/images/talkingdrum.jpg"
       default:
-        return kickDrumImage // Default fallback
+        return "/images/kickdrum.jpg" // Default fallback
     }
   }
 
@@ -806,9 +808,16 @@ export default function DraggableSample({
         <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2">
           {/* Heart (Favorite) */}
           <motion.button
-            onClick={() => {
-              const newLikedState = toggleFavorite(sample)
-              setIsLiked(newLikedState)
+            onClick={async () => {
+              // Optimistic UI update
+              setIsLiked(!isLiked)
+              try {
+                const newLikedState = await toggleFavorite(sample)
+                setIsLiked(newLikedState)
+              } catch (e) {
+                // Revert on error
+                setIsLiked(isLiked)
+              }
             }}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isLiked
               ? "text-red-500 bg-red-50 dark:bg-red-900/20"

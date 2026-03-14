@@ -20,10 +20,15 @@ function FavoritesContent() {
 
   // Load favorites from localStorage
   useEffect(() => {
-    const loadFavorites = () => {
-      const favs = getFavorites()
-      setFavorites(favs)
-      setLoading(false)
+    const loadFavorites = async () => {
+      try {
+        const favs = await getFavorites()
+        setFavorites(favs)
+      } catch (error) {
+        console.error("Failed to load favorites", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
     loadFavorites()
