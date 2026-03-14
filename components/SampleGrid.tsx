@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import SampleActionsMenu from "./SampleActionsMenu"
+import { useFavorites } from "@/hooks/useFavorites"
 
 // Removed static image imports to prevent sharp build error
 
@@ -18,7 +19,7 @@ interface SampleGridProps {
 
 export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamplePlay }: SampleGridProps) {
   const router = useRouter()
-  const [likedSamples, setLikedSamples] = useState<Set<string>>(new Set())
+  const { isFavorite, toggleFavorite } = useFavorites()
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({})
 
   // Handle audio playback
@@ -96,14 +97,9 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
     }
   }
 
-  const toggleLike = (sampleId: string) => {
-    const newLiked = new Set(likedSamples)
-    if (newLiked.has(sampleId)) {
-      newLiked.delete(sampleId)
-    } else {
-      newLiked.add(sampleId)
-    }
-    setLikedSamples(newLiked)
+  // Toggle like now handles both optimistic updates and DB sync via useFavorites
+  const toggleLike = (sample: any) => {
+    toggleFavorite(sample)
   }
 
   const handleSampleClick = (sampleId: string) => {
@@ -222,16 +218,16 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 <motion.button
                   onClick={(e) => {
                     e.stopPropagation()
-                    toggleLike(sample.id)
+                    toggleLike(sample)
                   }}
-                  className={`p-2 rounded-lg transition-all duration-300 ${likedSamples.has(sample.id)
+                  className={`p-2 rounded-lg transition-all duration-300 ${isFavorite(sample.id)
                     ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
                     : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
                     }`}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >
-                  <Heart className={`w-5 h-5 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
+                  <Heart className={`w-5 h-5 ${isFavorite(sample.id) ? "fill-current" : ""}`} />
                 </motion.button>
 
                 <motion.button
@@ -361,16 +357,16 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
               <motion.button
                 onClick={(e) => {
                   e.stopPropagation()
-                  toggleLike(sample.id)
+                  toggleLike(sample)
                 }}
-                className={`p-2.5 rounded-lg transition-all duration-300 ${likedSamples.has(sample.id)
+                className={`p-2.5 rounded-lg transition-all duration-300 ${isFavorite(sample.id)
                   ? "text-rose-400 bg-rose-500/20 border border-rose-500/30"
                   : "text-white/60 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent"
                   }`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
-                <Heart className={`w-5 h-5 ${likedSamples.has(sample.id) ? "fill-current" : ""}`} />
+                <Heart className={`w-5 h-5 ${isFavorite(sample.id) ? "fill-current" : ""}`} />
               </motion.button>
 
               <motion.button

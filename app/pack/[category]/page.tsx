@@ -29,7 +29,7 @@ export default function PackDetailPage({ params }: PageProps) {
   const { samples, loading: samplesLoading } = useSamples({ autoFetch: true })
   const { packs, loading: packsLoading, getPackByTitle } = usePacks()
   const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
-  const { isFavorite, addFavorite, removeFavorite } = useFavorites()
+  const { isFavorite, toggleFavorite: dbToggleFavorite } = useFavorites()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
@@ -124,20 +124,16 @@ export default function PackDetailPage({ params }: PageProps) {
 
   const toggleFavorite = (e: React.MouseEvent, sample: any) => {
     e.stopPropagation()
-    if (isFavorite(sample.id)) {
-      removeFavorite(sample.id)
-    } else {
-      addFavorite({
-        id: sample.id,
-        name: sample.name,
-        category: sample.category,
-        bpm: sample.bpm || 0,
-        key: formatKey(sample.key),
-        duration: sample.duration || '0:00',
-        imageUrl: packImage,
-        audioUrl: sample.audioUrl || sample.url
-      })
-    }
+    dbToggleFavorite({
+      id: sample.id,
+      name: sample.name,
+      category: sample.category,
+      bpm: sample.bpm || 0,
+      key: formatKey(sample.key),
+      duration: sample.duration || '0:00',
+      imageUrl: packImage,
+      audioUrl: sample.audioUrl || sample.url
+    })
   }
 
   const loading = samplesLoading || packsLoading

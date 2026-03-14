@@ -78,8 +78,7 @@ export async function addFavorite(sample: any): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) {
-      console.warn('User must be logged in to favorite samples')
-      return 
+      throw new Error('unauthenticated')
     }
 
     // Standardize object format
@@ -124,7 +123,9 @@ export async function addFavorite(sample: any): Promise<void> {
 export async function removeFavorite(sampleId: string): Promise<void> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) return
+    if (!session?.user) {
+      throw new Error('unauthenticated')
+    }
 
     const { error } = await supabase
       .from('favorites')

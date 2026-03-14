@@ -28,7 +28,7 @@ export default function SoundsPage() {
 
     // Fetch Data
     const { samples, loading } = useSamples({ autoFetch: true })
-    const { isFavorite, addFavorite, removeFavorite } = useFavorites()
+    const { isFavorite, toggleFavorite } = useFavorites()
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
     // Derived Filters Options
@@ -98,11 +98,7 @@ export default function SoundsPage() {
 
     const toggleFav = (e: React.MouseEvent, sample: any) => {
         e.stopPropagation()
-        if (isFavorite(sample.id)) {
-            removeFavorite(sample.id)
-        } else {
-            addFavorite(sample)
-        }
+        toggleFavorite(sample)
     }
 
     const handleDownload = async (e: React.MouseEvent, sample: any) => {
