@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon, Shield } from "lucide-react"
+import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon, Shield, User, LogOut, Save, Mail } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -12,6 +13,24 @@ export default function SettingsPage() {
   const [masterVolume, setMasterVolume] = useState(75)
   const [sampleRate, setSampleRate] = useState("44100")
   const [bufferSize, setBufferSize] = useState("512")
+  const [user, setUser] = useState<any>(null)
+  const [displayName, setDisplayName] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setDisplayName(session?.user?.user_metadata?.full_name || "")
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setDisplayName(session?.user?.user_metadata?.full_name || "")
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     // Apply theme
@@ -33,6 +52,43 @@ export default function SettingsPage() {
 
   const handleBack = () => {
     router.push("/")
+  }
+
+  const handleUpdateProfile = async () => {
+    if (!user) return
+    setIsSaving(true)
+    setSaveSuccess(false)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: displayName }
+      })
+      if (error) throw error
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error updating profile:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+      if (typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('sb-') || key.includes('supabase') || key === 'auth-storage') {
+            localStorage.removeItem(key)
+          }
+        })
+      }
+      router.push('/')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+      router.push('/')
+      router.refresh()
+    }
   }
 
   return (
@@ -66,6 +122,94 @@ export default function SettingsPage() {
 
       <div className="max-w-4xl mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Account / Profile Settings */}
+          <motion.div
+            className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 lg:col-span-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+          >
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+              <User className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+              Account
+            </h2>
+
+            {user ? (
+              <div className="space-y-5">
+                {/* Profile Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Display Name</label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
+                    <div className="flex items-center px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 text-sm">
+                      <Mail className="w-4 h-4 mr-2 flex-shrink-0" />
+                      <span className="truncate">{user.email}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save / Success */}
+                <div className="flex items-center space-x-3">
+                  <motion.button
+                    onClick={handleUpdateProfile}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center"
+                    whileHover={!isSaving ? { scale: 1.02 } : {}}
+                    whileTap={!isSaving ? { scale: 0.98 } : {}}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? "Saving..." : "Save Profile"}
+                  </motion.button>
+
+                  {saveSuccess && (
+                    <motion.span
+                      className="text-sm text-green-600 dark:text-green-400 font-medium"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                    >
+                      ✓ Profile updated!
+                    </motion.span>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <motion.button
+                    onClick={handleSignOut}
+                    className="px-5 py-2.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-medium rounded-lg transition-all duration-300 text-sm flex items-center"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </motion.button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-gray-500 dark:text-gray-400 mb-4">Sign in to manage your profile</p>
+                <motion.button
+                  onClick={() => router.push('/auth/login')}
+                  className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Sign In
+                </motion.button>
+              </div>
+            )}
+          </motion.div>
+
           {/* Appearance Settings */}
           <motion.div
             className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50"
@@ -261,3 +405,4 @@ export default function SettingsPage() {
     </div>
   )
 }
+

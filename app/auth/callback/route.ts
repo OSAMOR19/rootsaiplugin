@@ -6,8 +6,19 @@ export async function GET(request: Request) {
     const code = requestUrl.searchParams.get('code')
     const next = requestUrl.searchParams.get('next') ?? '/'
 
+    // Handle proxies (e.g., Render, Vercel) that might set requestUrl.origin to localhost:10000
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https'
+    let redirectOrigin = requestUrl.origin
+
+    if (forwardedHost) {
+        redirectOrigin = `${forwardedProto}://${forwardedHost}`
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+        redirectOrigin = process.env.NEXT_PUBLIC_SITE_URL
+    }
+
     if (code) {
-        const response = NextResponse.redirect(`${requestUrl.origin}${next}`)
+        const response = NextResponse.redirect(`${redirectOrigin}${next}`)
         const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -35,5 +46,5 @@ export async function GET(request: Request) {
     }
 
     // URL to redirect to after sign in process completes
-    return NextResponse.redirect(`${requestUrl.origin}${next}`)
+    return NextResponse.redirect(`${redirectOrigin}${next}`)
 }

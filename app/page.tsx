@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { Home, Settings, User as UserIcon, LogOut } from "lucide-react"
@@ -26,6 +26,20 @@ export default function CapturePage() {
   const [user, setUser] = useState<any>(null)
   const { analysisData, setAnalysisData } = useAudio()
   const router = useRouter()
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false)
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isDropdownOpen])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,7 +54,31 @@ export default function CapturePage() {
   }, [])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    console.log('🚪 handleSignOut called')
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) {
+        console.error('Supabase signOut error:', error)
+      }
+      console.log('✅ Supabase signOut completed')
+      // Clear any stale auth data from localStorage
+      if (typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('sb-') || key.includes('supabase') || key === 'auth-storage') {
+            localStorage.removeItem(key)
+          }
+        })
+      }
+      setUser(null)
+      router.push('/')
+      router.refresh()
+    } catch (error) {
+      console.error('Error signing out:', error)
+      // Force clear even on error
+      setUser(null)
+      router.push('/')
+      router.refresh()
+    }
   }
 
   // Convert AudioBuffer to WAV blob
@@ -221,17 +259,10 @@ export default function CapturePage() {
             <ThemeToggle />
             {/* Authentication UI */}
             {user ? (
-              <div className="relative">
-                {/* Invisible overlay to close dropdown when clicking outside */}
-                {isDropdownOpen && (
-                  <div 
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsDropdownOpen(false)}
-                  />
-                )}
+              <div className="relative" ref={dropdownRef}>
                 <motion.button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="relative z-50 flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
+                  className="relative flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -241,45 +272,42 @@ export default function CapturePage() {
                 </motion.button>
                 
                 {/* Interactive Dropdown Menu */}
-                <div 
-                  className={`absolute right-0 mt-2 w-56 transition-all duration-300 transform origin-top-right z-50 pt-2 ${
-                    isDropdownOpen 
-                      ? "opacity-100 visible scale-100 translate-y-0" 
-                      : "opacity-0 invisible scale-95 -translate-y-2 pointer-events-none"
-                  }`}
-                >
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                    <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">Signed in as</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                        {user.user_metadata?.full_name || user.email}
-                      </p>
-                    </div>
-                    <div className="p-2">
-                      <button 
-                        onClick={() => {
-                          setIsDropdownOpen(false);
-                          router.push('/browse');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 flex items-center rounded-lg transition-colors mb-1"
-                      >
-                        <UserIcon className="w-4 h-4 mr-2" />
-                        My Library
-                      </button>
-                      
-                      <button 
-                        onClick={() => {
-                          setIsDropdownOpen(false);
-                          handleSignOut();
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center rounded-lg transition-colors"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Sign Out
-                      </button>
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 z-[9999] pt-2">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                      <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">Signed in as</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                          {user.user_metadata?.full_name || user.email}
+                        </p>
+                      </div>
+                      <div className="p-2">
+                        <button 
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            router.push('/browse');
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 flex items-center rounded-lg transition-colors mb-1"
+                        >
+                          <UserIcon className="w-4 h-4 mr-2" />
+                          My Library
+                        </button>
+                        
+                        <button 
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSignOut();
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center rounded-lg transition-colors cursor-pointer"
+                        >
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Sign Out
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <motion.button
