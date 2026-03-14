@@ -112,8 +112,8 @@ export async function addFavorite(sample: any): Promise<void> {
     }
 
     notifyUpdate()
-  } catch (error) {
-    console.error('Error adding favorite to Supabase:', error)
+  } catch (error: any) {
+    throw error
   }
 }
 
@@ -135,8 +135,8 @@ export async function removeFavorite(sampleId: string): Promise<void> {
     if (error) throw error
 
     notifyUpdate()
-  } catch (error) {
-    console.error('Error removing favorite from Supabase:', error)
+  } catch (error: any) {
+    throw error
   }
 }
 

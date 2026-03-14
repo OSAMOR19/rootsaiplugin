@@ -42,16 +42,53 @@ export interface UseSamplesResult {
   filterByCategory: (category: string) => Sample[]
 }
 
+// Global cache to prevent refetching during client-side navigation
+const globalSamplesCache: Record<string, { data: Sample[], timestamp: number }> = {}
+const globalFetchPromises: Record<string, Promise<Sample[]> | null> = {}
+
+// Cache expiration: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000
+
 export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
   const { category, autoFetch = true } = options
   const [samples, setSamples] = useState<Sample[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchSamples = async () => {
+  const fetchSamples = async (forceRefetch = false) => {
+    const cacheKey = category || 'all_samples'
+
+    // 1. Check if we have valid cached data and we aren't forcing a refetch
+    if (!forceRefetch && globalSamplesCache[cacheKey] && (Date.now() - globalSamplesCache[cacheKey].timestamp < CACHE_TTL)) {
+      setSamples(globalSamplesCache[cacheKey].data)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    // 2. Check if a fetch is already in progress for this key (deduping)
+    if (!forceRefetch && globalFetchPromises[cacheKey]) {
+      setLoading(true)
+      try {
+        const data = await globalFetchPromises[cacheKey]!
+        // Make sure component is still mounted before setting state? 
+        // Not strictly necessary here since React 18 handles state on unmounted components gracefully,
+        // but can be added. We'll simply set the state.
+        setSamples(data)
+        setError(null)
+      } catch (err: any) {
+        setError(err instanceof Error ? err.message : "Failed to fetch samples")
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    // 3. Start a new fetch
     setLoading(true)
     setError(null)
-    try {
+
+    const fetchPromise = (async () => {
       // Supabase silently caps queries at 1,000 rows.
       // We paginate in batches of 1,000 until we get a partial page (= end of data).
       const PAGE_SIZE = 1000
@@ -109,12 +146,27 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
         stems: s.stems || []
       }))
 
+      // Update the cache
+      globalSamplesCache[cacheKey] = {
+        data: mappedSamples,
+        timestamp: Date.now()
+      }
+
+      return mappedSamples
+    })()
+
+    // Store the promise in the global dictionary
+    globalFetchPromises[cacheKey] = fetchPromise
+
+    try {
+      const mappedSamples = await fetchPromise
       setSamples(mappedSamples)
     } catch (err) {
       console.error("Failed to fetch samples:", err)
       setError(err instanceof Error ? err.message : "Failed to fetch samples")
     } finally {
       setLoading(false)
+      globalFetchPromises[cacheKey] = null
     }
   }
 
@@ -128,5 +180,5 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
     }
   }, [autoFetch, category])
 
-  return { samples, loading, error, refetch: fetchSamples, filterByCategory }
+  return { samples, loading, error, refetch: () => fetchSamples(true), filterByCategory }
 }

@@ -79,13 +79,12 @@ export function useFavorites() {
                 toast.success("Added to favorites!")
             }
         } catch (error: any) {
-            console.error("Failed to toggle favorite", error)
             // Revert on failure
             refreshFavorites()
             if (error?.message === "unauthenticated") {
                 toast.error("Please sign in to save favorites")
             } else {
-                toast.error("Failed to save favorite")
+                toast.error(`Failed to save favorite: ${error?.message || 'Database error'}`)
             }
         }
     }

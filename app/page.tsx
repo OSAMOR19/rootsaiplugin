@@ -222,9 +222,16 @@ export default function CapturePage() {
             {/* Authentication UI */}
             {user ? (
               <div className="relative">
+                {/* Invisible overlay to close dropdown when clicking outside */}
+                {isDropdownOpen && (
+                  <div 
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsDropdownOpen(false)}
+                  />
+                )}
                 <motion.button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
+                  className="relative z-50 flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -472,13 +479,6 @@ export default function CapturePage() {
         </motion.div>
       )}
 
-      {/* Invisible overlay to close dropdown when clicking outside */}
-      {isDropdownOpen && (
-        <div 
-          className="fixed inset-0 z-40"
-          onClick={() => setIsDropdownOpen(false)}
-        />
-      )}
     </div>
   )
 }
