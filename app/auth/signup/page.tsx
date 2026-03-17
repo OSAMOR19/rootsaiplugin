@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react"
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle, RefreshCw } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 const CAROUSEL_IMAGES = [
@@ -35,7 +35,8 @@ export default function SignupPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
-    const [successMsg, setSuccessMsg] = useState("")
+    const [confirmedEmail, setConfirmedEmail] = useState("")
+    const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "sent">("idle")
     const [currentSlide, setCurrentSlide] = useState(0)
 
     // Auto-rotate carousel
@@ -49,7 +50,6 @@ export default function SignupPage() {
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()
         setError("")
-        setSuccessMsg("")
 
         if (password.length < 8) {
             setError("Password must be at least 8 characters")
@@ -63,12 +63,12 @@ export default function SignupPage() {
                 password,
                 options: {
                     data: { full_name: name },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/browse`,
                 },
             })
             if (error) throw error
-            // Supabase may require email confirmation depending on your project settings
-            setSuccessMsg("Account created! Check your email to confirm, then sign in.")
+            // Show the confirmation screen
+            setConfirmedEmail(email)
         } catch (err: any) {
             setError(err.message || "Something went wrong. Please try again.")
         } finally {
@@ -83,6 +83,22 @@ export default function SignupPage() {
             options: { redirectTo: `${window.location.origin}/auth/callback` },
         })
         if (error) setError(error.message)
+    }
+
+    const handleResend = async () => {
+        if (!confirmedEmail || resendStatus === "sending") return
+        setResendStatus("sending")
+        try {
+            await supabase.auth.resend({
+                type: "signup",
+                email: confirmedEmail,
+                options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/browse` },
+            })
+            setResendStatus("sent")
+            setTimeout(() => setResendStatus("idle"), 5000)
+        } catch {
+            setResendStatus("idle")
+        }
     }
 
     return (
@@ -125,149 +141,183 @@ export default function SignupPage() {
                         </div>
                     </div>
 
-                    {/* Right Side - Signup Form */}
+                    {/* Right Side - Signup Form / Confirmation */}
                     <div className="w-full lg:w-1/2 p-8 lg:p-12">
-                        <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            {/* Back to Home */}
-                            <Link href="/">
-                                <div className="mb-6 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors cursor-pointer">
-                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                    </svg>
-                                    <span className="text-sm">Back to home</span>
-                                </div>
-                            </Link>
-
-                            {/* Logo for mobile */}
-                            <div className="lg:hidden flex justify-center mb-6">
-                                <Image src="/rootslogo.png" alt="ROOTS" width={48} height={48} className="h-12 w-auto object-contain" />
-                            </div>
-
-                            <div className="mb-6">
-                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Create Account</h1>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Start your journey with ROOTS</p>
-                            </div>
-
-                            {/* Error */}
-                            {error && (
+                        <AnimatePresence mode="wait">
+                            {confirmedEmail ? (
+                                /* ── Confirmation Screen ── */
                                 <motion.div
-                                    className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm"
-                                    initial={{ opacity: 0, y: -10 }}
+                                    key="confirm"
+                                    initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="flex flex-col items-center justify-center h-full text-center py-12"
                                 >
-                                    {error}
-                                </motion.div>
-                            )}
+                                    <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-6">
+                                        <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
+                                    </div>
 
-                            {/* Success */}
-                            {successMsg && (
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Check your inbox!</h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">We sent a confirmation link to</p>
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-6 break-all">{confirmedEmail}</p>
+
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 max-w-xs">
+                                        Click the link in the email to activate your account. After confirming, you can sign in.
+                                    </p>
+
+                                    {/* Resend button */}
+                                    <button
+                                        onClick={handleResend}
+                                        disabled={resendStatus !== "idle"}
+                                        className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors disabled:opacity-50"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${resendStatus === "sending" ? "animate-spin" : ""}`} />
+                                        {resendStatus === "sent" ? "Email resent!" : resendStatus === "sending" ? "Resending…" : "Resend confirmation email"}
+                                    </button>
+
+                                    <div className="mt-10 pt-6 border-t border-gray-200 dark:border-gray-700 w-full">
+                                        <Link href="/auth/login" className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                                            Already confirmed? <span className="font-semibold text-green-600 dark:text-green-400">Sign in</span>
+                                        </Link>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                /* ── Sign-up Form ── */
                                 <motion.div
-                                    className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm"
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
+                                    key="form"
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    transition={{ duration: 0.5 }}
                                 >
-                                    {successMsg}
-                                </motion.div>
-                            )}
+                                    {/* Back to Home */}
+                                    <Link href="/">
+                                        <div className="mb-6 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors cursor-pointer">
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                            </svg>
+                                            <span className="text-sm">Back to home</span>
+                                        </div>
+                                    </Link>
 
-                            {/* Google Signup */}
-                            <motion.button
-                                onClick={handleGoogleSignup}
-                                className="w-full py-2.5 px-4 mb-5 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-50 transition-all duration-300 flex items-center justify-center space-x-3"
-                                whileHover={{ scale: 1.01 }}
-                                whileTap={{ scale: 0.99 }}
-                            >
-                                <GoogleIcon />
-                                <span>Sign up with Google</span>
-                            </motion.button>
-
-                            {/* Divider */}
-                            <div className="relative my-5">
-                                <div className="absolute inset-0 flex items-center">
-                                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
-                                </div>
-                                <div className="relative flex justify-center text-xs">
-                                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with email</span>
-                                </div>
-                            </div>
-
-                            {/* Signup Form */}
-                            <form onSubmit={handleSignup} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            placeholder="John Doe"
-                                            required
-                                            className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
-                                        />
+                                    {/* Logo for mobile */}
+                                    <div className="lg:hidden flex justify-center mb-6">
+                                        <Image src="/rootslogo.png" alt="ROOTS" width={48} height={48} className="h-12 w-auto object-contain" />
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="you@example.com"
-                                            required
-                                            className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
-                                        />
+                                    <div className="mb-6">
+                                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Create Account</h1>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">Start your journey with ROOTS</p>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="••••••••"
-                                            required
-                                            className="w-full pl-9 pr-11 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    {/* Error */}
+                                    {error && (
+                                        <motion.div
+                                            className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm"
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
                                         >
-                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                        </button>
+                                            {error}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Google Signup */}
+                                    <motion.button
+                                        onClick={handleGoogleSignup}
+                                        className="w-full py-2.5 px-4 mb-5 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-50 transition-all duration-300 flex items-center justify-center space-x-3"
+                                        whileHover={{ scale: 1.01 }}
+                                        whileTap={{ scale: 0.99 }}
+                                    >
+                                        <GoogleIcon />
+                                        <span>Sign up with Google</span>
+                                    </motion.button>
+
+                                    {/* Divider */}
+                                    <div className="relative my-5">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                                        </div>
+                                        <div className="relative flex justify-center text-xs">
+                                            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with email</span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">At least 8 characters</p>
-                                </div>
 
-                                <motion.button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                                    whileHover={!isLoading ? { scale: 1.01 } : {}}
-                                    whileTap={!isLoading ? { scale: 0.99 } : {}}
-                                >
-                                    {isLoading ? "Creating account..." : "Create Account"}
-                                </motion.button>
-                            </form>
+                                    {/* Signup Form */}
+                                    <form onSubmit={handleSignup} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+                                            <div className="relative">
+                                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    value={name}
+                                                    onChange={(e) => setName(e.target.value)}
+                                                    placeholder="John Doe"
+                                                    required
+                                                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
+                                                />
+                                            </div>
+                                        </div>
 
-                            <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
-                                Already have an account?{" "}
-                                <Link href="/auth/login" className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold">
-                                    Sign in
-                                </Link>
-                            </p>
-                        </motion.div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                                            <div className="relative">
+                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    type="email"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    placeholder="you@example.com"
+                                                    required
+                                                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                                            <div className="relative">
+                                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    type={showPassword ? "text" : "password"}
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    placeholder="••••••••"
+                                                    required
+                                                    className="w-full pl-9 pr-11 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all text-gray-900 dark:text-white text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                >
+                                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">At least 8 characters</p>
+                                        </div>
+
+                                        <motion.button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="w-full py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                            whileHover={!isLoading ? { scale: 1.01 } : {}}
+                                            whileTap={!isLoading ? { scale: 0.99 } : {}}
+                                        >
+                                            {isLoading ? "Creating account..." : "Create Account"}
+                                        </motion.button>
+                                    </form>
+
+                                    <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
+                                        Already have an account?{" "}
+                                        <Link href="/auth/login" className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold">
+                                            Sign in
+                                        </Link>
+                                    </p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </div>

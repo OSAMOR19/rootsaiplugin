@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(request: Request) {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const next = requestUrl.searchParams.get('next') ?? '/'
+    const next = requestUrl.searchParams.get('next') ?? '/browse'
 
     // Handle proxies (e.g., Render, Vercel) that might set requestUrl.origin to localhost:10000
     const forwardedHost = request.headers.get('x-forwarded-host')
