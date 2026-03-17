@@ -27,7 +27,7 @@ export default function SearchInput({ value, onChange, placeholder, disabled, on
       transition={{ duration: 0.5 }}
     >
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <Search className="absolute left-4 top-4 w-5 h-5 text-gray-400 pointer-events-none" />
         <motion.textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}

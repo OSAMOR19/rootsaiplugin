@@ -1,8 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Routes that require a logged-in session
-const PROTECTED_ROUTES = ['/favorites', '/settings', '/sample']
+// Routes that require a logged-in session.
+// The home page (/), /auth/*, and /admin/* stay public.
+const PROTECTED_ROUTES = [
+    '/browse',
+    '/explore',
+    '/sounds',
+    '/results',
+    '/pack',
+    '/sample',
+    '/favorites',
+    '/favourite',
+    '/settings',
+    '/loop-player',
+    '/audio-demo',
+    '/audio-test',
+    '/r2-demo',
+]
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
