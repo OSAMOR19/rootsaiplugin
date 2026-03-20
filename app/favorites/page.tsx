@@ -8,6 +8,8 @@ import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
 import { getFavorites, removeFavorite, type FavoriteSample } from "@/lib/favorites"
 import { Skeleton } from "@/components/ui/skeleton"
+import PaywallModal from "@/components/PaywallModal"
+import { useSubscription } from "@/hooks/useSubscription"
 
 function FavoritesContent() {
   const router = useRouter()
@@ -17,6 +19,24 @@ function FavoritesContent() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
   const [volume, setVolume] = useState(75)
   const [searchFilter, setSearchFilter] = useState("")
+  const { isPro, loading: subLoading } = useSubscription()
+
+  // Paywall gate — show before loading favorites
+  if (subLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!isPro) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900">
+        <PaywallModal onDismiss={() => router.push('/')} />
+      </div>
+    )
+  }
 
   // Load favorites from localStorage
   useEffect(() => {
