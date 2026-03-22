@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
+import { trackEvent } from "@/utils/analytics"
 
 interface SampleActionsMenuProps {
     sample: any
@@ -32,6 +33,7 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
             link.click()
             document.body.removeChild(link)
             window.URL.revokeObjectURL(blobUrl)
+            trackEvent('download', 'sample', sample.id, sample.pack_id)
         } catch (error) {
             console.error('Download failed:', error)
             window.open(url, '_blank')
@@ -62,6 +64,7 @@ export default function SampleActionsMenu({ sample, iconColor = "text-gray-400 d
 
             const content = await zip.generateAsync({ type: "blob" })
             saveAs(content, `${sample.name}_stems.zip`)
+            trackEvent('download', 'sample', sample.id, sample.pack_id)
 
         } catch (error) {
             console.error("Failed to zip stems:", error)

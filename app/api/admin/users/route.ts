@@ -7,7 +7,7 @@ export async function GET() {
         // Also pull email from auth.users via the admin API
         const { data: profiles, error } = await supabaseAdmin
             .from('profiles')
-            .select('id, full_name, plan, created_at')
+            .select('id, full_name, plan, created_at, is_pro, stripe_subscription_id, paystack_reference')
             .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -42,14 +42,16 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ success: false, error: 'Invalid params' }, { status: 400 })
         }
 
+        const is_pro = plan === 'paid'
+
         const { error } = await supabaseAdmin
             .from('profiles')
-            .update({ plan })
+            .update({ plan, is_pro })
             .eq('id', userId)
 
         if (error) throw error
 
-        return NextResponse.json({ success: true })
+        return NextResponse.json({ success: true, plan, is_pro })
     } catch (error) {
         return NextResponse.json(
             { success: false, error: error instanceof Error ? error.message : 'Failed to update user' },

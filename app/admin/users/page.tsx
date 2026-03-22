@@ -9,6 +9,9 @@ interface UserRow {
     full_name: string | null
     email: string | null
     plan: 'free' | 'paid'
+    is_pro?: boolean
+    stripe_subscription_id?: string | null
+    paystack_reference?: string | null
     created_at: string
 }
 
@@ -53,7 +56,7 @@ export default function UsersPage() {
             })
             const data = await res.json()
             if (data.success) {
-                setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: newPlan } : u))
+                setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: newPlan, is_pro: newPlan === 'paid' } : u))
             }
         } catch (err) {
             console.error('Failed to update plan:', err)
@@ -70,8 +73,8 @@ export default function UsersPage() {
         )
     })
 
-    const freeCount = users.filter(u => u.plan === 'free').length
-    const paidCount = users.filter(u => u.plan === 'paid').length
+    const freeCount = users.filter(u => !u.is_pro && u.plan !== 'paid').length
+    const paidCount = users.filter(u => u.is_pro || u.plan === 'paid').length
 
     return (
         <div className="space-y-6">
@@ -128,9 +131,10 @@ export default function UsersPage() {
             <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
                 {/* Header */}
                 <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-medium text-white/40 uppercase tracking-wider">
-                    <div className="col-span-4">User</div>
-                    <div className="col-span-4">Email</div>
+                    <div className="col-span-3">User</div>
+                    <div className="col-span-3">Email</div>
                     <div className="col-span-2">Plan</div>
+                    <div className="col-span-2">Provider</div>
                     <div className="col-span-1">Joined</div>
                     <div className="col-span-1 text-right">Action</div>
                 </div>
@@ -152,7 +156,7 @@ export default function UsersPage() {
                                 className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/5 transition-colors"
                             >
                                 {/* Name + avatar */}
-                                <div className="col-span-4 flex items-center gap-3">
+                                <div className="col-span-3 flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                                         {(user.full_name || user.email || '?')[0].toUpperCase()}
                                     </div>
@@ -162,20 +166,31 @@ export default function UsersPage() {
                                 </div>
 
                                 {/* Email */}
-                                <div className="col-span-4 text-white/60 text-sm truncate">
+                                <div className="col-span-3 text-white/60 text-sm truncate">
                                     {user.email || '—'}
                                 </div>
 
                                 {/* Plan badge */}
                                 <div className="col-span-2">
-                                    {user.plan === 'paid' ? (
+                                    {user.is_pro || user.plan === 'paid' ? (
                                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-semibold">
-                                            <Crown className="w-3 h-3" /> Paid
+                                            <Crown className="w-3 h-3" /> Pro
                                         </span>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-white/10 text-white/50 rounded-full text-xs font-medium">
                                             Free
                                         </span>
+                                    )}
+                                </div>
+
+                                {/* Provider badge */}
+                                <div className="col-span-2 flex items-center">
+                                    {user.stripe_subscription_id ? (
+                                        <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded text-[10px] font-bold tracking-wider uppercase">Stripe</span>
+                                    ) : user.paystack_reference ? (
+                                        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold tracking-wider uppercase">Paystack</span>
+                                    ) : (
+                                        <span className="text-white/30 text-xs">—</span>
                                     )}
                                 </div>
 

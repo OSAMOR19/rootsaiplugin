@@ -58,7 +58,17 @@ export async function POST(request: Request) {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRO_PRICE_ID!,
+          price_data: {
+            currency: (process.env.NEXT_PUBLIC_STRIPE_CURRENCY || 'USD').toLowerCase(),
+            recurring: {
+              interval: 'month',
+            },
+            product_data: {
+              name: 'ROOTS Pro Subscription',
+              description: 'Full access to all samples, genres, and features',
+            },
+            unit_amount: Math.round(Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT || 5) * 100),
+          },
           quantity: 1,
         },
       ],

@@ -30,6 +30,18 @@ interface PaywallModalProps {
   onDismiss?: () => void
 }
 
+const PaystackLogo = () => (
+  <svg width="28" height="28" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M512 0C229.2 0 0 229.2 0 512c0 282.8 229.2 512 512 512 282.8 0 512-229.2 512-512C1024 229.2 794.8 0 512 0zm-111 685H277.5V562.6H401V685zm345.5 0H623v-122.4h123.5V685zM746.5 500.2H277.5V377.7h469v122.5z" fill="#0BA4DB"/>
+  </svg>
+)
+
+const StripeLogo = () => (
+  <svg width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15.4 12.3c0-1.2 1-1.7 2.6-1.7 2.1 0 4.3 .7 6.1 1.9l2.2-6.5C24.1 4.5 21.1 3.5 18 3.5c-6.1 0-10.4 3.2-10.4 8.7 0 8.1 11.2 6.6 11.2 10.1 0 1.4-1.2 2-3 2-2.7 0-5.5-1.1-7.8-2.9l-2.3 6.6c2.8 1.8 6.1 2.9 9.5 2.9 6.4 0 10.9-3.2 10.9-8.9 0-8.6-11.2-6.9-11.2-10.3z" fill="#635BFF"/>
+  </svg>
+)
+
 export default function PaywallModal({ onDismiss }: PaywallModalProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<Provider | null>(null)
@@ -76,7 +88,10 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
 
       const redirectUrl = provider === 'paystack' ? data.authorization_url : data.url
       if (redirectUrl) {
-        window.location.href = redirectUrl
+        window.open(redirectUrl, '_blank')
+        // Automatically close the modal in this tab since it opened in a new one
+        if (onDismiss) onDismiss()
+        else router.back()
       }
     } catch (err: any) {
       setError(err.message)
@@ -89,11 +104,11 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
     else router.back()
   }
 
-  const providers: { id: Provider; name: string; logo: string; tagline: string; price: string; symbol: string; currency: string }[] = [
+  const providers: { id: Provider; name: string; logo: React.ReactNode; tagline: string; price: string; symbol: string; currency: string }[] = [
     {
       id:       'paystack',
       name:     'Paystack',
-      logo:     '🇳🇬',
+      logo:     <PaystackLogo />,
       tagline:  'Cards, Bank, USSD & more',
       price:    Math.round(psPrice).toLocaleString(),
       symbol:   psSymbol,
@@ -102,7 +117,7 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
     {
       id:       'stripe',
       name:     'Stripe',
-      logo:     '💳',
+      logo:     <StripeLogo />,
       tagline:  'International cards',
       price:    stripePriceStr,
       symbol:   stripeSymbol,
@@ -181,7 +196,7 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
                   {selected === p.id && (
                     <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-green-500" />
                   )}
-                  <span className="text-2xl">{p.logo}</span>
+                  <span className="flex items-center justify-center h-8 my-1">{p.logo}</span>
                   <span className="text-sm font-bold text-gray-900 dark:text-white">{p.name}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">{p.tagline}</span>
                   <span className="mt-1 text-base font-extrabold text-green-600 dark:text-green-400">

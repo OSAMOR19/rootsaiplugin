@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import SampleActionsMenu from "./SampleActionsMenu"
 import { useFavorites } from "@/hooks/useFavorites"
+import { trackEvent } from "@/utils/analytics"
 
 // Removed static image imports to prevent sharp build error
 
@@ -36,6 +37,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
         await newAudio.play()
         onSamplePlay(sampleId)
         console.log('Playing audio:', sampleId, audioUrl)
+        trackEvent('play', 'sample', sampleId, samples.find(s => s.id === sampleId)?.pack_id)
       } catch (error) {
         console.error('Error playing audio:', error)
       }
@@ -66,6 +68,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
         await audioElement.play()
         onSamplePlay(sampleId)
         console.log('Playing audio:', sampleId, audioElement.src)
+        trackEvent('play', 'sample', sampleId, samples.find(s => s.id === sampleId)?.pack_id)
       }
     } catch (error) {
       console.error('Error playing audio:', error)
@@ -233,7 +236,19 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 <motion.button
                   onClick={(e) => {
                     e.stopPropagation()
-                    // Handle download
+                    const url = sample.audioUrl || sample.url
+                    if (!url) return
+                    fetch(url)
+                      .then(res => res.blob())
+                      .then(blob => {
+                        const blobUrl = window.URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = blobUrl
+                        a.download = `${sample.name || 'sample'}.wav`
+                        a.click()
+                        window.URL.revokeObjectURL(blobUrl)
+                      }).catch(() => window.open(url, '_blank'))
+                    trackEvent('download', 'sample', sample.id, sample.pack_id)
                   }}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30"
                   whileHover={{ scale: 1.05 }}
@@ -372,7 +387,19 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
               <motion.button
                 onClick={(e) => {
                   e.stopPropagation()
-                  // Handle download
+                  const url = sample.audioUrl || sample.url
+                  if (!url) return
+                  fetch(url)
+                    .then(res => res.blob())
+                    .then(blob => {
+                      const blobUrl = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = blobUrl
+                      a.download = `${sample.name || 'sample'}.wav`
+                      a.click()
+                      window.URL.revokeObjectURL(blobUrl)
+                    }).catch(() => window.open(url, '_blank'))
+                  trackEvent('download', 'sample', sample.id, sample.pack_id)
                 }}
                 className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30 flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}

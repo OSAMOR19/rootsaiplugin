@@ -1,30 +1,39 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronDown, ArrowUpRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { ChevronDown, Loader2 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
-// Mock Data for Chart
-const chartData = [
-    { name: 'Nov 13', value: 400 },
-    { name: 'Nov 15', value: 300 },
-    { name: 'Nov 17', value: 200 },
-    { name: 'Nov 19', value: 278 },
-    { name: 'Nov 21', value: 189 },
-    { name: 'Nov 23', value: 239 },
-    { name: 'Nov 25', value: 349 },
-    { name: 'Nov 27', value: 200 },
-    { name: 'Nov 29', value: 278 },
-    { name: 'Dec 01', value: 189 },
-    { name: 'Dec 03', value: 349 },
-    { name: 'Dec 05', value: 400 },
-    { name: 'Dec 07', value: 300 },
-    { name: 'Dec 09', value: 200 },
-    { name: 'Dec 11', value: 278 },
-    { name: 'Dec 13', value: 189 },
-]
-
 export default function DashboardPage() {
+    const [data, setData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/admin/dashboard')
+                const json = await res.json()
+                if (json.success) {
+                    setData(json)
+                }
+            } catch (error) {
+                console.error('Failed to load dashboard metrics', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchMetrics()
+    }, [])
+
+    if (loading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+            </div>
+        )
+    }
+
+    const { totalPlays = 0, totalDownloads = 0, conversionRate = "0%", chartData = [], topPacks = [] } = data || {}
 
     return (
         <div className="space-y-8">
@@ -39,9 +48,9 @@ export default function DashboardPage() {
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <StatCard label="Downloads" value="1,720" />
-                <StatCard label="Plays" value="45,921" />
-                <StatCard label="Conversion rate" value="3.75%" />
+                <StatCard label="Downloads" value={totalDownloads.toLocaleString()} />
+                <StatCard label="Plays" value={totalPlays.toLocaleString()} />
+                <StatCard label="Conversion rate" value={conversionRate} />
                 {/* Revenue excluded as requested */}
             </div>
 
@@ -73,11 +82,21 @@ export default function DashboardPage() {
                         />
                         <Area
                             type="monotone"
-                            dataKey="value"
+                            dataKey="plays"
+                            name="Plays"
                             stroke="#8b5cf6"
                             strokeWidth={2}
                             fillOpacity={1}
                             fill="url(#colorValue)"
+                        />
+                        <Area
+                            type="monotone"
+                            dataKey="downloads"
+                            name="Downloads"
+                            stroke="#10b981"
+                            strokeWidth={2}
+                            fillOpacity={0.2}
+                            fill="#10b981"
                         />
                     </AreaChart>
                 </ResponsiveContainer>
@@ -101,22 +120,22 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Rows */}
-                    {[
-                        { name: "Afrowave Vol 4", downloads: "1,755", plays: "34,052", conv: "5.15%", date: "Jun 4, 2024" },
-                        { name: "PLUTO Vol 2 - Amapiano", downloads: "1,382", plays: "25,564", conv: "5.41%", date: "Sep 18, 2024" },
-                        { name: "Riddims Drum Loops Vol. 4", downloads: "1,207", plays: "29,659", conv: "4.07%", date: "Jan 14, 2025" }
-                    ].map((row, index) => (
-                        <div key={index} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/5 transition-colors">
-                            <div className="col-span-1 text-white/60">{index + 1}</div>
-                            <div className="col-span-5 flex items-center gap-3">
-                                <div className="w-8 h-8 bg-gray-700 rounded flex-shrink-0" />
-                                <span className="font-medium text-white">{row.name}</span>
+                    {topPacks.length === 0 ? (
+                        <div className="p-8 text-center text-white/40 text-sm">No engagement data yet. Go play some samples!</div>
+                    ) : (
+                        topPacks.map((row: any, index: number) => (
+                            <div key={index} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-white/5 transition-colors">
+                                <div className="col-span-1 text-white/60">{index + 1}</div>
+                                <div className="col-span-5 flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-gray-700/50 rounded flex-shrink-0 flex items-center justify-center text-xs text-white/50">{row.name.charAt(0)}</div>
+                                    <span className="font-medium text-white truncate">{row.name}</span>
+                                </div>
+                                <div className="col-span-2 text-right text-white/80">{row.downloads.toLocaleString()}</div>
+                                <div className="col-span-2 text-right text-white/80">{row.plays.toLocaleString()}</div>
+                                <div className="col-span-2 text-right text-white/80">{row.conv}</div>
                             </div>
-                            <div className="col-span-2 text-right text-white/80">{row.downloads}</div>
-                            <div className="col-span-2 text-right text-white/80">{row.plays}</div>
-                            <div className="col-span-2 text-right text-white/80">{row.conv}</div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
         </div>
