@@ -6,7 +6,7 @@ import stripe from '@/lib/stripe'
 export async function POST(request: Request) {
   if (!stripe) {
     return NextResponse.json(
-      { error: 'Stripe is not configured yet. Please add STRIPE_SECRET_KEY to your environment variables.' },
+      { error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY to your environment variables.' },
       { status: 503 }
     )
   }
@@ -45,7 +45,6 @@ export async function POST(request: Request) {
       })
       customerId = customer.id
 
-      // Save customer ID
       await supabase
         .from('profiles')
         .upsert({ id: user.id, stripe_customer_id: customerId })

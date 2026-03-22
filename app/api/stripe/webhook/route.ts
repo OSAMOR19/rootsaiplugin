@@ -58,7 +58,6 @@ export async function POST(request: Request) {
       const subscription = event.data.object as any
       const customerId = subscription.customer as string
 
-      // Find the user by stripe_customer_id
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -82,7 +81,6 @@ export async function POST(request: Request) {
     }
 
     default:
-      // Unhandled event type — ignore silently
       break
   }
 

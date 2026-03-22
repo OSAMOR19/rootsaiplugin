@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -12,6 +12,8 @@ import {
   X,
   Loader2,
   Star,
+  CreditCard,
+  CheckCircle2,
 } from 'lucide-react'
 
 const FEATURES = [
@@ -22,43 +24,91 @@ const FEATURES = [
   { icon: Star,       label: 'New drops every week' },
 ]
 
+type Provider = 'paystack' | 'stripe'
+
 interface PaywallModalProps {
-  /** Called when the user dismisses the modal (goes back) */
   onDismiss?: () => void
 }
 
 export default function PaywallModal({ onDismiss }: PaywallModalProps) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState<Provider | null>(null)
   const [error, setError] = useState('')
+  const [selected, setSelected] = useState<Provider>('paystack')
 
-  const price = process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT ?? '9.99'
-  const currency = (process.env.NEXT_PUBLIC_STRIPE_CURRENCY ?? 'USD').toUpperCase()
-  const currencySymbol = currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '$'
+  // ── Stripe pricing (Base) ──────────────────────────────────────────────────
+  const stripeBasePrice = Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT ?? 5)
+  const stripeCurrency = (process.env.NEXT_PUBLIC_STRIPE_CURRENCY ?? 'USD').toUpperCase()
+  const stripeSymbol   = stripeCurrency === 'GBP' ? '£' : stripeCurrency === 'EUR' ? '€' : '$'
+  const stripePriceStr = stripeBasePrice.toFixed(2)
 
-  const handleSubscribe = async () => {
-    setIsLoading(true)
+  // ── Paystack pricing (Dynamic) ─────────────────────────────────────────────
+  const psCurrency   = (process.env.NEXT_PUBLIC_PAYSTACK_CURRENCY ?? 'NGN').toUpperCase()
+  const psSymbol     = psCurrency === 'GBP' ? '£' : psCurrency === 'EUR' ? '€' : psCurrency === 'GHS' ? 'GH₵' : psCurrency === 'ZAR' ? 'R' : '₦'
+  
+  // Start with fallback from env
+  const fallbackAmount = Number(process.env.NEXT_PUBLIC_PAYSTACK_AMOUNT ?? 500000) / 100
+  const [psPrice, setPsPrice] = useState<number>(fallbackAmount)
+
+  useEffect(() => {
+    // Fetch live conversion rate from USD to target currency (e.g. NGN)
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.rates?.[psCurrency]) {
+          setPsPrice(stripeBasePrice * data.rates[psCurrency])
+        }
+      })
+      .catch(err => console.error("Failed to fetch exchange rate", err))
+  }, [stripeBasePrice, psCurrency])
+
+  const handleSubscribe = async (provider: Provider) => {
+    setIsLoading(provider)
     setError('')
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const endpoint = provider === 'paystack'
+        ? '/api/paystack/checkout'
+        : '/api/stripe/checkout'
+
+      const res  = await fetch(endpoint, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
-      if (data.url) {
-        window.location.href = data.url
+
+      const redirectUrl = provider === 'paystack' ? data.authorization_url : data.url
+      if (redirectUrl) {
+        window.location.href = redirectUrl
       }
     } catch (err: any) {
       setError(err.message)
-      setIsLoading(false)
+      setIsLoading(null)
     }
   }
 
   const handleDismiss = () => {
-    if (onDismiss) {
-      onDismiss()
-    } else {
-      router.back()
-    }
+    if (onDismiss) onDismiss()
+    else router.back()
   }
+
+  const providers: { id: Provider; name: string; logo: string; tagline: string; price: string; symbol: string; currency: string }[] = [
+    {
+      id:       'paystack',
+      name:     'Paystack',
+      logo:     '🇳🇬',
+      tagline:  'Cards, Bank, USSD & more',
+      price:    Math.round(psPrice).toLocaleString(),
+      symbol:   psSymbol,
+      currency: psCurrency,
+    },
+    {
+      id:       'stripe',
+      name:     'Stripe',
+      logo:     '💳',
+      tagline:  'International cards',
+      price:    stripePriceStr,
+      symbol:   stripeSymbol,
+      currency: stripeCurrency,
+    },
+  ]
 
   return (
     <AnimatePresence>
@@ -113,12 +163,33 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
               ))}
             </ul>
 
-            {/* Pricing */}
-            <div className="text-center mb-6">
-              <span className="text-4xl font-extrabold text-gray-900 dark:text-white">
-                {currencySymbol}{price}
-              </span>
-              <span className="text-gray-500 dark:text-gray-400 text-sm ml-1">/month</span>
+            {/* Payment provider selector */}
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <CreditCard className="w-3.5 h-3.5" /> Choose payment method
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              {providers.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelected(p.id)}
+                  className={`relative flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-200 text-center ${
+                    selected === p.id
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-sm'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-700'
+                  }`}
+                >
+                  {selected === p.id && (
+                    <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-green-500" />
+                  )}
+                  <span className="text-2xl">{p.logo}</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">{p.name}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{p.tagline}</span>
+                  <span className="mt-1 text-base font-extrabold text-green-600 dark:text-green-400">
+                    {p.symbol}{p.price}
+                    <span className="text-xs font-normal text-gray-400 ml-0.5">/{p.currency}/mo</span>
+                  </span>
+                </button>
+              ))}
             </div>
 
             {/* Error */}
@@ -134,8 +205,8 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
 
             {/* CTA */}
             <motion.button
-              onClick={handleSubscribe}
-              disabled={isLoading}
+              onClick={() => handleSubscribe(selected)}
+              disabled={!!isLoading}
               className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               whileHover={!isLoading ? { scale: 1.02 } : {}}
               whileTap={!isLoading ? { scale: 0.98 } : {}}
@@ -143,18 +214,18 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Redirecting to checkout…
+                  Redirecting to {isLoading === 'paystack' ? 'Paystack' : 'Stripe'}…
                 </>
               ) : (
                 <>
                   <Zap className="w-4 h-4" />
-                  Get ROOTS Pro — {currencySymbol}{price}/mo
+                  Pay with {selected === 'paystack' ? 'Paystack' : 'Stripe'}
                 </>
               )}
             </motion.button>
 
             <p className="mt-3 text-center text-xs text-gray-400 dark:text-gray-500">
-              Cancel anytime · Secure payment via Stripe
+              Cancel anytime · Secure payment via {selected === 'paystack' ? 'Paystack' : 'Stripe'}
             </p>
           </div>
         </motion.div>
