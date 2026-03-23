@@ -8,6 +8,9 @@ import Image from "next/image"
 import SampleActionsMenu from "./SampleActionsMenu"
 import { useFavorites } from "@/hooks/useFavorites"
 import { trackEvent } from "@/utils/analytics"
+import { useSubscription } from "@/hooks/useSubscription"
+import { useLimits } from "@/hooks/useLimits"
+import PaywallModal from "@/components/PaywallModal"
 
 // Removed static image imports to prevent sharp build error
 
@@ -22,6 +25,9 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
   const router = useRouter()
   const { isFavorite, toggleFavorite } = useFavorites()
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({})
+  const { isPro } = useSubscription()
+  const { canDownload, incrementDownload } = useLimits(isPro)
+  const [showPaywall, setShowPaywall] = useState(false)
 
   // Handle audio playback
   const handlePlayPause = async (sampleId: string, audioUrl?: string) => {
@@ -109,9 +115,29 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
     router.push(`/sample/${sampleId}`)
   }
 
+  const handleDownloadClick = (e: React.MouseEvent, sample: any) => {
+    e.stopPropagation()
+    if (!canDownload) { setShowPaywall(true); return }
+    const url = sample.audioUrl || sample.url
+    if (!url) return
+    incrementDownload()
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => {
+        const blobUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = `${sample.name || 'sample'}.wav`
+        a.click()
+        window.URL.revokeObjectURL(blobUrl)
+      }).catch(() => window.open(url, '_blank'))
+    trackEvent('download', 'sample', sample.id, sample.pack_id)
+  }
+
   if (viewMode === "grid") {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+        {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
         {samples.map((sample, index) => (
           <motion.div
             key={sample.id}
@@ -234,22 +260,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
                 </motion.button>
 
                 <motion.button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const url = sample.audioUrl || sample.url
-                    if (!url) return
-                    fetch(url)
-                      .then(res => res.blob())
-                      .then(blob => {
-                        const blobUrl = window.URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = blobUrl
-                        a.download = `${sample.name || 'sample'}.wav`
-                        a.click()
-                        window.URL.revokeObjectURL(blobUrl)
-                      }).catch(() => window.open(url, '_blank'))
-                    trackEvent('download', 'sample', sample.id, sample.pack_id)
-                  }}
+                  onClick={(e) => handleDownloadClick(e, sample)}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -285,6 +296,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
   // List view - Glassmorphism design
   return (
     <div className="space-y-4">
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
       {samples.map((sample, index) => (
         <motion.div
           key={sample.id}
@@ -385,22 +397,7 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
               </motion.button>
 
               <motion.button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const url = sample.audioUrl || sample.url
-                  if (!url) return
-                  fetch(url)
-                    .then(res => res.blob())
-                    .then(blob => {
-                      const blobUrl = window.URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = blobUrl
-                      a.download = `${sample.name || 'sample'}.wav`
-                      a.click()
-                      window.URL.revokeObjectURL(blobUrl)
-                    }).catch(() => window.open(url, '_blank'))
-                  trackEvent('download', 'sample', sample.id, sample.pack_id)
-                }}
+                onClick={(e) => handleDownloadClick(e, sample)}
                 className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-all duration-300 shadow-lg shadow-emerald-500/30 flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon, Shield, User, LogOut, Save, Mail } from "lucide-react"
+import { ArrowLeft, Moon, Sun, Monitor, Volume2, Headphones, SettingsIcon, Shield, User, LogOut, Save, Mail, HeadphonesIcon, CreditCard, Crown, Loader2, MessageSquare, ExternalLink } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { useSubscription } from "@/hooks/useSubscription"
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { isPro } = useSubscription()
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system")
   const [audioOutput, setAudioOutput] = useState("default")
   const [masterVolume, setMasterVolume] = useState(75)
@@ -17,11 +19,28 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelSuccess, setCancelSuccess] = useState(false)
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null)
+  const [paystackCustomerCode, setPaystackCustomerCode] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       setDisplayName(session?.user?.user_metadata?.full_name || "")
+    })
+    // Fetch payment provider info for the manage sub section
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id, paystack_customer_code')
+        .eq('id', user.id)
+        .single()
+      if (data) {
+        setStripeCustomerId(data.stripe_customer_id || null)
+        setPaystackCustomerCode(data.paystack_customer_code || null)
+      }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -91,6 +110,35 @@ export default function SettingsPage() {
     }
   }
 
+  const handleManageStripe = async () => {
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const { url, error } = await res.json()
+      if (error) { alert(error); return }
+      window.open(url, '_blank')
+    } catch {
+      alert('Could not open billing portal. Please try again.')
+    }
+  }
+
+  const handleCancelPaystack = async () => {
+    if (!confirm('Are you sure you want to cancel your ROOTS Pro subscription? You will lose access at the end of your current period.')) return
+    setIsCancelling(true)
+    try {
+      const res = await fetch('/api/paystack/cancel', { method: 'POST' })
+      const { success, error } = await res.json()
+      if (error) { alert(error); setIsCancelling(false); return }
+      if (success) {
+        setCancelSuccess(true)
+        setTimeout(() => window.location.reload(), 2000)
+      }
+    } catch {
+      alert('Cancellation failed. Please contact support.')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 transition-colors duration-300">
       {/* Header */}
@@ -157,6 +205,67 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Plan Badge */}
+                <div className="flex items-center gap-3 p-4 rounded-xl border"
+                  style={isPro
+                    ? { background: 'linear-gradient(135deg,rgba(34,197,94,.15),rgba(16,185,129,.15))', borderColor: 'rgba(34,197,94,.3)' }
+                    : { background: 'rgba(107,114,128,.05)', borderColor: 'rgba(107,114,128,.2)' }
+                  }>
+                  <Crown className={`w-5 h-5 ${isPro ? 'text-yellow-500' : 'text-gray-400 dark:text-gray-500'}`} />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      Current Plan: <span className={isPro ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}>{isPro ? 'Pro ✓' : 'Free'}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {isPro ? 'Full access to all samples, packs, and AI features.' : '5 downloads and 5 AI uses included. Upgrade to unlock everything.'}
+                    </div>
+                  </div>
+                  {!isPro && (
+                    <motion.button
+                      onClick={() => router.push('/browse')}
+                      className="ml-auto px-4 py-1.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-xs font-semibold rounded-full shadow-md"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Upgrade
+                    </motion.button>
+                  )}
+                </div>
+
+                {/* Subscription Management (only for pro users) */}
+                {isPro && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Subscription Management</p>
+                    {cancelSuccess ? (
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-400">
+                        ✓ Subscription cancelled. Refreshing…
+                      </div>
+                    ) : stripeCustomerId ? (
+                      <motion.button
+                        onClick={handleManageStripe}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 font-medium rounded-lg text-sm transition-all"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Manage / Cancel Stripe Subscription
+                        <ExternalLink className="w-3.5 h-3.5 ml-auto opacity-60" />
+                      </motion.button>
+                    ) : paystackCustomerCode ? (
+                      <motion.button
+                        onClick={handleCancelPaystack}
+                        disabled={isCancelling}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-medium rounded-lg text-sm transition-all disabled:opacity-50"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {isCancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                        {isCancelling ? 'Cancelling…' : 'Cancel Paystack Subscription'}
+                      </motion.button>
+                    ) : null}
+                  </div>
+                )}
 
                 {/* Save / Success */}
                 <div className="flex items-center space-x-3">
@@ -399,6 +508,31 @@ export default function SettingsPage() {
             >
               Check for Updates
             </motion.button>
+          </motion.div>
+
+          {/* Contact Support */}
+          <motion.div
+            className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2 flex items-center">
+              <MessageSquare className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
+              Contact Support
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Having trouble with payments, subscriptions, or the app? We're here to help.
+            </p>
+            <motion.a
+              href="mailto:support@rootsaiplugin.com?subject=ROOTS Support Request"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-sm"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Mail className="w-4 h-4" />
+              Email Support
+            </motion.a>
           </motion.div>
         </div>
       </div>

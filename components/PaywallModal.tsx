@@ -14,6 +14,7 @@ import {
   Star,
   CreditCard,
   CheckCircle2,
+  Tag,
 } from 'lucide-react'
 
 const FEATURES = [
@@ -25,6 +26,7 @@ const FEATURES = [
 ]
 
 type Provider = 'paystack' | 'stripe'
+type BillingInterval = 'month' | 'year'
 
 interface PaywallModalProps {
   onDismiss?: () => void
@@ -42,37 +44,39 @@ const StripeLogo = () => (
   </svg>
 )
 
+// Pricing config
+const MONTHLY_USD = 5
+const YEARLY_USD = 50  // $60 discounted to $50
+const YEARLY_SAVINGS_USD = 60 - 50
+
 export default function PaywallModal({ onDismiss }: PaywallModalProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<Provider | null>(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Provider>('paystack')
+  const [billing, setBilling] = useState<BillingInterval>('month')
 
-  // ── Stripe pricing (Base) ──────────────────────────────────────────────────
-  const stripeBasePrice = Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT ?? 5)
-  const stripeCurrency = (process.env.NEXT_PUBLIC_STRIPE_CURRENCY ?? 'USD').toUpperCase()
-  const stripeSymbol   = stripeCurrency === 'GBP' ? '£' : stripeCurrency === 'EUR' ? '€' : '$'
-  const stripePriceStr = stripeBasePrice.toFixed(2)
-
-  // ── Paystack pricing (Dynamic) ─────────────────────────────────────────────
-  const psCurrency   = (process.env.NEXT_PUBLIC_PAYSTACK_CURRENCY ?? 'NGN').toUpperCase()
-  const psSymbol     = psCurrency === 'GBP' ? '£' : psCurrency === 'EUR' ? '€' : psCurrency === 'GHS' ? 'GH₵' : psCurrency === 'ZAR' ? 'R' : '₦'
-  
-  // Start with fallback from env
+  // ── Live Paystack exchange rate ───────────────────────────────────────────
+  const psCurrency = (process.env.NEXT_PUBLIC_PAYSTACK_CURRENCY ?? 'NGN').toUpperCase()
+  const psSymbol = psCurrency === 'GBP' ? '£' : psCurrency === 'EUR' ? '€' : psCurrency === 'GHS' ? 'GH₵' : psCurrency === 'ZAR' ? 'R' : '₦'
   const fallbackAmount = Number(process.env.NEXT_PUBLIC_PAYSTACK_AMOUNT ?? 500000) / 100
-  const [psPrice, setPsPrice] = useState<number>(fallbackAmount)
+  const [exchangeRate, setExchangeRate] = useState<number>(fallbackAmount / MONTHLY_USD)
 
   useEffect(() => {
-    // Fetch live conversion rate from USD to target currency (e.g. NGN)
     fetch('https://open.er-api.com/v6/latest/USD')
       .then(res => res.json())
       .then(data => {
-        if (data?.rates?.[psCurrency]) {
-          setPsPrice(stripeBasePrice * data.rates[psCurrency])
-        }
+        if (data?.rates?.[psCurrency]) setExchangeRate(data.rates[psCurrency])
       })
-      .catch(err => console.error("Failed to fetch exchange rate", err))
-  }, [stripeBasePrice, psCurrency])
+      .catch(() => {})
+  }, [psCurrency])
+
+  // ── Computed prices ────────────────────────────────────────────────────────
+  const stripeSymbol = '$'
+  const stripeUSD = billing === 'month' ? MONTHLY_USD : YEARLY_USD
+  const psAmount = billing === 'month'
+    ? Math.round(MONTHLY_USD * exchangeRate)
+    : Math.round(YEARLY_USD * exchangeRate)
 
   const handleSubscribe = async (provider: Provider) => {
     setIsLoading(provider)
@@ -82,14 +86,17 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
         ? '/api/paystack/checkout'
         : '/api/stripe/checkout'
 
-      const res  = await fetch(endpoint, { method: 'POST' })
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billing_interval: billing }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Something went wrong')
 
       const redirectUrl = provider === 'paystack' ? data.authorization_url : data.url
       if (redirectUrl) {
         window.open(redirectUrl, '_blank')
-        // Automatically close the modal in this tab since it opened in a new one
         if (onDismiss) onDismiss()
         else router.back()
       }
@@ -106,22 +113,16 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
 
   const providers: { id: Provider; name: string; logo: React.ReactNode; tagline: string; price: string; symbol: string; currency: string }[] = [
     {
-      id:       'paystack',
-      name:     'Paystack',
-      logo:     <PaystackLogo />,
-      tagline:  'Cards, Bank, USSD & more',
-      price:    Math.round(psPrice).toLocaleString(),
-      symbol:   psSymbol,
-      currency: psCurrency,
+      id: 'paystack', name: 'Paystack', logo: <PaystackLogo />,
+      tagline: 'Cards, Bank, USSD & more',
+      price: psAmount.toLocaleString(),
+      symbol: psSymbol, currency: psCurrency,
     },
     {
-      id:       'stripe',
-      name:     'Stripe',
-      logo:     <StripeLogo />,
-      tagline:  'International cards',
-      price:    stripePriceStr,
-      symbol:   stripeSymbol,
-      currency: stripeCurrency,
+      id: 'stripe', name: 'Stripe', logo: <StripeLogo />,
+      tagline: 'International cards',
+      price: stripeUSD.toFixed(2),
+      symbol: stripeSymbol, currency: 'USD',
     },
   ]
 
@@ -167,7 +168,7 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
             </div>
 
             {/* Feature list */}
-            <ul className="space-y-3 mb-6">
+            <ul className="space-y-2.5 mb-5">
               {FEATURES.map(({ icon: Icon, label }) => (
                 <li key={label} className="flex items-center gap-3">
                   <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
@@ -178,7 +179,31 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
               ))}
             </ul>
 
-            {/* Payment provider selector */}
+            {/* Billing interval toggle */}
+            <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-5">
+              {(['month', 'year'] as BillingInterval[]).map((interval) => (
+                <button
+                  key={interval}
+                  onClick={() => setBilling(interval)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    billing === interval
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  {interval === 'month' ? 'Monthly' : (
+                    <>
+                      Yearly
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                        <Tag className="w-2.5 h-2.5" /> Save ${YEARLY_SAVINGS_USD}
+                      </span>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Provider selector */}
             <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
               <CreditCard className="w-3.5 h-3.5" /> Choose payment method
             </p>
@@ -201,7 +226,9 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
                   <span className="text-xs text-gray-500 dark:text-gray-400">{p.tagline}</span>
                   <span className="mt-1 text-base font-extrabold text-green-600 dark:text-green-400">
                     {p.symbol}{p.price}
-                    <span className="text-xs font-normal text-gray-400 ml-0.5">/{p.currency}/mo</span>
+                    <span className="text-xs font-normal text-gray-400 ml-0.5">
+                      /{p.currency}/{billing === 'month' ? 'mo' : 'yr'}
+                    </span>
                   </span>
                 </button>
               ))}

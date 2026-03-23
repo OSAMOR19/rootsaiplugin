@@ -44,9 +44,35 @@ export async function PATCH(request: Request) {
 
         const is_pro = plan === 'paid'
 
+        // When manually upgrading, set a 1-month subscription window by default
+        // so the expiry notification banner doesn't trigger incorrectly.
+        // When downgrading, clear payment/subscription fields.
+        const endDate = is_pro ? (() => {
+            const d = new Date()
+            d.setMonth(d.getMonth() + 1)
+            return d.toISOString()
+        })() : null
+
+        const updatePayload: Record<string, any> = {
+            plan,
+            is_pro,
+            subscription_end_date: endDate,
+            updated_at: new Date().toISOString(),
+        }
+
+        if (!is_pro) {
+            // Revoke everything on downgrade
+            updatePayload.stripe_subscription_id = null
+            updatePayload.paystack_reference = null
+            updatePayload.billing_interval = null
+        } else {
+            // Mark as manually assigned monthly
+            updatePayload.billing_interval = 'month'
+        }
+
         const { error } = await supabaseAdmin
             .from('profiles')
-            .update({ plan, is_pro })
+            .update(updatePayload)
             .eq('id', userId)
 
         if (error) throw error
@@ -59,3 +85,4 @@ export async function PATCH(request: Request) {
         )
     }
 }
+

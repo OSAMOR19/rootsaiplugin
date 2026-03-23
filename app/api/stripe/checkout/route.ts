@@ -3,6 +3,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import stripe from '@/lib/stripe'
 
+const MONTHLY_AMOUNT = Math.round(Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT || 5) * 100)
+const YEARLY_AMOUNT = 5000  // $50.00
+
 export async function POST(request: Request) {
   if (!stripe) {
     return NextResponse.json(
@@ -12,6 +15,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const body = await request.json().catch(() => ({}))
+    const billingInterval: 'month' | 'year' = body.billing_interval === 'year' ? 'year' : 'month'
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +35,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get or create Stripe customer
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
@@ -51,6 +56,8 @@ export async function POST(request: Request) {
     }
 
     const origin = request.headers.get('origin') || 'http://localhost:3000'
+    const unitAmount = billingInterval === 'year' ? YEARLY_AMOUNT : MONTHLY_AMOUNT
+    const currency = (process.env.NEXT_PUBLIC_STRIPE_CURRENCY || 'usd').toLowerCase()
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -59,22 +66,24 @@ export async function POST(request: Request) {
       line_items: [
         {
           price_data: {
-            currency: (process.env.NEXT_PUBLIC_STRIPE_CURRENCY || 'USD').toLowerCase(),
-            recurring: {
-              interval: 'month',
-            },
+            currency,
+            recurring: { interval: billingInterval },
             product_data: {
-              name: 'ROOTS Pro Subscription',
-              description: 'Full access to all samples, genres, and features',
+              name: billingInterval === 'year'
+                ? 'ROOTS Pro — Annual Plan'
+                : 'ROOTS Pro — Monthly Plan',
+              description: billingInterval === 'year'
+                ? 'Full access for 1 year — Save $10 vs monthly!'
+                : 'Full access to all samples, genres, and features',
             },
-            unit_amount: Math.round(Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT || 5) * 100),
+            unit_amount: unitAmount,
           },
           quantity: 1,
         },
       ],
       success_url: `${origin}/browse?upgraded=true`,
       cancel_url: `${origin}/browse?cancelled=true`,
-      metadata: { supabase_user_id: user.id },
+      metadata: { supabase_user_id: user.id, billing_interval: billingInterval },
     })
 
     return NextResponse.json({ url: session.url })

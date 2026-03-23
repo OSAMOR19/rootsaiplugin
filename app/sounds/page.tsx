@@ -11,9 +11,15 @@ import { DRUM_TYPE_OPTIONS, KEYWORD_OPTIONS } from "@/lib/constants"
 import WaveformCell from "@/components/WaveformCell"
 import SampleActionsMenu from "@/components/SampleActionsMenu"
 import { formatTimeSeconds } from "@/lib/utils"
+import { useSubscription } from "@/hooks/useSubscription"
+import { useLimits } from "@/hooks/useLimits"
+import PaywallModal from "@/components/PaywallModal"
 
 export default function SoundsPage() {
     const router = useRouter()
+    const { isPro, loading: subLoading } = useSubscription()
+    const { canDownload, incrementDownload } = useLimits(isPro)
+    const [showPaywall, setShowPaywall] = useState(false)
     const searchParams = useSearchParams()
     // Filters State
     const [searchQuery, setSearchQuery] = useState(searchParams.get('query') || "")
@@ -30,6 +36,19 @@ export default function SoundsPage() {
     const { samples, loading } = useSamples({ autoFetch: true })
     const { isFavorite, toggleFavorite } = useFavorites()
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
+
+    // Paywall guard for free users
+    if (!subLoading && !isPro) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900">
+                <div className="filter blur-sm pointer-events-none select-none opacity-40 p-6">
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Sounds</h1>
+                    <p className="text-gray-600 dark:text-white/60">Discover your next sample…</p>
+                </div>
+                <PaywallModal onDismiss={() => router.push('/')} />
+            </div>
+        )
+    }
 
     // Derived Filters Options
     const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
@@ -103,6 +122,12 @@ export default function SoundsPage() {
 
     const handleDownload = async (e: React.MouseEvent, sample: any) => {
         e.stopPropagation()
+        // Enforce limit for free users
+        if (!canDownload) {
+            setShowPaywall(true)
+            return
+        }
+        incrementDownload()
         try {
             const audioUrl = sample.audioUrl || sample.url
             if (!audioUrl) return
@@ -119,13 +144,13 @@ export default function SoundsPage() {
             document.body.removeChild(a)
         } catch (error) {
             console.error('Download failed:', error)
-            // Fallback
             window.open(sample.audioUrl || sample.url, '_blank')
         }
     }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300 p-6">
+            {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
             {/* Header */}
             <div className="flex items-end justify-between mb-8">
                 <div>

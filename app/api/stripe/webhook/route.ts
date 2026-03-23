@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import stripe from '@/lib/stripe'
 
-// Disable body parsing — Stripe needs the raw body to verify signatures
 export const runtime = 'nodejs'
 
 const supabaseAdmin = createClient(
@@ -39,16 +38,28 @@ export async function POST(request: Request) {
       const userId = getUserId(session)
       const customerId = session.customer as string
       const subscriptionId = session.subscription as string
+      const billingInterval: 'month' | 'year' = session.metadata?.billing_interval === 'year' ? 'year' : 'month'
 
       if (userId) {
+        // Calculate subscription end date from the interval
+        const endDate = new Date()
+        if (billingInterval === 'year') {
+          endDate.setFullYear(endDate.getFullYear() + 1)
+        } else {
+          endDate.setMonth(endDate.getMonth() + 1)
+        }
+
         await supabaseAdmin.from('profiles').upsert({
           id: userId,
           is_pro: true,
+          plan: 'paid',
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
+          billing_interval: billingInterval,
+          subscription_end_date: endDate.toISOString(),
           updated_at: new Date().toISOString(),
         })
-        console.log(`✅ [stripe/webhook] User ${userId} upgraded to Pro`)
+        console.log(`✅ [stripe/webhook] User ${userId} upgraded to Pro (${billingInterval})`)
       }
       break
     }
@@ -67,10 +78,34 @@ export async function POST(request: Request) {
       if (profile?.id) {
         await supabaseAdmin.from('profiles').update({
           is_pro: false,
+          plan: 'free',
           stripe_subscription_id: null,
+          subscription_end_date: null,
           updated_at: new Date().toISOString(),
         }).eq('id', profile.id)
         console.log(`❌ [stripe/webhook] User ${profile.id} downgraded to Free`)
+      }
+      break
+    }
+
+    case 'customer.subscription.updated': {
+      // Renewal — update the subscription end date
+      const subscription = event.data.object as any
+      const customerId = subscription.customer as string
+      const currentPeriodEnd = subscription.current_period_end // unix timestamp
+
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single()
+
+      if (profile?.id && currentPeriodEnd) {
+        await supabaseAdmin.from('profiles').update({
+          subscription_end_date: new Date(currentPeriodEnd * 1000).toISOString(),
+          is_pro: subscription.status === 'active',
+          updated_at: new Date().toISOString(),
+        }).eq('id', profile.id)
       }
       break
     }

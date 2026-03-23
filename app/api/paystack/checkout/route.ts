@@ -3,6 +3,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { paystackConfigured, paystackHeaders, PAYSTACK_BASE_URL } from '@/lib/paystack'
 
+const MONTHLY_USD = Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT ?? 5)
+const YEARLY_USD = 50  // $50/yr discounted from $60
+
 export async function POST(request: Request) {
   if (!paystackConfigured) {
     return NextResponse.json(
@@ -12,6 +15,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    const body = await request.json().catch(() => ({}))
+    const billingInterval: 'month' | 'year' = body.billing_interval === 'year' ? 'year' : 'month'
+
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,28 +36,22 @@ export async function POST(request: Request) {
     }
 
     const origin = request.headers.get('origin') || 'http://localhost:3000'
-
-    // Base USD amount from Stripe env var
-    const usdAmount = Number(process.env.NEXT_PUBLIC_STRIPE_PRICE_AMOUNT ?? 5)
+    const usdAmount = billingInterval === 'year' ? YEARLY_USD : MONTHLY_USD
     const currency = process.env.NEXT_PUBLIC_PAYSTACK_CURRENCY ?? 'NGN'
 
-    // Default fallback amount (from env) if API fails
-    let amount = Number(process.env.NEXT_PUBLIC_PAYSTACK_AMOUNT ?? 500000)
+    let amount = Math.round(Number(process.env.NEXT_PUBLIC_PAYSTACK_AMOUNT ?? 500000) * (billingInterval === 'year' ? 10 : 1))
 
     try {
-      // Fetch live exchange rate, cache for 1 hour to respect limits
       const rateRes = await fetch('https://open.er-api.com/v6/latest/USD', {
         next: { revalidate: 3600 }
       })
       const rateData = await rateRes.json()
-      
+
       if (rateData?.rates?.[currency]) {
-        // Calculate exact equivalent (e.g. 5 USD * 1356 NGN/USD = 6780 NGN)
         const localAmount = usdAmount * rateData.rates[currency]
-        // Convert to smallest unit (kobo/pesewas) and round to nearest whole number
         amount = Math.round(localAmount * 100)
       }
-    } catch (e) {
+    } catch {
       console.warn('[paystack/checkout] Failed to fetch live exchange rate, using fallback amount')
     }
 
@@ -64,6 +64,7 @@ export async function POST(request: Request) {
         currency,
         metadata: {
           supabase_user_id: user.id,
+          billing_interval: billingInterval,
           cancel_action: `${origin}/browse?cancelled=true`,
         },
         callback_url: `${origin}/api/paystack/verify`,
@@ -77,7 +78,6 @@ export async function POST(request: Request) {
       throw new Error(data.message ?? 'Failed to initialize Paystack transaction')
     }
 
-    // Persist the Paystack reference so we can verify it later
     await supabase
       .from('profiles')
       .upsert({ id: user.id, paystack_reference: data.data.reference })
