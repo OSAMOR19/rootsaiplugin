@@ -15,8 +15,9 @@ export async function POST(request: Request) {
   const body = await request.text()
   const paystackSignature = request.headers.get('x-paystack-signature')
 
-  if (!paystackSignature || !PAYSTACK_SECRET_KEY) {
-    return NextResponse.json({ error: 'Missing signature or secret key' }, { status: 400 })
+  if (!paystackSignature || !PAYSTACK_SECRET_KEY || PAYSTACK_SECRET_KEY.includes('PASTE_YOUR')) {
+    console.error('[paystack/webhook] Missing or placeholder webhook secret in .env');
+    return NextResponse.json({ error: 'Missing or placeholder signature or secret key' }, { status: 400 })
   }
 
   // Verify HMAC-SHA512 signature
@@ -54,9 +55,9 @@ export async function POST(request: Request) {
         await supabaseAdmin.from('profiles').upsert({
           id: userId,
           is_pro: true,
+          plan: 'paid',
           paystack_customer_code: customerCode ?? null,
           paystack_reference: reference ?? null,
-          updated_at: new Date().toISOString(),
         })
         console.log(`✅ [paystack/webhook] charge.success — User ${userId} upgraded to Pro`)
       }
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
         if (profile?.id) {
           await supabaseAdmin.from('profiles').update({
             is_pro: false,
-            updated_at: new Date().toISOString(),
+            plan: 'free',
           }).eq('id', profile.id)
           console.log(`❌ [paystack/webhook] ${eventType} — User ${profile.id} downgraded to Free`)
         }
