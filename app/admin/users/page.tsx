@@ -185,9 +185,9 @@ export default function UsersPage() {
 
                                 {/* Provider badge */}
                                 <div className="col-span-2 flex items-center">
-                                    {user.stripe_subscription_id ? (
+                                    {user.plan === 'paid' && user.stripe_subscription_id ? (
                                         <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded text-[10px] font-bold tracking-wider uppercase">Stripe</span>
-                                    ) : user.paystack_reference ? (
+                                    ) : user.plan === 'paid' && user.paystack_reference ? (
                                         <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold tracking-wider uppercase">Paystack</span>
                                     ) : (
                                         <span className="text-white/30 text-xs">—</span>

@@ -112,6 +112,10 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
   }
 
   const handleSampleClick = (sampleId: string) => {
+    if (!isPro) {
+      setShowPaywall(true)
+      return
+    }
     router.push(`/sample/${sampleId}`)
   }
 

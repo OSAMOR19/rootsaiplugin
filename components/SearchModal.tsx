@@ -7,6 +7,8 @@ import { Search, X, Play, Pause, TrendingUp } from "lucide-react"
 import { useSamples } from "@/hooks/useSamples"
 import { useAudio } from "@/contexts/AudioContext"
 import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
+import { useSubscription } from "@/hooks/useSubscription"
+import PaywallModal from "./PaywallModal"
 
 import SampleActionsMenu from "./SampleActionsMenu"
 
@@ -28,6 +30,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState("")
   const { samples, loading } = useSamples({ autoFetch: true })
   const { playTrack, currentTrack, isPlaying, pauseTrack } = useAudio()
+  const { isPro } = useSubscription()
+  const [showPaywall, setShowPaywall] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Filter samples based on search query
@@ -72,6 +76,10 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       onClose()
       router.push(`/results?${params.toString()}`)
     } else {
+      if (!isPro) {
+        setShowPaywall(true)
+        return
+      }
       // Otherwise, navigate to pack page for this sample's category
       if (sample.category) {
         onClose()
@@ -119,6 +127,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
   return (
     <AnimatePresence>
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
       {isOpen && (
         <>
           {/* Backdrop */}

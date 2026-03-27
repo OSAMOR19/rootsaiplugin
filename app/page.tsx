@@ -14,8 +14,14 @@ import ThemeToggle from "@/components/ThemeToggle"
 import { useRouter } from "next/navigation"
 import { useAudio } from "@/contexts/AudioContext"
 import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
+import { useLimits } from "@/hooks/useLimits"
+import { useSubscription } from "@/hooks/useSubscription"
+import PaywallModal from "@/components/PaywallModal"
 
 export default function CapturePage() {
+  const { isPro } = useSubscription()
+  const { canUseAI, incrementAI } = useLimits(isPro)
+  const [showPaywall, setShowPaywall] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [hasListened, setHasListened] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -128,6 +134,11 @@ export default function CapturePage() {
   }
 
   const handleListen = () => {
+    if (!canUseAI) {
+      setShowPaywall(true)
+      return
+    }
+    incrementAI()
     setIsListening(true)
   }
 
@@ -166,6 +177,12 @@ export default function CapturePage() {
       setShowWarningModal(true);
       return;
     }
+
+    if (!canUseAI) {
+      setShowPaywall(true);
+      return;
+    }
+    incrementAI()
 
     // Allow search with text description
     const query = searchQuery.trim() || "afrobeat drums";
@@ -507,6 +524,7 @@ export default function CapturePage() {
         </motion.div>
       )}
 
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
     </div>
   )
 }

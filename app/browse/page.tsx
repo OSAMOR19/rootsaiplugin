@@ -92,7 +92,8 @@ export default function BrowsePage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900">
         {pollGaveUp && (
           <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700 px-6 py-3 text-sm text-amber-800 dark:text-amber-300 text-center">
-            ⚠ We couldn't confirm your payment automatically. If you have paid, please wait a minute and refresh the page. Contact support if this persists.
+            ⚠ We couldn't confirm your payment automatically. Please refresh the page manually once your payment succeeds.
+            <button onClick={() => window.location.href = '/browse'} className="ml-2 font-bold underline">Refresh Now</button>
           </div>
         )}
         {cancelled && (
@@ -105,7 +106,7 @@ export default function BrowsePage() {
           <BrowseHeader />
           <RecommendedSection />
         </div>
-        <PaywallModal onDismiss={() => router.push('/')} />
+        {!pollGaveUp && <PaywallModal onDismiss={() => router.push('/')} />}
       </div>
     )
   }

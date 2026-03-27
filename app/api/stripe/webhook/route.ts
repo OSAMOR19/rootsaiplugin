@@ -17,8 +17,9 @@ export async function POST(request: Request) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
 
-  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: 'Missing signature or webhook secret' }, { status: 400 })
+  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET.includes('PASTE_YOUR')) {
+    console.error('[stripe/webhook] Missing or placeholder webhook secret in .env');
+    return NextResponse.json({ error: 'Missing or placeholder signature or webhook secret' }, { status: 400 })
   }
 
   let event
@@ -55,9 +56,6 @@ export async function POST(request: Request) {
           plan: 'paid',
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
-          billing_interval: billingInterval,
-          subscription_end_date: endDate.toISOString(),
-          updated_at: new Date().toISOString(),
         })
         console.log(`✅ [stripe/webhook] User ${userId} upgraded to Pro (${billingInterval})`)
       }
@@ -80,8 +78,6 @@ export async function POST(request: Request) {
           is_pro: false,
           plan: 'free',
           stripe_subscription_id: null,
-          subscription_end_date: null,
-          updated_at: new Date().toISOString(),
         }).eq('id', profile.id)
         console.log(`❌ [stripe/webhook] User ${profile.id} downgraded to Free`)
       }
@@ -102,9 +98,7 @@ export async function POST(request: Request) {
 
       if (profile?.id && currentPeriodEnd) {
         await supabaseAdmin.from('profiles').update({
-          subscription_end_date: new Date(currentPeriodEnd * 1000).toISOString(),
-          is_pro: subscription.status === 'active',
-          updated_at: new Date().toISOString(),
+          is_pro: subscription.status === 'active'
         }).eq('id', profile.id)
       }
       break

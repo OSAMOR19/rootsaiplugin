@@ -49,17 +49,19 @@ export function useLimits(isPro: boolean): LimitsState {
   }, [])
 
   const incrementDownload = (): boolean => {
-    if (isPro || !userId) return true
-    if (downloadCount >= DOWNLOAD_LIMIT) return false
-    const newCount = increment(userId, 'downloads')
+    if (isPro) return true
+    const uid = userId || 'anon'
+    if (getCount(uid, 'downloads') >= DOWNLOAD_LIMIT) return false
+    const newCount = increment(uid, 'downloads')
     setDownloadCount(newCount)
     return true
   }
 
   const incrementAI = (): boolean => {
-    if (isPro || !userId) return true
-    if (aiCount >= AI_LIMIT) return false
-    const newCount = increment(userId, 'ai')
+    if (isPro) return true
+    const uid = userId || 'anon'
+    if (getCount(uid, 'ai') >= AI_LIMIT) return false
+    const newCount = increment(uid, 'ai')
     setAiCount(newCount)
     return true
   }
