@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { Home, Settings, User as UserIcon, LogOut } from "lucide-react"
+import { Settings } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import CaptureKnob from "@/components/CaptureKnob"
 import SessionKeyButton from "@/components/SessionKeyButton"
@@ -28,25 +28,11 @@ export default function CapturePage() {
   const [sessionKey, setSessionKey] = useState("F MAJOR")
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const { analysisData, setAnalysisData } = useAudio()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false)
-      }
-    }
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isDropdownOpen])
 
   // Auto-open paywall when redirected here with ?subscribe=true (e.g. from Sounds page for free users)
   useEffect(() => {
@@ -286,56 +272,17 @@ export default function CapturePage() {
             <ThemeToggle />
             {/* Authentication UI */}
             {user ? (
-              <div className="relative" ref={dropdownRef}>
-                <motion.button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="relative flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold shadow-inner">
-                    {user.user_metadata?.full_name ? user.user_metadata.full_name[0].toUpperCase() : (user.email?.[0].toUpperCase() || <UserIcon className="w-3 h-3 sm:w-4 sm:h-4" />)}
-                  </div>
-                </motion.button>
-                
-                {/* Interactive Dropdown Menu */}
-                {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 z-[9999] pt-2">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-                      <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">Signed in as</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                          {user.user_metadata?.full_name || user.email}
-                        </p>
-                      </div>
-                      <div className="p-2">
-                        <button 
-                          onClick={() => {
-                            setIsDropdownOpen(false);
-                            router.push('/browse');
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 flex items-center rounded-lg transition-colors mb-1"
-                        >
-                          <UserIcon className="w-4 h-4 mr-2" />
-                          My Library
-                        </button>
-                        
-                        <button 
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleSignOut();
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center rounded-lg transition-colors cursor-pointer"
-                        >
-                          <LogOut className="w-4 h-4 mr-2" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <motion.button
+                onClick={handleSettings}
+                className="relative flex items-center px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                title="Settings"
+              >
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold shadow-inner">
+                  {user.user_metadata?.full_name ? user.user_metadata.full_name[0].toUpperCase() : (user.email?.[0].toUpperCase() || '?')}
+                </div>
+              </motion.button>
             ) : (
               <motion.button
                 onClick={() => router.push('/auth/login')}
