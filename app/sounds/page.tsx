@@ -32,19 +32,38 @@ export default function SoundsPage() {
 
     const [loadedDurations, setLoadedDurations] = useState<Record<string, number>>({})
 
-    // Fetch Data
+    // Fetch Data — hooks must ALL be called before any early return (Rules of Hooks)
     const { samples, loading } = useSamples({ autoFetch: true })
     const { isFavorite, toggleFavorite } = useFavorites()
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
-    // Redirect free users immediately to home with subscribe popup — prevents white-screen hook errors
+    // Filter Logic — useMemo must stay above any early return so hook order never changes
+    const filteredSamples = useMemo(() => {
+        return samples.filter(sample => {
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase()
+                const matchName = sample.name?.toLowerCase().includes(q)
+                const matchCategory = sample.category?.toLowerCase().includes(q)
+                if (!matchName && !matchCategory) return false
+            }
+            if (selectedGenre && !sample.genres?.includes(selectedGenre)) return false
+            if (selectedInstrument && !sample.instruments?.includes(selectedInstrument)) return false
+            if (selectedKey && sample.key !== selectedKey) return false
+            if (selectedDrumType && sample.drumType?.toLowerCase() !== selectedDrumType.toLowerCase()) return false
+            if (selectedKeyword && !sample.keywords?.some((k: string) => k.toLowerCase() === selectedKeyword.toLowerCase())) return false
+            if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
+            return true
+        })
+    }, [samples, searchQuery, selectedGenre, selectedInstrument, selectedKey, selectedDrumType, selectedKeyword, selectedTimeSignature])
+
+    // Redirect free users to home — triggers subscribe popup there
     useEffect(() => {
         if (!subLoading && !isPro) {
             router.replace('/?subscribe=true')
         }
     }, [subLoading, isPro, router])
 
-    // Show loading while checking subscription (prevents premature hook calls)
+    // ── Guard: show spinner while subscription loads or if user is not pro (redirect in flight) ──
     if (subLoading || !isPro) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 flex items-center justify-center">
@@ -53,48 +72,13 @@ export default function SoundsPage() {
         )
     }
 
-    // Derived Filters Options
+    // Derived filter option lists (plain expressions, not hooks — safe below early return)
     const genres = [...new Set(samples.flatMap(s => s.genres || []))].filter(Boolean) as string[]
     const instruments = [...new Set(samples.flatMap(s => s.instruments || []))].filter(Boolean) as string[]
     const keys = [...new Set(samples.map(s => s.key).filter(Boolean))] as string[]
     const drumTypes = [...new Set(samples.map(s => s.drumType).filter(Boolean))] as string[]
-    // Keywords often stored as array in s.keywords or s.tags
-    // Assuming keywords is string[]
     const keywords = [...new Set(samples.flatMap(s => s.keywords || []))].filter(Boolean) as string[]
     const timeSignatures = [...new Set([...samples.map(s => s.timeSignature).filter(Boolean), "4/4", "3/4"])].sort() as string[]
-
-    // Filter Logic
-    const filteredSamples = useMemo(() => {
-        return samples.filter(sample => {
-            // Search Query
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase()
-                const matchName = sample.name?.toLowerCase().includes(q)
-                const matchCategory = sample.category?.toLowerCase().includes(q)
-                if (!matchName && !matchCategory) return false
-            }
-
-            // Genre Filter
-            if (selectedGenre && !sample.genres?.includes(selectedGenre)) return false
-
-            // Instrument Filter
-            if (selectedInstrument && !sample.instruments?.includes(selectedInstrument)) return false
-
-            // Key Filter
-            if (selectedKey && sample.key !== selectedKey) return false
-
-            // Drum Type Filter
-            if (selectedDrumType && sample.drumType?.toLowerCase() !== selectedDrumType.toLowerCase()) return false
-
-            // Keyword/Style Filter
-            if (selectedKeyword && !sample.keywords?.some((k: string) => k.toLowerCase() === selectedKeyword.toLowerCase())) return false
-
-            // Time Signature Filter
-            if (selectedTimeSignature && sample.timeSignature !== selectedTimeSignature) return false
-
-            return true
-        })
-    }, [samples, searchQuery, selectedGenre, selectedInstrument, selectedKey, selectedDrumType, selectedKeyword, selectedTimeSignature])
 
     const handlePlay = (sample: any) => {
         if (currentTrack?.id === sample.id && isPlaying) {
