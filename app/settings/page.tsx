@@ -525,7 +525,7 @@ export default function SettingsPage() {
               Having trouble with payments, subscriptions, or the app? We're here to help.
             </p>
             <motion.a
-              href="mailto:support@rootsaiplugin.com?subject=ROOTS Support Request"
+              href="mailto:support@manifxtaudio.com?subject=ROOTS Support Request"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-sm"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

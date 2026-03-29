@@ -96,9 +96,16 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
 
       const redirectUrl = provider === 'paystack' ? data.authorization_url : data.url
       if (redirectUrl) {
-        window.open(redirectUrl, '_blank')
-        if (onDismiss) onDismiss()
-        else router.back()
+        if (provider === 'paystack') {
+          // Same-tab redirect so Paystack's callback_url lands back in this tab
+          // and the /browse?upgraded=true polling flow triggers correctly
+          window.location.href = redirectUrl
+        } else {
+          // Stripe opens in new tab (Stripe handles its own redirect)
+          window.open(redirectUrl, '_blank')
+          if (onDismiss) onDismiss()
+          else router.back()
+        }
       }
     } catch (err: any) {
       setError(err.message)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useSamples } from "@/hooks/useSamples"
 import { useFavorites } from "@/hooks/useFavorites"
 import { useAudio } from "@/contexts/AudioContext"
@@ -37,15 +37,18 @@ export default function SoundsPage() {
     const { isFavorite, toggleFavorite } = useFavorites()
     const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
 
-    // Paywall guard for free users
-    if (!subLoading && !isPro) {
+    // Redirect free users immediately to home with subscribe popup — prevents white-screen hook errors
+    useEffect(() => {
+        if (!subLoading && !isPro) {
+            router.replace('/?subscribe=true')
+        }
+    }, [subLoading, isPro, router])
+
+    // Show loading while checking subscription (prevents premature hook calls)
+    if (subLoading || !isPro) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900">
-                <div className="filter blur-sm pointer-events-none select-none opacity-40 p-6">
-                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Sounds</h1>
-                    <p className="text-gray-600 dark:text-white/60">Discover your next sample…</p>
-                </div>
-                <PaywallModal onDismiss={() => router.push('/')} />
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
         )
     }
@@ -217,7 +220,7 @@ export default function SoundsPage() {
                         options={keys}
                     />
                     <FilterSelect
-                        label="Drum Type"
+                        label="Loop Type"
                         value={selectedDrumType}
                         onChange={setSelectedDrumType}
                         options={DRUM_TYPE_OPTIONS}

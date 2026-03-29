@@ -11,7 +11,7 @@ import SessionKeyModal from "@/components/SessionKeyModal"
 import SearchInput from "@/components/SearchInput"
 import GradientButton from "@/components/GradientButton"
 import ThemeToggle from "@/components/ThemeToggle"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAudio } from "@/contexts/AudioContext"
 import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
 import { useLimits } from "@/hooks/useLimits"
@@ -32,6 +32,7 @@ export default function CapturePage() {
   const [user, setUser] = useState<any>(null)
   const { analysisData, setAnalysisData } = useAudio()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -46,6 +47,15 @@ export default function CapturePage() {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isDropdownOpen])
+
+  // Auto-open paywall when redirected here with ?subscribe=true (e.g. from Sounds page for free users)
+  useEffect(() => {
+    if (searchParams.get('subscribe') === 'true') {
+      setShowPaywall(true)
+      // Clean the URL so refreshing doesn't re-trigger it
+      router.replace('/')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -388,6 +398,7 @@ export default function CapturePage() {
             onListen={handleListen}
             disabled={false}
             onAnalysisComplete={handleAnalysisComplete}
+            onPaywallRequired={!isPro ? () => setShowPaywall(true) : undefined}
           />
         </motion.div>
 

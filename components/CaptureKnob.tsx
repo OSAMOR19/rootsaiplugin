@@ -15,9 +15,11 @@ interface CaptureKnobProps {
   onListen: () => void
   disabled?: boolean
   onAnalysisComplete?: (data: { detectedBPM: number; detectedKey: string; recommendations: any[]; recordedAudioBuffer: AudioBuffer }) => void
+  /** Called when a free user tries to record or upload — show subscribe popup */
+  onPaywallRequired?: () => void
 }
 
-export default function CaptureKnob({ isListening, hasListened, onListen, disabled, onAnalysisComplete }: CaptureKnobProps) {
+export default function CaptureKnob({ isListening, hasListened, onListen, disabled, onAnalysisComplete, onPaywallRequired }: CaptureKnobProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [recordingProgress, setRecordingProgress] = useState(0)
@@ -617,6 +619,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
   }
 
   const handleUploadClick = () => {
+    if (onPaywallRequired) { onPaywallRequired(); return }
     fileInputRef.current?.click()
   }
 
@@ -647,6 +650,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
     setIsDragging(false)
 
     if (disabled || isRecording || isProcessing || isExtracting || isBPMAnalyzing) return
+    if (onPaywallRequired) { onPaywallRequired(); return }
 
     const files = e.dataTransfer.files
     if (files.length === 0) return
@@ -753,6 +757,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
 
   const toggleMode = () => {
     if (isRecording || isProcessing || isExtracting) return
+    if (onPaywallRequired) { onPaywallRequired(); return }
     setMode(mode === 'capture' ? 'upload' : 'capture')
   }
 
@@ -775,6 +780,8 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           playRecordedAudio()
         }
       } else {
+        // Gate record for free users
+        if (onPaywallRequired) { onPaywallRequired(); return }
         startRecording()
       }
     } else {
@@ -786,7 +793,7 @@ export default function CaptureKnob({ isListening, hasListened, onListen, disabl
           playRecordedAudio()
         }
       } else {
-        // Upload mode - trigger file upload
+        // Gate upload for free users (handleUploadClick already checks)
         handleUploadClick()
       }
     }
