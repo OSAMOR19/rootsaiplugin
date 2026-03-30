@@ -11,6 +11,9 @@ import { extractBPMFromString, formatTimeSeconds } from "@/lib/utils"
 import { isFavorite, toggleFavorite } from "@/lib/favorites"
 import WaveSurfer from "wavesurfer.js"
 import SampleActionsMenu from "./SampleActionsMenu"
+import { useSubscription } from "@/hooks/useSubscription"
+import { useLimits } from "@/hooks/useLimits"
+import PaywallModal from "@/components/PaywallModal"
 
 
 // Remove static image imports to avoid Sharp dependency issues during build
@@ -48,6 +51,9 @@ export default function DraggableSample({
   const [isDragging, setIsDragging] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [hasStarted, setHasStarted] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const { isPro } = useSubscription()
+  const { canDownload, incrementDownload } = useLimits(isPro)
 
   // Load favorite status from Supabase on mount
   useEffect(() => {
@@ -614,42 +620,36 @@ export default function DraggableSample({
   }
 
   const handleDownload = async () => {
-    try {
-      // Get the real audio URL
-      const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
+    // Enforce per-session download limit for free users
+    if (!canDownload) { setShowPaywall(true); return }
 
-      // Fetch the audio file
+    try {
+      const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
       const response = await fetch(realAudioUrl)
-      if (!response.ok) {
-        throw new Error('Failed to fetch audio file')
-      }
+      if (!response.ok) throw new Error('Failed to fetch audio file')
+
+      incrementDownload()
 
       const audioBlob = await response.blob()
-
-      // Create download link
       const url = window.URL.createObjectURL(audioBlob)
       const link = document.createElement('a')
       link.href = url
       link.download = sample.name || sample.filename || 'sample.wav'
-
-      // Trigger download
       document.body.appendChild(link)
       link.click()
-
-      // Cleanup
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-
     } catch (error) {
       console.error('Download failed:', error)
-      // Fallback: open in new tab
       const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
       window.open(realAudioUrl, '_blank')
     }
   }
 
   return (
-    <motion.div
+    <>
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
+      <motion.div
       className={`backdrop-blur-sm rounded-xl border overflow-hidden transition-all duration-300 group cursor-grab active:cursor-grabbing relative ${sample.isRecentSong
         ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 dark:border-blue-500/50 hover:border-blue-400 dark:hover:border-blue-400"
         : "bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-green-500/50"
@@ -868,5 +868,6 @@ export default function DraggableSample({
         <div className="absolute inset-0 bg-green-500/20 border-2 border-green-500 border-dashed rounded-xl pointer-events-none" />
       )}
     </motion.div>
+    </>
   )
 }
