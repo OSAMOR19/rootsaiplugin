@@ -114,7 +114,11 @@ export default function SoundsPage() {
             setShowPaywall(true)
             return
         }
-        incrementDownload()
+
+        // Server-side limit check + analytics tracking
+        const allowed = await incrementDownload(sample.id, sample.pack_id)
+        if (!allowed) { setShowPaywall(true); return }
+
         try {
             const audioUrl = sample.audioUrl || sample.url
             if (!audioUrl) return

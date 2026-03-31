@@ -8,6 +8,9 @@ import WaveformVisualizer from "@/components/WaveformVisualizer"
 import RelatedSamples from "@/components/RelatedSamples"
 import { mockFeaturedSamples } from "@/lib/mockData"
 import { isFavorite, toggleFavorite } from "@/lib/favorites"
+import { useSubscription } from "@/hooks/useSubscription"
+import { useLimits } from "@/hooks/useLimits"
+import PaywallModal from "@/components/PaywallModal"
 
 export default function SampleDetailPage() {
   const router = useRouter()
@@ -16,6 +19,9 @@ export default function SampleDetailPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isLiked, setIsLiked] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const { isPro } = useSubscription()
+  const { canDownload, incrementDownload } = useLimits(isPro)
 
   useEffect(() => {
     // Find sample by ID
@@ -49,6 +55,7 @@ export default function SampleDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50">
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
       {/* Header */}
       <motion.header
         className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200"
@@ -146,6 +153,27 @@ export default function SampleDetailPage() {
                   className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all duration-300"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={async () => {
+                    if (!canDownload) { setShowPaywall(true); return }
+                    if (sample?.audioUrl || sample?.url) {
+                      const allowed = await incrementDownload(sample.id, sample.pack_id)
+                      if (!allowed) { setShowPaywall(true); return }
+                      try {
+                        const res = await fetch(sample.audioUrl || sample.url)
+                        const blob = await res.blob()
+                        const blobUrl = window.URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = blobUrl
+                        a.download = `${sample.name || 'sample'}.wav`
+                        a.click()
+                        window.URL.revokeObjectURL(blobUrl)
+                      } catch {
+                        window.open(sample.audioUrl || sample.url, '_blank')
+                      }
+                    } else {
+                      setShowPaywall(true)
+                    }
+                  }}
                 >
                   <Download className="w-4 h-4 mr-2 inline" />
                   Download

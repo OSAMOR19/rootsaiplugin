@@ -9,8 +9,11 @@ import { useSamples } from "@/hooks/useSamples"
 import { usePacks } from "@/hooks/usePacks"
 import { useAudio } from "@/contexts/AudioContext"
 import { useFavorites } from "@/hooks/useFavorites"
+import { useSubscription } from "@/hooks/useSubscription"
+import { useLimits } from "@/hooks/useLimits"
 import WaveformCell from "@/components/WaveformCell"
 import SampleActionsMenu from "@/components/SampleActionsMenu"
+import PaywallModal from "@/components/PaywallModal"
 import { formatTimeSeconds } from "@/lib/utils"
 
 import { SAMPLE_IMAGES } from "@/constants/images"
@@ -30,6 +33,9 @@ export default function PackDetailPage({ params }: PageProps) {
   const { packs, loading: packsLoading, getPackByTitle } = usePacks()
   const { playTrack, currentTrack, isPlaying, pauseTrack, duration } = useAudio()
   const { isFavorite, toggleFavorite: dbToggleFavorite } = useFavorites()
+  const { isPro } = useSubscription()
+  const { canDownload, incrementDownload, downloadCount, downloadLimit } = useLimits(isPro)
+  const [showPaywall, setShowPaywall] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedBPM, setSelectedBPM] = useState<string>("all")
@@ -101,8 +107,16 @@ export default function PackDetailPage({ params }: PageProps) {
 
   const handleDownload = async (e: React.MouseEvent, sample: any) => {
     e.stopPropagation()
+
+    // Enforce download limit for free users
+    if (!canDownload) { setShowPaywall(true); return }
+
     const audioUrl = sample.audioUrl || sample.url
     if (!audioUrl) return
+
+    // Server-side limit check + analytics tracking
+    const allowed = await incrementDownload(sample.id, sample.pack_id)
+    if (!allowed) { setShowPaywall(true); return }
 
     try {
       const response = await fetch(audioUrl)
@@ -110,14 +124,13 @@ export default function PackDetailPage({ params }: PageProps) {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${sample.name}.wav` // Assuming wav, or just name
+      link.download = `${sample.name}.wav`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Download failed:', error)
-      // Fallback
       window.open(audioUrl, '_blank')
     }
   }
@@ -140,6 +153,7 @@ export default function PackDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-green-900 text-gray-900 dark:text-white transition-colors duration-300">
+      {showPaywall && <PaywallModal onDismiss={() => setShowPaywall(false)} />}
       {/* Header */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Back Button */}

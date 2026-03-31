@@ -623,12 +623,14 @@ export default function DraggableSample({
     // Enforce per-session download limit for free users
     if (!canDownload) { setShowPaywall(true); return }
 
+    // Server-side limit check + analytics tracking
+    const allowed = await incrementDownload(sample.id, sample.pack_id)
+    if (!allowed) { setShowPaywall(true); return }
+
     try {
       const realAudioUrl = sample.url || audioUrl || `/audio/${sample.filename || sample.name}`
       const response = await fetch(realAudioUrl)
       if (!response.ok) throw new Error('Failed to fetch audio file')
-
-      incrementDownload()
 
       const audioBlob = await response.blob()
       const url = window.URL.createObjectURL(audioBlob)

@@ -17,10 +17,11 @@ import { extractFiltersFromQuery, buildFilterParams } from "@/lib/searchUtils"
 import { useLimits } from "@/hooks/useLimits"
 import { useSubscription } from "@/hooks/useSubscription"
 import PaywallModal from "@/components/PaywallModal"
+import DownloadLimitBanner from "@/components/DownloadLimitBanner"
 
 export default function CapturePage() {
   const { isPro } = useSubscription()
-  const { canUseAI, incrementAI } = useLimits(isPro)
+  const { canUseAI, incrementAI, downloadCount, downloadLimit } = useLimits(isPro)
   const [showPaywall, setShowPaywall] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [hasListened, setHasListened] = useState(false)
@@ -307,7 +308,13 @@ export default function CapturePage() {
       </motion.header>
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col lg:flex-row items-center justify-center min-h-[calc(100vh-200px)] px-6 pb-16">
+      <div className="relative z-10 flex flex-col items-center min-h-[calc(100vh-200px)] px-6 pb-16">
+        {/* Download Limit Banner */}
+        <div className="w-full max-w-4xl mb-4">
+          <DownloadLimitBanner downloadCount={downloadCount} downloadLimit={downloadLimit} isPro={isPro} />
+        </div>
+
+        <div className="flex flex-col lg:flex-row items-center justify-center flex-1 w-full">
         {/* Left Side - Search Input */}
         <motion.div
           className="w-full lg:w-1/3 lg:pr-12 mb-8 lg:mb-0"
@@ -376,6 +383,7 @@ export default function CapturePage() {
             </motion.button>
           </div>
         </motion.div>
+        </div>
       </div>
 
 

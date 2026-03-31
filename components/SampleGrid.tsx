@@ -119,12 +119,16 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
     router.push(`/sample/${sampleId}`)
   }
 
-  const handleDownloadClick = (e: React.MouseEvent, sample: any) => {
+  const handleDownloadClick = async (e: React.MouseEvent, sample: any) => {
     e.stopPropagation()
     if (!canDownload) { setShowPaywall(true); return }
     const url = sample.audioUrl || sample.url
     if (!url) return
-    incrementDownload()
+
+    // Server-side limit check + analytics tracking
+    const allowed = await incrementDownload(sample.id, sample.pack_id)
+    if (!allowed) { setShowPaywall(true); return }
+
     fetch(url)
       .then(res => res.blob())
       .then(blob => {
@@ -135,7 +139,6 @@ export default function SampleGrid({ viewMode, samples, currentlyPlaying, onSamp
         a.click()
         window.URL.revokeObjectURL(blobUrl)
       }).catch(() => window.open(url, '_blank'))
-    trackEvent('download', 'sample', sample.id, sample.pack_id)
   }
 
   if (viewMode === "grid") {
