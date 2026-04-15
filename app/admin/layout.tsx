@@ -9,44 +9,19 @@ import Image from "next/image"
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
     const router = useRouter()
-    const [isAuthorized, setIsAuthorized] = useState(false)
-    const [isLoading, setIsLoading] = useState(true)
 
-    // Auth Check
-    useEffect(() => {
-        if (pathname === "/admin/login") {
-            setIsLoading(false)
-            return
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/admin/auth/logout', { method: 'POST' })
+        } catch (error) {
+            console.error('Logout failed:', error)
         }
-
-        const checkAuth = () => {
-            const auth = localStorage.getItem("admin_authenticated")
-            if (auth !== "true") {
-                router.push("/admin/login")
-            } else {
-                setIsAuthorized(true)
-            }
-            setIsLoading(false)
-        }
-        checkAuth()
-    }, [router, pathname])
-
-    const handleLogout = () => {
-        localStorage.removeItem("admin_authenticated")
         router.push("/admin/login")
     }
 
-    // Bypass layout for login page - MOVED AFTER HOOKS
+    // Bypass layout for login page
     if (pathname === "/admin/login") {
         return <>{children}</>
-    }
-
-    if (isLoading) {
-        return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>
-    }
-
-    if (!isAuthorized) {
-        return null // Will redirect
     }
 
     return (

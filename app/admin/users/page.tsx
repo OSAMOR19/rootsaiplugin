@@ -57,12 +57,22 @@ export default function UsersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: user.id, plan: newPlan }),
             })
+            
+            if (res.status === 401) {
+                alert("Your admin session has expired or is invalid. Please log in again using the new secure password.")
+                window.location.href = '/admin/login'
+                return
+            }
+
             const data = await res.json()
-            if (data.success) {
+            if (res.ok && data.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: newPlan, is_pro: newPlan === 'paid' } : u))
+            } else {
+                alert(`Failed to update user: ${data.error || 'Unknown error'}`)
             }
         } catch (err) {
             console.error('Failed to update plan:', err)
+            alert("Network error: Failed to update user plan.")
         } finally {
             setUpdatingId(null)
         }
