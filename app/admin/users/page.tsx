@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, RefreshCw, Users, Crown, User } from "lucide-react"
-import { motion } from "framer-motion"
+import { Search, RefreshCw, Users, Crown, User, ShieldCheck, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface UserRow {
     id: string
@@ -45,9 +45,12 @@ export default function UsersPage() {
         return () => clearInterval(interval)
     }, [fetchUsers])
 
+    const [confirmUser, setConfirmUser] = useState<UserRow | null>(null)
+
     const handleTogglePlan = async (user: UserRow) => {
         const newPlan = user.plan === 'free' ? 'paid' : 'free'
         setUpdatingId(user.id)
+        setConfirmUser(null)
         try {
             const res = await fetch('/api/admin/users', {
                 method: 'PATCH',
@@ -189,6 +192,10 @@ export default function UsersPage() {
                                         <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded text-[10px] font-bold tracking-wider uppercase">Stripe</span>
                                     ) : user.plan === 'paid' && user.paystack_reference ? (
                                         <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold tracking-wider uppercase">Paystack</span>
+                                    ) : (user.is_pro || user.plan === 'paid') ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 rounded text-[10px] font-bold tracking-wider uppercase">
+                                            <ShieldCheck className="w-3 h-3" /> Admin
+                                        </span>
                                     ) : (
                                         <span className="text-white/30 text-xs">—</span>
                                     )}
@@ -202,15 +209,21 @@ export default function UsersPage() {
                                 {/* Toggle plan */}
                                 <div className="col-span-1 flex justify-end">
                                     <button
-                                        onClick={() => handleTogglePlan(user)}
+                                        onClick={() => setConfirmUser(user)}
                                         disabled={updatingId === user.id}
-                                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${user.plan === 'free'
-                                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                                            : 'bg-white/10 text-white/50 hover:bg-white/20'
-                                            } disabled:opacity-40`}
-                                        title={user.plan === 'free' ? 'Upgrade to Paid' : 'Downgrade to Free'}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${user.plan === 'free'
+                                            ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 hover:scale-105'
+                                            : 'bg-red-500/15 text-red-400 hover:bg-red-500/25 hover:scale-105'
+                                            } disabled:opacity-40 disabled:hover:scale-100`}
+                                        title={user.plan === 'free' ? 'Grant Pro Access' : 'Revoke Pro Access'}
                                     >
-                                        {updatingId === user.id ? '...' : user.plan === 'free' ? '↑ Paid' : '↓ Free'}
+                                        {updatingId === user.id ? (
+                                            <RefreshCw className="w-3 h-3 animate-spin" />
+                                        ) : user.plan === 'free' ? (
+                                            <><ChevronUp className="w-3 h-3" /> Grant Pro</>
+                                        ) : (
+                                            <><ChevronDown className="w-3 h-3" /> Revoke</>
+                                        )}
                                     </button>
                                 </div>
                             </motion.div>
@@ -222,6 +235,77 @@ export default function UsersPage() {
             <p className="text-xs text-white/20 text-right">
                 Last refreshed: {lastRefreshed.toLocaleTimeString()} · Auto-refreshes every 30s
             </p>
+
+            {/* Confirmation dialog */}
+            <AnimatePresence>
+                {confirmUser && (
+                    <motion.div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setConfirmUser(null)}
+                    >
+                        <motion.div
+                            className="bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                    confirmUser.plan === 'free'
+                                        ? 'bg-yellow-500/20'
+                                        : 'bg-red-500/20'
+                                }`}>
+                                    {confirmUser.plan === 'free' ? (
+                                        <Crown className="w-5 h-5 text-yellow-400" />
+                                    ) : (
+                                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className="text-white font-bold text-sm">
+                                        {confirmUser.plan === 'free' ? 'Grant Pro Access' : 'Revoke Pro Access'}
+                                    </h3>
+                                    <p className="text-white/40 text-xs">This takes effect immediately</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white/5 rounded-xl p-3 mb-5">
+                                <p className="text-white/70 text-sm">
+                                    {confirmUser.plan === 'free' ? (
+                                        <>You are about to <span className="text-yellow-400 font-semibold">grant Pro access</span> to <span className="text-white font-semibold">{confirmUser.full_name || confirmUser.email || 'this user'}</span>. They will immediately get full access to all paid features.{` `}Access will be set for 1 month by default.</>
+                                    ) : (
+                                        <>You are about to <span className="text-red-400 font-semibold">revoke Pro access</span> from <span className="text-white font-semibold">{confirmUser.full_name || confirmUser.email || 'this user'}</span>. They will be downgraded to the free plan immediately.</>
+                                    )}
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setConfirmUser(null)}
+                                    className="flex-1 py-2.5 px-4 bg-white/5 hover:bg-white/10 text-white/60 rounded-xl text-sm font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleTogglePlan(confirmUser)}
+                                    disabled={updatingId === confirmUser.id}
+                                    className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-200 disabled:opacity-40 ${
+                                        confirmUser.plan === 'free'
+                                            ? 'bg-yellow-500 hover:bg-yellow-400 text-black'
+                                            : 'bg-red-500 hover:bg-red-400 text-white'
+                                    }`}
+                                >
+                                    {updatingId === confirmUser.id ? 'Updating...' : confirmUser.plan === 'free' ? 'Grant Pro' : 'Revoke Pro'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

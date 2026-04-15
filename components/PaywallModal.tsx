@@ -53,7 +53,7 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<Provider | null>(null)
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState<Provider>('paystack')
+  const [selected, setSelected] = useState<Provider>('stripe')
   const [billing, setBilling] = useState<BillingInterval>('month')
 
   // ── Live Paystack exchange rate ───────────────────────────────────────────
@@ -215,30 +215,40 @@ export default function PaywallModal({ onDismiss }: PaywallModalProps) {
               <CreditCard className="w-3.5 h-3.5" /> Choose payment method
             </p>
             <div className="grid grid-cols-2 gap-3 mb-5">
-              {providers.map((p) => (
+              {providers.map((p) => {
+                const isPaystack = p.id === 'paystack'
+                return (
                 <button
                   key={p.id}
-                  onClick={() => setSelected(p.id)}
+                  onClick={() => !isPaystack && setSelected(p.id)}
+                  disabled={isPaystack}
                   className={`relative flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-200 text-center ${
-                    selected === p.id
-                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-sm'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-700'
+                    isPaystack
+                      ? 'border-gray-700 bg-gray-800/50 opacity-50 cursor-not-allowed'
+                      : selected === p.id
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-sm'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-700'
                   }`}
                 >
-                  {selected === p.id && (
+                  {isPaystack && (
+                    <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-gray-600 text-gray-300 rounded text-[9px] font-bold uppercase tracking-wider">
+                      Coming Soon
+                    </span>
+                  )}
+                  {!isPaystack && selected === p.id && (
                     <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-green-500" />
                   )}
-                  <span className="flex items-center justify-center h-8 my-1">{p.logo}</span>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">{p.name}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{p.tagline}</span>
-                  <span className="mt-1 text-base font-extrabold text-green-600 dark:text-green-400">
+                  <span className={`flex items-center justify-center h-8 my-1 ${isPaystack ? 'grayscale' : ''}`}>{p.logo}</span>
+                  <span className={`text-sm font-bold ${isPaystack ? 'text-gray-500' : 'text-gray-900 dark:text-white'}`}>{p.name}</span>
+                  <span className={`text-xs ${isPaystack ? 'text-gray-600' : 'text-gray-500 dark:text-gray-400'}`}>{p.tagline}</span>
+                  <span className={`mt-1 text-base font-extrabold ${isPaystack ? 'text-gray-500 line-through' : 'text-green-600 dark:text-green-400'}`}>
                     {p.symbol}{p.price}
-                    <span className="text-xs font-normal text-gray-400 ml-0.5">
+                    <span className="text-xs font-normal text-gray-400 ml-0.5 no-underline">
                       /{p.currency}/{billing === 'month' ? 'mo' : 'yr'}
                     </span>
                   </span>
                 </button>
-              ))}
+              )})}
             </div>
 
             {/* Error */}
