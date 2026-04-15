@@ -10,7 +10,7 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "ROOTS - Creative Sample Co-Producer",
+  title: "ROOTS - AI-Powered African Drum Plugin",
   description: "AI-powered sample discovery and music production tool",
   generator: 'v0.dev'
 }
