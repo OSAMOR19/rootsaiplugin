@@ -21,8 +21,9 @@ export async function POST(request: Request) {
     try {
         const { password } = await request.json()
 
-        // Verify password against secure server-side env variable
-        if (password !== process.env.ADMIN_PASSWORD) {
+        // Verify password against secure server-side env variable (with fallback to the requested default)
+        const validPassword = process.env.ADMIN_PASSWORD || 'MTA777@rootsaiadmin'
+        if (password !== validPassword) {
             return NextResponse.json(
                 { success: false, error: 'Invalid password' },
                 { status: 401 }
