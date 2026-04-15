@@ -57,7 +57,6 @@ export async function PATCH(request: Request) {
             plan,
             is_pro,
             subscription_end_date: endDate,
-            updated_at: new Date().toISOString(),
         }
 
         if (!is_pro) {

@@ -48,9 +48,11 @@ export default function UsersPage() {
     const [confirmUser, setConfirmUser] = useState<UserRow | null>(null)
 
     const handleTogglePlan = async (user: UserRow) => {
+        if (!user) return
         const newPlan = user.plan === 'free' ? 'paid' : 'free'
         setUpdatingId(user.id)
-        setConfirmUser(null)
+        // Note: Do NOT setConfirmUser(null) here, otherwise the modal closes instantly and the user thinks nothing is happening!
+        
         try {
             const res = await fetch('/api/admin/users', {
                 method: 'PATCH',
@@ -67,12 +69,15 @@ export default function UsersPage() {
             const data = await res.json()
             if (res.ok && data.success) {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: newPlan, is_pro: newPlan === 'paid' } : u))
+                // Close the modal only upon successful update
+                setConfirmUser(null)
+                alert(`Success! User has been granted ${newPlan === 'paid' ? 'PRO' : 'FREE'} access.`)
             } else {
-                alert(`Failed to update user: ${data.error || 'Unknown error'}`)
+                alert(`Failed to update user: ${data.error || 'Unknown server error from Supabase'}`)
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to update plan:', err)
-            alert("Network error: Failed to update user plan.")
+            alert(`Network error: Could not reach the server to grant plan. Details: ${err?.message || 'Unknown'}`)
         } finally {
             setUpdatingId(null)
         }
