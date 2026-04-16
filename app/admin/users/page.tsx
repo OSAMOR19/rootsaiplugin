@@ -46,6 +46,7 @@ export default function UsersPage() {
     }, [fetchUsers])
 
     const [confirmUser, setConfirmUser] = useState<UserRow | null>(null)
+    const [successModal, setSuccessModal] = useState<{user: UserRow, action: 'granted' | 'revoked'} | null>(null)
 
     const handleTogglePlan = async (user: UserRow) => {
         if (!user) return
@@ -71,7 +72,8 @@ export default function UsersPage() {
                 setUsers(prev => prev.map(u => u.id === user.id ? { ...u, plan: newPlan, is_pro: newPlan === 'paid' } : u))
                 // Close the modal only upon successful update
                 setConfirmUser(null)
-                alert(`Success! User has been granted ${newPlan === 'paid' ? 'PRO' : 'FREE'} access.`)
+                // Show beautiful success modal instead of native alert
+                setSuccessModal({ user, action: newPlan === 'paid' ? 'granted' : 'revoked' })
             } else {
                 alert(`Failed to update user: ${data.error || 'Unknown server error from Supabase'}`)
             }
@@ -317,6 +319,87 @@ export default function UsersPage() {
                                     {updatingId === confirmUser.id ? 'Updating...' : confirmUser.plan === 'free' ? 'Grant Pro' : 'Revoke Pro'}
                                 </button>
                             </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Success dialog */}
+            <AnimatePresence>
+                {successModal && (
+                    <motion.div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setSuccessModal(null)}
+                    >
+                        <motion.div
+                            className="bg-gray-900 border border-green-500/30 rounded-2xl p-8 max-w-sm w-full mx-4 shadow-[0_0_50px_rgba(34,197,94,0.1)] text-center relative overflow-hidden"
+                            initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+                            transition={{ type: "spring", bounce: 0.5 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* CSS Confetti Effect Background */}
+                            <div className="absolute inset-0 pointer-events-none opacity-20">
+                                <motion.div 
+                                    className="absolute w-full h-full"
+                                    initial={{ backgroundPosition: "0px 0px" }}
+                                    animate={{ backgroundPosition: "0px 200px" }}
+                                    transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                                    style={{
+                                        backgroundImage: 'radial-gradient(circle, #4ade80 2px, transparent 2px), radial-gradient(circle, #60a5fa 2px, transparent 2px), radial-gradient(circle, #facc15 2px, transparent 2px)',
+                                        backgroundSize: '40px 40px',
+                                        backgroundPosition: '0 0, 20px 20px, 10px 30px'
+                                    }}
+                                />
+                            </div>
+
+                            <motion.div 
+                                className="w-20 h-20 bg-green-500/20 rounded-full mx-auto flex items-center justify-center mb-6 relative z-10"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1, rotate: 360 }}
+                                transition={{ type: "spring", delay: 0.1, bounce: 0.5 }}
+                            >
+                                <ShieldCheck className="w-10 h-10 text-green-400" />
+                            </motion.div>
+
+                            <motion.h3 
+                                className="text-2xl font-bold text-white mb-2 relative z-10"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                            >
+                                Success!
+                            </motion.h3>
+
+                            <motion.p 
+                                className="text-white/70 text-sm mb-8 relative z-10"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                            >
+                                You have successfully {successModal.action === 'granted' ? 
+                                    <span className="text-yellow-400 font-bold">GRANTED</span> : 
+                                    <span className="text-red-400 font-bold">REVOKED</span>
+                                } Pro Access {successModal.action === 'granted' ? 'to' : 'from'}:
+                                <br />
+                                <span className="block mt-2 text-white font-bold text-lg p-2 bg-white/5 rounded-lg border border-white/10">
+                                    {successModal.user.full_name || successModal.user.email || 'this user'}
+                                </span>
+                            </motion.p>
+
+                            <motion.button
+                                onClick={() => setSuccessModal(null)}
+                                className="w-full py-3 bg-green-500 hover:bg-green-400 text-black rounded-xl font-bold transition-colors relative z-10"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.4 }}
+                            >
+                                Awesome
+                            </motion.button>
                         </motion.div>
                     </motion.div>
                 )}
