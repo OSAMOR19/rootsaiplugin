@@ -12,7 +12,11 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "ROOTS - AI-Powered African Drum Plugin",
   description: "AI-powered sample discovery and music production tool",
-  generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: "/rootslogo.png",
+    apple: "/rootslogo.png",
+  },
 }
 
 export default function RootLayout({
