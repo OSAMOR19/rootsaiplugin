@@ -8,6 +8,7 @@ export default function AdminLoginPage() {
     const router = useRouter()
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(false)
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
