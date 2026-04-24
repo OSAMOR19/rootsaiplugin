@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, Suspense, useMemo } from "react"
+import { useState, useEffect, Suspense, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music, Heart, Filter } from "lucide-react"
+import { ArrowLeft, Volume2, Search, RefreshCw, Sun, Moon, Minus, Plus, Music, Heart, Filter, Upload, Mic } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import DraggableSample from "@/components/DraggableSample"
@@ -21,6 +21,72 @@ import { supabase } from "@/lib/supabase"
 import PlayerBar from "@/components/PlayerBar"
 import FilterSelect from "@/components/FilterSelect"
 import { DRUM_TYPE_OPTIONS, INSTRUMENT_OPTIONS, GENRE_OPTIONS, KEYWORD_OPTIONS, KEY_OPTIONS } from "@/lib/constants"
+
+// =====================================================================
+// GLOBAL RESULTS CACHE — prevents re-fetching 5000 samples every visit
+// =====================================================================
+interface ResultsCacheEntry {
+  data: any[]
+  timestamp: number
+}
+const globalResultsCache: Record<string, ResultsCacheEntry> = {}
+let globalResultsFetchPromise: Promise<any[]> | null = null
+const RESULTS_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+async function getCachedAllSamples(forceRefresh = false): Promise<any[]> {
+  const cacheKey = '__all_samples__'
+
+  // 1. Return cached data if fresh
+  if (!forceRefresh && globalResultsCache[cacheKey] && (Date.now() - globalResultsCache[cacheKey].timestamp < RESULTS_CACHE_TTL)) {
+    console.log('⚡ Results cache HIT — skipping Supabase fetch')
+    return globalResultsCache[cacheKey].data
+  }
+
+  // 2. Dedupe: if a fetch is already in-flight, wait for it
+  if (!forceRefresh && globalResultsFetchPromise) {
+    console.log('⏳ Results fetch already in progress — deduping')
+    return globalResultsFetchPromise
+  }
+
+  // 3. Fresh fetch with pagination (Supabase caps at 1000 per query)
+  console.log('📂 Results cache MISS — fetching all samples from Supabase...')
+  globalResultsFetchPromise = (async () => {
+    const PAGE_SIZE = 1000
+    let allData: any[] = []
+    let from = 0
+    let keepFetching = true
+
+    while (keepFetching) {
+      const { data, error } = await supabase
+        .from('samples')
+        .select('*')
+        .order('created_at', { ascending: true })  // Oldest → Newest
+        .range(from, from + PAGE_SIZE - 1)
+
+      if (error) throw error
+      if (data && data.length > 0) {
+        allData = allData.concat(data)
+      }
+      if (!data || data.length < PAGE_SIZE) {
+        keepFetching = false
+      } else {
+        from += PAGE_SIZE
+      }
+    }
+
+    // Store in cache
+    globalResultsCache[cacheKey] = { data: allData, timestamp: Date.now() }
+    console.log(`✅ Cached ${allData.length} samples (TTL: ${RESULTS_CACHE_TTL / 60000}min)`)
+    return allData
+  })()
+
+  try {
+    const result = await globalResultsFetchPromise
+    return result
+  } finally {
+    globalResultsFetchPromise = null
+  }
+}
 
 function ResultsContent() {
   const { toast } = useToast()
@@ -81,22 +147,18 @@ function ResultsContent() {
     }
 
     try {
-      console.log('📂 Fetching broader sample set (limit 200) from Supabase...')
+      console.log('📂 Loading samples (using cache if available)...')
 
-      // Simply fetch recent samples
-      // We do filtering in memory to avoid complex OR logic issues with the client
-      const { data: allLoops, error } = await supabase
-        .from('samples')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5000)
-
-      if (error) {
-        console.error('❌ Could not load samples from Supabase:', error)
+      // Use the global cache instead of hitting Supabase every time
+      let allLoops: any[]
+      try {
+        allLoops = await getCachedAllSamples()
+      } catch (error) {
+        console.error('❌ Could not load samples:', error)
         return []
       }
 
-      console.log('✅ Loaded samples from DB:', allLoops?.length, 'loops')
+      console.log('✅ Loaded samples:', allLoops?.length, 'loops')
 
       // ✅ Filter out invalid entries (no filename/fileName and no url/audioUrl)
       const validLoops = (allLoops || []).filter(loop => {
@@ -387,7 +449,6 @@ function ResultsContent() {
 
       if (query) {
         setLoading(true)
-        await new Promise(resolve => setTimeout(resolve, 1500))
       }
 
       if (recommendationsParam || query) {
@@ -637,17 +698,14 @@ function ResultsContent() {
     setIsLoadingMore(true)
 
     try {
-      // Load more samples from Supabase (same source as initial results)
-      console.log('📂 Loading more compatible sounds from Supabase...')
+      // Load more samples from cache (same source as initial results)
+      console.log('📂 Loading more compatible sounds (from cache)...')
 
-      const { data: allLoops, error } = await supabase
-        .from('samples')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5000) // Fetch all available samples
-
-      if (error) {
-        console.error('❌ Could not load samples from Supabase:', error)
+      let allLoops: any[]
+      try {
+        allLoops = await getCachedAllSamples()
+      } catch (error) {
+        console.error('❌ Could not load samples:', error)
         throw new Error('Failed to load samples from database')
       }
 
@@ -1211,18 +1269,51 @@ function ResultsContent() {
         </motion.div>
       )}
 
+      {/* Sticky "YOUR AUDIO" card — always visible below the header */}
+      {(() => {
+        const yourAudioSample = filteredSamples.find((s: any) => s.isRecentSong)
+        if (!yourAudioSample) return null
+        return (
+          <div className="sticky top-[68px] z-30 bg-gradient-to-r from-blue-50/95 via-green-50/95 to-blue-50/95 dark:from-blue-950/95 dark:via-green-950/95 dark:to-blue-950/95 backdrop-blur-xl border-b-2 border-blue-200/60 dark:border-blue-700/60 shadow-lg">
+            <div className="p-3 sm:p-4 lg:px-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded-full">
+                  <Mic className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Your Audio</span>
+                </div>
+              </div>
+              <DraggableSample
+                key={yourAudioSample.id}
+                sample={yourAudioSample}
+                isPlaying={currentlyPlaying === yourAudioSample.id}
+                onPlayPause={() => handlePlayPause(yourAudioSample.id)}
+                index={0}
+                isSyncPlaying={syncPlayingSampleId === yourAudioSample.id}
+                onSyncPlay={() => handleSyncPlay(yourAudioSample.id, yourAudioSample.originalBpm || yourAudioSample.bpm, yourAudioSample.audioUrl)}
+                audioUrl={yourAudioSample.audioUrl}
+                recordedAudioBuffer={recordedAudioBuffer}
+                recordedBPM={editedBPM ?? recordedBPM}
+                originalDetectedBPM={originalDetectedBPM}
+                volume={(syncPlayingSampleId ? sampleVolume : volume) / 100}
+                showCheckbox={false}
+              />
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Sample List - Row Layout */}
       <div className="p-3 sm:p-4 lg:p-6">
 
         {/* Results count */}
         {filteredSamples.length > 0 && (
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Showing {Math.min(displayLimit, filteredSamples.length)} of {filteredSamples.length} results
+            Showing {Math.min(displayLimit, filteredSamples.filter((s: any) => !s.isRecentSong).length)} of {filteredSamples.filter((s: any) => !s.isRecentSong).length} results
           </div>
         )}
 
         <div className="space-y-2 sm:space-y-3">
-          {filteredSamples.slice(0, displayLimit).map((sample, index) => (
+          {filteredSamples.filter((s: any) => !s.isRecentSong).slice(0, displayLimit).map((sample, index) => (
             <DraggableSample
               key={sample.id}
               sample={sample}
@@ -1242,13 +1333,13 @@ function ResultsContent() {
         </div>
 
         {/* Load More button */}
-        {filteredSamples.length > displayLimit && (
+        {filteredSamples.filter((s: any) => !s.isRecentSong).length > displayLimit && (
           <div className="flex justify-center mt-4">
             <button
               onClick={() => setDisplayLimit(prev => prev + 20)}
               className="px-6 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 rounded-full text-sm font-medium transition-colors border border-green-500/20"
             >
-              Load More ({filteredSamples.length - displayLimit} remaining)
+              Load More ({filteredSamples.filter((s: any) => !s.isRecentSong).length - displayLimit} remaining)
             </button>
           </div>
         )}

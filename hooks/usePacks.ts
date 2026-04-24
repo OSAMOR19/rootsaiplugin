@@ -28,8 +28,8 @@ export interface UsePacksResult {
 let globalPacksCache: { data: Pack[], timestamp: number } | null = null
 let globalFetchPromise: Promise<Pack[]> | null = null
 
-// Cache expiration: 5 minutes
-const CACHE_TTL = 5 * 60 * 1000
+// Cache expiration: 15 minutes (longer TTL reduces DB calls and improves speed)
+const CACHE_TTL = 15 * 60 * 1000
 
 export function usePacks(): UsePacksResult {
     const [packs, setPacks] = useState<Pack[]>([])

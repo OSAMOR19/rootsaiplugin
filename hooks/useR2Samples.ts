@@ -31,6 +31,13 @@ export interface UploadResult {
   originalName: string;
 }
 
+// =====================================================================
+// GLOBAL R2 CACHE — prevents re-fetching file list on every mount
+// =====================================================================
+let globalR2Cache: { data: { files: R2FileInfo[], count: number }, timestamp: number } | null = null;
+let globalR2FetchPromise: Promise<{ files: R2FileInfo[], count: number }> | null = null;
+const R2_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
 /**
  * React hook for fetching and managing R2 samples
  * @param options - Configuration options
@@ -45,13 +52,41 @@ export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesRes
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Fetch files from R2
+   * Fetch files from R2 (with global cache + deduplication)
    */
-  const fetchFiles = useCallback(async () => {
+  const fetchFiles = useCallback(async (forceRefresh = false) => {
+    // 1. Check cache
+    if (!forceRefresh && globalR2Cache && (Date.now() - globalR2Cache.timestamp < R2_CACHE_TTL)) {
+      console.log('⚡ R2 cache HIT — skipping API fetch');
+      setFiles(globalR2Cache.data.files);
+      setCount(globalR2Cache.data.count);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    // 2. Dedupe in-flight request
+    if (!forceRefresh && globalR2FetchPromise) {
+      console.log('⏳ R2 fetch already in progress — deduping');
+      setLoading(true);
+      try {
+        const result = await globalR2FetchPromise;
+        setFiles(result.files);
+        setCount(result.count);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // 3. Fresh fetch
     setLoading(true);
     setError(null);
 
-    try {
+    globalR2FetchPromise = (async () => {
       const params = new URLSearchParams();
       if (prefix) params.append('prefix', prefix);
       if (maxKeys) params.append('maxKeys', maxKeys.toString());
@@ -74,14 +109,23 @@ export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesRes
         lastModified: new Date(file.lastModified),
       }));
 
-      setFiles(filesWithDates);
-      setCount(result.data.count);
+      const cacheData = { files: filesWithDates, count: result.data.count };
+      globalR2Cache = { data: cacheData, timestamp: Date.now() };
+      console.log(`✅ R2 cached ${cacheData.count} files (TTL: ${R2_CACHE_TTL / 60000}min)`);
+      return cacheData;
+    })();
+
+    try {
+      const result = await globalR2FetchPromise;
+      setFiles(result.files);
+      setCount(result.count);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       console.error('Error fetching R2 files:', err);
     } finally {
       setLoading(false);
+      globalR2FetchPromise = null;
     }
   }, [prefix, maxKeys]);
 
@@ -108,8 +152,9 @@ export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesRes
         throw new Error(result.error || 'Upload failed');
       }
 
-      // Refetch the list after successful upload
-      await fetchFiles();
+      // Invalidate cache and refetch after successful upload
+      globalR2Cache = null;
+      await fetchFiles(true);
 
       return result.data;
     } catch (err) {
@@ -143,8 +188,9 @@ export function useR2Samples(options: UseR2SamplesOptions = {}): UseR2SamplesRes
         throw new Error(result.error || 'Delete failed');
       }
 
-      // Refetch the list after successful deletion
-      await fetchFiles();
+      // Invalidate cache and refetch after successful deletion
+      globalR2Cache = null;
+      await fetchFiles(true);
 
       return true;
     } catch (err) {

@@ -46,8 +46,8 @@ export interface UseSamplesResult {
 const globalSamplesCache: Record<string, { data: Sample[], timestamp: number }> = {}
 const globalFetchPromises: Record<string, Promise<Sample[]> | null> = {}
 
-// Cache expiration: 5 minutes
-const CACHE_TTL = 5 * 60 * 1000
+// Cache expiration: 15 minutes (longer TTL reduces DB calls and improves speed)
+const CACHE_TTL = 15 * 60 * 1000
 
 export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
   const { category, autoFetch = true } = options
@@ -100,7 +100,7 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
         let query = supabase
           .from('samples')
           .select('*')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })  // Oldest → Newest
           .range(from, from + PAGE_SIZE - 1)
 
         // Optional category filter
