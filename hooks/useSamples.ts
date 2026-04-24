@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react'
 import { supabase } from "@/lib/supabase"
 
+// Fisher-Yates shuffle — randomizes array order for a fresh, mixed feel
+function shuffleSamples<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 export interface Sample {
   id: string
   name: string
@@ -146,13 +156,16 @@ export function useSamples(options: UseSamplesOptions = {}): UseSamplesResult {
         stems: s.stems || []
       }))
 
+      // Shuffle for a mixed/random feel — no strict ordering
+      const shuffledSamples = shuffleSamples(mappedSamples)
+
       // Update the cache
       globalSamplesCache[cacheKey] = {
-        data: mappedSamples,
+        data: shuffledSamples,
         timestamp: Date.now()
       }
 
-      return mappedSamples
+      return shuffledSamples
     })()
 
     // Store the promise in the global dictionary

@@ -74,9 +74,15 @@ async function getCachedAllSamples(forceRefresh = false): Promise<any[]> {
       }
     }
 
+    // Shuffle for a mixed/random feel — the scoring algorithm still picks best matches
+    for (let i = allData.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allData[i], allData[j]] = [allData[j], allData[i]]
+    }
+
     // Store in cache
     globalResultsCache[cacheKey] = { data: allData, timestamp: Date.now() }
-    console.log(`✅ Cached ${allData.length} samples (TTL: ${RESULTS_CACHE_TTL / 60000}min)`)
+    console.log(`✅ Cached ${allData.length} samples — shuffled (TTL: ${RESULTS_CACHE_TTL / 60000}min)`)
     return allData
   })()
 
@@ -270,7 +276,7 @@ function ResultsContent() {
           loopKey = loop.key.tonic
         }
 
-        let score = 0
+        let score = 5 // Base score: every sample gets included (comprehensive library search)
 
         // Text Search Scoring (Enhanced keyword-based)
         if (searchQuery) {
@@ -279,8 +285,11 @@ function ResultsContent() {
           const loopGenres = (loop.genres || []).map((g: string) => g.toLowerCase())
           const loopKeywords = (loop.keywords || []).map((k: string) => k.toLowerCase())
 
-          // Combine all searchable text
-          const allSearchableText = `${lowerName} ${lowerCat} ${loopGenres.join(' ')} ${loopKeywords.join(' ')}`
+          const loopDrumType = (loop.drum_type || '').toLowerCase()
+          const loopMood = (loop.mood_tag || loop.mood || '').toLowerCase()
+
+          // Combine all searchable text (comprehensive: includes name, category, genres, keywords, drumType, mood)
+          const allSearchableText = `${lowerName} ${lowerCat} ${loopGenres.join(' ')} ${loopKeywords.join(' ')} ${loopDrumType} ${loopMood}`
 
           // Improved stop words list
           const stopWords = ['i', 'need', 'a', 'want', 'the', 'of', 'for', 'with', 'sound', 'loop', 'sample', 'drums', 'drum', 'beat', 'me', 'get', 'find', 'show', 'please', 'some', 'give', 'looking', 'like', 'that', 'and', 'or', 'is', 'are', 'have', 'has']
@@ -350,17 +359,22 @@ function ResultsContent() {
           }
         }
 
-        // BPM matching (use query BPM if specified, otherwise detected BPM)
+        // BPM matching — wider range for comprehensive results
         if (effectiveBPM) {
+          const bpmDiff = Math.abs(effectiveBPM - loopBPM)
           const bpmRatio = loopBPM / effectiveBPM
           if (bpmRatio >= 0.98 && bpmRatio <= 1.02) {
-            score += 45 // Exact match is very important
-          } else if (Math.abs(effectiveBPM - loopBPM) <= 5) {
+            score += 45 // Exact match
+          } else if (bpmDiff <= 5) {
             score += 35
-          } else if (Math.abs(effectiveBPM - loopBPM) <= 10) {
+          } else if (bpmDiff <= 10) {
             score += 25
-          } else if (Math.abs(effectiveBPM - loopBPM) <= 15) {
-            score += 15
+          } else if (bpmDiff <= 15) {
+            score += 18
+          } else if (bpmDiff <= 20) {
+            score += 10 // Still somewhat relevant
+          } else if (bpmDiff <= 30) {
+            score += 5  // Loosely relevant — include for comprehensive results
           }
         }
 

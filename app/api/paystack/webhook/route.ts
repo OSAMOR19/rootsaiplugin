@@ -90,8 +90,36 @@ export async function POST(request: Request) {
       break
     }
 
-    case 'invoice.payment_failed': {
-      console.warn('[paystack/webhook] Payment failed for event:', event)
+    /**
+     * Fired when a recurring charge/invoice payment fails.
+     * Restrict PRO access — user's subscription can't be charged.
+     */
+    case 'invoice.payment_failed':
+    case 'charge.failed': {
+      const userId: string | undefined = eventData.metadata?.supabase_user_id
+      const customerCode: string | undefined = eventData.customer?.customer_code
+
+      // Try to find user by metadata first, then by customer code
+      let targetUserId = userId
+
+      if (!targetUserId && customerCode) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('paystack_customer_code', customerCode)
+          .single()
+        targetUserId = profile?.id
+      }
+
+      if (targetUserId) {
+        await supabaseAdmin.from('profiles').update({
+          is_pro: false,
+          plan: 'free',
+        }).eq('id', targetUserId)
+        console.log(`🚫 [paystack/webhook] ${eventType} — User ${targetUserId} PRO access REVOKED (payment failed)`)
+      } else {
+        console.warn(`⚠️ [paystack/webhook] ${eventType} — Could not identify user to revoke PRO access`)
+      }
       break
     }
 

@@ -104,8 +104,31 @@ export async function POST(request: Request) {
       break
     }
 
+    /**
+     * Fired when a recurring invoice payment fails.
+     * Restrict PRO access — user's subscription can't be charged.
+     */
     case 'invoice.payment_failed': {
-      console.warn('[stripe/webhook] Payment failed for event:', event.id)
+      const invoice = event.data.object as any
+      const customerId = invoice.customer as string
+
+      if (customerId) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single()
+
+        if (profile?.id) {
+          await supabaseAdmin.from('profiles').update({
+            is_pro: false,
+            plan: 'free',
+          }).eq('id', profile.id)
+          console.log(`🚫 [stripe/webhook] invoice.payment_failed — User ${profile.id} PRO access REVOKED`)
+        }
+      } else {
+        console.warn('[stripe/webhook] invoice.payment_failed — No customer ID found')
+      }
       break
     }
 

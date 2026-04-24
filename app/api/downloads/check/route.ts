@@ -62,12 +62,17 @@ export async function GET() {
             })
         }
 
-        // Count downloads from analytics_events for this user
+        // Count downloads from analytics_events for this user (LAST 30 DAYS ONLY)
+        // ROOTS LITE: Free users get 5 downloads that renew every month
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
         const { count, error } = await supabaseAdmin
             .from('analytics_events')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', userId)
             .eq('event_type', 'download')
+            .gte('created_at', thirtyDaysAgo.toISOString())
 
         if (error) {
             console.error('Error counting downloads:', error)
